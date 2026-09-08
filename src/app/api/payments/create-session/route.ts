@@ -10,40 +10,58 @@ export async function POST(req: NextRequest) {
     }
 
     try {
-        const { plan, isDiscountApplied, couponCode, projectData } = await req.json();
+        const body = await req.json();
+        const { 
+            plan, 
+            amount, 
+            isDiscountApplied, 
+            couponCode, 
+            projectData,
+            paymentLinkId,
+            usePaymentLink,
+            orderTitle,
+            metadata
+        } = body;
         
-        const validPlans = ['pro', 'max', 'student_pro', 'student_max', 'employee', 'org_owner', 'org', 'pay_as_you_go'];
-        if (!plan || !validPlans.includes(plan.toLowerCase())) {
-            return NextResponse.json({ error: 'Invalid or missing plan type' }, { status: 400 });
-        }
-
-        const cleanPlan = plan.toLowerCase() === 'student_pro' ? 'pro' : 
-                          plan.toLowerCase() === 'student_max' ? 'max' : 
-                          plan.toLowerCase() === 'org' ? 'org_owner' : 
-                          plan.toLowerCase();
-
+        let cleanPlan = 'pro';
+        let basePrice = 500;
         const pool = getPgPool();
 
-        // 1. Fetch exact plan from fluxbase_global.plans table
-        const planRes = await pool.query(
-            `SELECT plan_key, name, price 
-             FROM fluxbase_global.plans 
-             WHERE plan_key = $1 AND is_active = true 
-             LIMIT 1`,
-            [cleanPlan]
-        );
-
-        let basePrice = 500;
-        if (cleanPlan === 'pay_as_you_go') {
-            basePrice = 50; // Refundable verification fee
-        } else if (planRes.rows.length > 0) {
-            basePrice = parseFloat(planRes.rows[0].price);
+        // 1. If client app calculated the amount dynamically (e.g. Shopping App, custom tier, multi-seat)
+        if (amount !== undefined && !isNaN(parseFloat(amount))) {
+            basePrice = Math.max(1, Math.floor(parseFloat(amount)));
+            cleanPlan = plan ? String(plan).toLowerCase() : 'custom_order';
         } else {
-            // Fallback defaults
-            if (cleanPlan === 'employee') basePrice = 500;
-            if (cleanPlan === 'org_owner') basePrice = 5000;
-            if (cleanPlan === 'pro') basePrice = 499;
-            if (cleanPlan === 'max') basePrice = 1499;
+            // Standard plan fallback
+            const validPlans = ['pro', 'max', 'student_pro', 'student_max', 'employee', 'org_owner', 'org', 'pay_as_you_go'];
+            if (!plan || !validPlans.includes(plan.toLowerCase())) {
+                return NextResponse.json({ error: 'Invalid or missing plan type or amount' }, { status: 400 });
+            }
+
+            cleanPlan = plan.toLowerCase() === 'student_pro' ? 'pro' : 
+                        plan.toLowerCase() === 'student_max' ? 'max' : 
+                        plan.toLowerCase() === 'org' ? 'org_owner' : 
+                        plan.toLowerCase();
+
+            // Fetch exact plan from fluxbase_global.plans table
+            const planRes = await pool.query(
+                `SELECT plan_key, name, price 
+                 FROM fluxbase_global.plans 
+                 WHERE plan_key = $1 AND is_active = true 
+                 LIMIT 1`,
+                [cleanPlan]
+            );
+
+            if (cleanPlan === 'pay_as_you_go') {
+                basePrice = 50; // Refundable verification fee
+            } else if (planRes.rows.length > 0) {
+                basePrice = parseFloat(planRes.rows[0].price);
+            } else {
+                if (cleanPlan === 'employee') basePrice = 500;
+                if (cleanPlan === 'org_owner') basePrice = 5000;
+                if (cleanPlan === 'pro') basePrice = 499;
+                if (cleanPlan === 'max') basePrice = 1499;
+            }
         }
 
         // 2. Fetch discount rate from fluxbase_global.discounts table if coupon was applied
@@ -77,58 +95,156 @@ export async function POST(req: NextRequest) {
             }
         }
 
-        // Convert basePrice to integer to clear out any decimal parts before adding our unique offset
+        // Convert basePrice to integer to clear out any decimal parts
         basePrice = Math.floor(basePrice);
 
-        // 3. Query all currently active pending sessions to find occupied decimal offsets (.01, .02, etc.)
-        const activeSessionsQuery = await pool.query(
-            `SELECT amount FROM fluxbase_global.payment_sessions 
-             WHERE status = 'pending' AND expires_at > NOW()`
+        // Fetch user information for order creation
+        const userRes = await pool.query(
+            `SELECT email, display_name FROM fluxbase_global.users WHERE id = $1 LIMIT 1`,
+            [userId]
         );
+        const user = userRes.rows[0] || {};
 
-        const occupiedOffsets = new Set(
-            activeSessionsQuery.rows.map(row => {
-                const amt = parseFloat(row.amount);
-                return Math.round((amt - Math.floor(amt)) * 100); // 1 for .01, 2 for .02, etc.
-            })
+        // 3. Create placeholder session in database
+        const insertSessionQuery = await pool.query(
+            `INSERT INTO fluxbase_global.payment_sessions (user_id, plan_type, amount, status, expires_at, project_data)
+             VALUES ($1, $2, $3, 'pending', NOW() + INTERVAL '5 minutes', $4)
+             RETURNING id`,
+            [userId, cleanPlan, basePrice, projectData ? JSON.stringify(projectData) : null]
         );
+        const session = insertSessionQuery.rows[0];
 
-        // 4. Find the lowest available decimal offset from .01 to .99
-        let chosenOffsetIndex = 1;
-        let foundOffset = false;
+        // 3.5. Payment Links are OPTIONAL:
+        // Use a payment link ONLY if explicitly requested (e.g. paymentLinkId provided or usePaymentLink: true).
+        // For shopping apps (1,000,000+ items) and dynamic tiers, calculations are done client-side.
+        if (paymentLinkId || usePaymentLink) {
+            try {
+                let pLink: any = null;
+                if (paymentLinkId) {
+                    const linkRes = await pool.query(
+                        `SELECT id, title, amount 
+                         FROM flux_tenant_0e3d63b989b94d08.payment_links 
+                         WHERE id = $1 AND is_active = true 
+                         LIMIT 1`,
+                        [paymentLinkId]
+                    );
+                    if (linkRes.rows.length > 0) pLink = linkRes.rows[0];
+                } else if (usePaymentLink) {
+                    const planKeyword = cleanPlan === 'pay_as_you_go' ? 'pay' : cleanPlan.replace('_', ' ');
+                    const linkRes = await pool.query(
+                        `SELECT id, title, amount 
+                         FROM flux_tenant_0e3d63b989b94d08.payment_links 
+                         WHERE is_active = true 
+                           AND (
+                             LOWER(title) LIKE '%' || $1 || '%' 
+                             OR ROUND(amount) = ROUND($2::numeric)
+                           )
+                         ORDER BY created_at DESC 
+                         LIMIT 1`,
+                        [planKeyword, basePrice]
+                    );
+                    if (linkRes.rows.length > 0) pLink = linkRes.rows[0];
+                }
 
-        for (let i = 1; i <= 99; i++) {
-            if (!occupiedOffsets.has(i)) {
-                chosenOffsetIndex = i;
-                foundOffset = true;
-                break;
+                if (pLink) {
+                    const gatewayUrl = process.env.FLUXPAY_GATEWAY_URL || 'https://payments.fluxbasedb.me';
+                    const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://www.fluxbasedb.me';
+                    const linkCheckoutUrl = `${gatewayUrl}/pay/link/${pLink.id}?userId=${userId}&email=${encodeURIComponent(user.email || '')}&name=${encodeURIComponent(user.display_name || '')}&plan=${cleanPlan}&callbackUrl=${encodeURIComponent(`${appUrl}/checkout?sessionId=${session.id}`)}`;
+
+                    logger.info(`[Create Session] Explicit Payment Link routed: ${pLink.id} (₹${pLink.amount})`);
+
+                    await pool.query(
+                        `UPDATE fluxbase_global.payment_sessions 
+                         SET amount = $1, fluxpay_checkout_url = $2 
+                         WHERE id = $3`,
+                        [parseFloat(pLink.amount), linkCheckoutUrl, session.id]
+                    );
+
+                    return NextResponse.json({
+                        success: true,
+                        sessionId: session.id,
+                        paymentLinkId: pLink.id,
+                        amount: parseFloat(pLink.amount),
+                        checkoutUrl: linkCheckoutUrl,
+                        planType: cleanPlan,
+                        isPaymentLink: true
+                    });
+                }
+            } catch (linkErr) {
+                logger.warn('[Create Session] Error querying payment_links, falling back to dynamic order:', linkErr);
             }
         }
 
-        if (!foundOffset) {
-            return NextResponse.json({
-                error: 'Payment gateway channels at full capacity. Please try again in 1 minute.'
-            }, { status: 429 });
+        // 4. Default / Dynamic Path: Calculate amount in client app & generate FluxPay order
+        let fluxpayOrderId: string | null = null;
+        let finalAmount = basePrice;
+        let vpa = 'sumith0909@ibl';
+        let checkoutUrl: string | null = null;
+        let expiresAt = new Date(Date.now() + 5 * 60 * 1000).toISOString();
+
+        try {
+            const { createFluxPayOrder } = await import('@/lib/fluxpay-client');
+            const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://www.fluxbasedb.me';
+            const orderLabel = orderTitle || `${cleanPlan.toUpperCase()} TIER`;
+            const fluxpayRes = await createFluxPayOrder({
+                amount: basePrice,
+                couponCode: isDiscountApplied ? couponCode : undefined,
+                customerName: user.display_name || 'Fluxbase Customer',
+                customerEmail: user.email || undefined,
+                callbackUrl: `${appUrl}/checkout?sessionId=${session.id}`,
+                metadata: {
+                    sessionId: session.id,
+                    userId,
+                    plan: cleanPlan,
+                    plan_name: orderLabel,
+                    projectData,
+                    ...(metadata || {})
+                }
+            });
+
+            fluxpayOrderId = fluxpayRes.orderId;
+            finalAmount = fluxpayRes.finalAmount;
+            vpa = fluxpayRes.vpa;
+            checkoutUrl = fluxpayRes.checkoutUrl;
+            expiresAt = fluxpayRes.expiresAt;
+
+            logger.info(`[Create Session] FluxPay order created: ${fluxpayOrderId}, VPA: ${vpa}, Amount: ₹${finalAmount}`);
+        } catch (fpErr: any) {
+            logger.warn('[Create Session] FluxPay gateway call error, falling back to local allocation:', fpErr?.message);
+            // Fallback: local decimal offset calculation
+            finalAmount = parseFloat((basePrice + 0.14).toFixed(2));
         }
 
-        const finalAmount = parseFloat((basePrice + (chosenOffsetIndex / 100)).toFixed(2));
+        if (checkoutUrl) {
+            let normalized = String(checkoutUrl).trim();
+            if (normalized.startsWith('//')) {
+                normalized = `https:${normalized}`;
+            } else if (normalized.startsWith('/')) {
+                const gw = (process.env.FLUXPAY_GATEWAY_URL || 'https://payments.fluxbasedb.me').replace(/\/+$/, '');
+                normalized = `${gw}${normalized}`;
+            } else if (!/^https?:\/\//i.test(normalized)) {
+                normalized = `https://${normalized}`;
+            }
+            checkoutUrl = normalized;
+        }
 
-        // 5. Create new payment session with 3-minute expiration and 'pending' status
-        const insertSessionQuery = await pool.query(
-            `INSERT INTO fluxbase_global.payment_sessions (user_id, plan_type, amount, status, expires_at, project_data)
-             VALUES ($1, $2, $3, 'pending', NOW() + INTERVAL '3 minutes', $4)
-             RETURNING id, amount, expires_at, plan_type`,
-            [userId, cleanPlan, finalAmount, projectData ? JSON.stringify(projectData) : null]
+        // 5. Update session with FluxPay details
+        await pool.query(
+            `UPDATE fluxbase_global.payment_sessions 
+             SET amount = $1, fluxpay_order_id = $2, fluxpay_vpa = $3, fluxpay_checkout_url = $4 
+             WHERE id = $5`,
+            [finalAmount, fluxpayOrderId, vpa, checkoutUrl, session.id]
         );
-
-        const session = insertSessionQuery.rows[0];
 
         return NextResponse.json({
             success: true,
             sessionId: session.id,
-            amount: parseFloat(session.amount),
-            expiresAt: session.expires_at,
-            planType: session.plan_type
+            orderId: fluxpayOrderId,
+            amount: finalAmount,
+            vpa,
+            checkoutUrl,
+            expiresAt,
+            planType: cleanPlan
         });
 
     } catch (err: any) {

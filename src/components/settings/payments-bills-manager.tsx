@@ -51,12 +51,22 @@ export function PaymentsBillsManager() {
                 body: JSON.stringify({ plan: planKey })
             });
             const data = await res.json();
-            if (res.ok && data.sessionId) {
+            if (res.ok && (data.checkoutUrl || data.sessionId)) {
                 toast({
-                    title: 'Redirecting to Payment Gateway',
-                    description: `Starting checkout for ${planKey.toUpperCase()} tier...`,
+                    title: 'Redirecting to FluxPay',
+                    description: `Redirecting to payments.fluxbasedb.me to review order and pay...`,
                 });
-                router.push(`/checkout?sessionId=${data.sessionId}`);
+                if (data.checkoutUrl) {
+                    let targetUrl = String(data.checkoutUrl).trim();
+                    if (targetUrl.startsWith('//')) {
+                        targetUrl = `https:${targetUrl}`;
+                    } else if (!/^https?:\/\//i.test(targetUrl)) {
+                        targetUrl = `https://${targetUrl.replace(/^\/+/, '')}`;
+                    }
+                    window.location.href = targetUrl;
+                } else {
+                    router.push(`/checkout?sessionId=${data.sessionId}`);
+                }
             } else {
                 throw new Error(data.error || 'Failed to initialize payment');
             }

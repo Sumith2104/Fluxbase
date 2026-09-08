@@ -16,7 +16,11 @@
     "test:integration": "vitest run --config vitest.integration.config.mts",
     "postinstall": "node scripts/copy-monaco.js",
     "setup:browser": "npx playwright install chromium",
-    "tauri": "tauri"
+    "tauri": "tauri",
+    "gateway:dev": "next dev packages/gateway --port 3001",
+    "gateway:build": "next build packages/gateway --no-lint",
+    "gateway:start": "next start packages/gateway --port 3001",
+    "gateway:typecheck": "tsc -p packages/gateway/tsconfig.json --noEmit"
   },
   "dependencies": {
     "@aws-sdk/client-cloudwatch": "^3.1002.0",

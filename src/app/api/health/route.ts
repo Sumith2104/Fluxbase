@@ -22,6 +22,22 @@ export async function GET() {
         results.dbLatencyMs = -1;
     }
 
+    // Check MySQL Latency
+    const mysqlStart = Date.now();
+    try {
+        const { getMysqlPool } = await import('@/lib/mysql');
+        const mysqlPool = getMysqlPool();
+        await Promise.race([
+            mysqlPool.query('SELECT 1'),
+            new Promise((_, rej) => setTimeout(() => rej('timeout'), 2500))
+        ]);
+        results.mysql = true;
+        results.mysqlLatencyMs = Date.now() - mysqlStart;
+    } catch {
+        results.mysql = false;
+        results.mysqlLatencyMs = -1;
+    }
+
     // Check Redis Latency
     const redisStart = Date.now();
     try {

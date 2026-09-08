@@ -21,7 +21,8 @@ export async function GET(req: NextRequest) {
 
         // Query status of the session, ensuring it belongs to the authenticated user
         const result = await pool.query(
-            `SELECT status, expires_at, amount, plan_type FROM fluxbase_global.payment_sessions 
+            `SELECT status, expires_at, amount, plan_type, fluxpay_vpa, fluxpay_order_id, fluxpay_checkout_url 
+             FROM fluxbase_global.payment_sessions 
              WHERE id = $1 AND user_id = $2`,
             [parseInt(sessionId, 10), userId]
         );
@@ -33,7 +34,7 @@ export async function GET(req: NextRequest) {
         const session = result.rows[0];
         let status = session.status;
 
-        // If the session is still pending but has passed its expiration time (3 min), mark it expired
+        // If the session is still pending but has passed its expiration time, mark it expired
         if (status === 'pending' && new Date() > new Date(session.expires_at)) {
             status = 'expired';
             await pool.query(
@@ -44,8 +45,7 @@ export async function GET(req: NextRequest) {
             );
         }
 
-        const pricingRes = await pool.query(`SELECT upi_id FROM fluxbase_global.pricing_configs ORDER BY id DESC LIMIT 1`);
-        const upiMerchantVpa = pricingRes.rows[0]?.upi_id || process.env.NEXT_PUBLIC_UPI_ID || '918310870493@waaxis';
+        const upiMerchantVpa = session.fluxpay_vpa || 'sumith0909@ibl';
 
         return NextResponse.json({
             success: true,
@@ -53,7 +53,9 @@ export async function GET(req: NextRequest) {
             amount: parseFloat(session.amount),
             planType: session.plan_type,
             expiresAt: session.expires_at,
-            upiMerchantVpa
+            upiMerchantVpa,
+            orderId: session.fluxpay_order_id,
+            checkoutUrl: session.fluxpay_checkout_url
         });
 
     } catch (error: any) {

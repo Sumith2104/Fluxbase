@@ -24,16 +24,6 @@ export async function GET() {
              ORDER BY id ASC`
         );
 
-        // 3. Fallback UPI ID query from pricing_configs
-        let upiId = process.env.NEXT_PUBLIC_UPI_ID || '918310870493@waaxis';
-        try {
-            const upiRes = await pool.query('SELECT upi_id FROM fluxbase_global.pricing_configs ORDER BY id DESC LIMIT 1');
-            if (upiRes.rows.length > 0 && upiRes.rows[0].upi_id) {
-                upiId = upiRes.rows[0].upi_id;
-            }
-        } catch (e) {
-            // Keep default
-        }
 
         const plans = plansRes.rows.map(row => ({
             planKey: row.plan_key,
@@ -81,8 +71,7 @@ export async function GET() {
                 discountProPrice,
                 discountMaxPrice,
                 enableDiscount: discounts.length > 0,
-                discountCode: primaryDiscount?.code || 'FLUX20',
-                upiId
+                discountCode: primaryDiscount?.code || 'FLUX20'
             }
         });
     } catch (err: any) {

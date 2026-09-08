@@ -16,7 +16,8 @@ wh_test/.env
 /coverage
 
 # next.js
-/.next/
+.next/
+**/.next/
 /out/
 
 # production

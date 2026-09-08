@@ -526,17 +526,47 @@ export default function SelectProjectPage() {
           workDescription: workDescription.trim()
         }));
 
-        // 2. Redirect to Order & Plan Review screen
+        // 2. Redirect to FluxPay Hosted Gateway
         const isPayg = billingPreference === 'pay_as_you_go';
         const planKey = isPayg ? 'pay_as_you_go' : (selectedRole === 'org_owner' ? 'org_owner' : 'employee');
 
         setModalDialect(null);
         toast({
-          title: isPayg ? 'Refundable Verification Deposit' : 'Order Review',
-          description: isPayg 
-            ? 'Pay-As-You-Go requires a ₹50 refundable verification fee, credited on your 1st month bill.'
-            : `Review your ${selectedRole === 'org_owner' ? 'Org Owner (₹5,000)' : 'Employee (₹500)'} tier details before payment.`,
+          title: 'Redirecting to FluxPay',
+          description: `Redirecting to payments.fluxbasedb.me to review order and pay...`,
         });
+
+        try {
+          const res = await fetch('/api/payments/create-session', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              plan: planKey,
+              projectData: {
+                projectName: projectName.trim(),
+                dialect: modalDialect,
+                timezone: selectedTimezone,
+                userRole: selectedRole,
+                billingPreference,
+                companyName: companyName.trim(),
+                workDescription: workDescription.trim()
+              }
+            })
+          });
+          const data = await res.json();
+          if (data.checkoutUrl) {
+            let targetUrl = String(data.checkoutUrl).trim();
+            if (targetUrl.startsWith('//')) {
+              targetUrl = `https:${targetUrl}`;
+            } else if (!/^https?:\/\//i.test(targetUrl)) {
+              targetUrl = `https://${targetUrl.replace(/^\/+/, '')}`;
+            }
+            window.location.href = targetUrl;
+            return;
+          }
+        } catch (e) {
+          console.error('Direct checkout redirection error:', e);
+        }
         router.push(`/checkout?plan=${planKey}`);
         return;
       }
