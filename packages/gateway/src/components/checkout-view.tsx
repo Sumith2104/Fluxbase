@@ -44,7 +44,7 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({ order }) => {
   const [copied, setCopied] = useState(false);
   const [status, setStatus] = useState(order.status);
   const [utr, setUtr] = useState(order.utr || '');
-  const [remainingSeconds, setRemainingSeconds] = useState(90);
+  const [remainingSeconds, setRemainingSeconds] = useState(180);
   const [redirectCount, setRedirectCount] = useState<number | null>(null);
 
   // Dynamic pricing and coupon state
@@ -227,7 +227,7 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({ order }) => {
           <div className="w-full bg-[#18181b] h-1">
             <div
               className="bg-[#ff6600] h-1 transition-all duration-1000 ease-linear"
-              style={{ width: `${Math.max(0, Math.min(100, (remainingSeconds / 90) * 100))}%` }}
+              style={{ width: `${Math.max(0, Math.min(100, (remainingSeconds / 180) * 100))}%` }}
             />
           </div>
         )}

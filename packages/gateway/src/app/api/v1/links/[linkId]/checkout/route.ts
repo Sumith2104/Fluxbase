@@ -71,7 +71,7 @@ export async function POST(
     const baseAmount = Math.floor(orderAmount);
     const orderId = generateOrderId();
     const slot = await allocateSlot(baseAmount, orderId);
-    const expiresAt = new Date(Date.now() + 90 * 1000);
+    const expiresAt = new Date(Date.now() + 180 * 1000); // 3-minute payment window
 
     const callbackUrl = body.callback_url || null;
     const webhookUrl = body.webhook_url || link.merchant_webhook_url || null;

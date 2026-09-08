@@ -45,7 +45,7 @@ export async function allocateSlot(
   for (const vpa of vpas) {
     for (let offset = 1; offset <= 99; offset++) {
       const slotKey = `slot:${vpa.vpa_address}:${baseAmount}:${offset}`;
-      const locked = await redis.set(slotKey, orderId, { nx: true, ex: 90 });
+      const locked = await redis.set(slotKey, orderId, { nx: true, ex: 180 });
 
       if (locked === 'OK') {
         // Successfully acquired atomic slot
@@ -72,7 +72,7 @@ export async function allocateSlot(
   for (const vpa of vpas) {
     for (let offset = 1; offset <= 99; offset++) {
       const slotKey = `slot:${vpa.vpa_address}:${discountedBase}:${offset}`;
-      const locked = await redis.set(slotKey, orderId, { nx: true, ex: 90 });
+      const locked = await redis.set(slotKey, orderId, { nx: true, ex: 180 });
 
       if (locked === 'OK') {
         await pool.query(

@@ -164,7 +164,7 @@ export async function POST(req: NextRequest) {
     }
 
     // 6. Persistence in PostgreSQL
-    const expiresAt = new Date(Date.now() + 90 * 1000); // 90-second payment window
+    const expiresAt = new Date(Date.now() + 180 * 1000); // 3-minute (180-second) payment window
     const insertRes = await pool.query(
       `INSERT INTO orders (
           id, merchant_id, idempotency_key, base_amount, offset_cents, final_amount,

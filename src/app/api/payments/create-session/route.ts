@@ -119,7 +119,7 @@ export async function POST(req: NextRequest) {
         // 3. Create placeholder session in database
         const insertSessionQuery = await pool.query(
             `INSERT INTO fluxbase_global.payment_sessions (user_id, plan_type, amount, status, expires_at, project_data)
-             VALUES ($1, $2, $3, 'pending', NOW() + INTERVAL '5 minutes', $4)
+             VALUES ($1, $2, $3, 'pending', NOW() + INTERVAL '3 minutes', $4)
              RETURNING id`,
             [userId, cleanPlan, basePrice, projectData ? JSON.stringify(projectData) : null]
         );
@@ -191,7 +191,7 @@ export async function POST(req: NextRequest) {
         let finalAmount = basePrice;
         let vpa = 'sumith0909@ibl';
         let checkoutUrl: string | null = null;
-        let expiresAt = new Date(Date.now() + 5 * 60 * 1000).toISOString();
+        let expiresAt = new Date(Date.now() + 3 * 60 * 1000).toISOString();
 
         try {
             const { createFluxPayOrder } = await import('@/lib/fluxpay-client');
