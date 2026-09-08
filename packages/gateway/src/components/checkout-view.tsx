@@ -404,7 +404,7 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({ order }) => {
                           type="text"
                           value={couponCodeInput}
                           onChange={(e) => setCouponCodeInput(e.target.value.toUpperCase())}
-                          placeholder="ENTER COUPON (e.g. BHAICHARA)"
+                          placeholder="ENTER COUPON (e.g. FLUX20)"
                           style={{ backgroundColor: '#0b0b0b', color: '#f4f4f5', borderColor: '#27272a' }}
                           className="flex-1 bg-[#0b0b0b] border border-[#27272a] rounded px-3 py-2 text-xs font-mono uppercase focus:border-[#ff6600]"
                         />
