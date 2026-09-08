@@ -165,7 +165,8 @@ export async function POST(req: NextRequest) {
             }
         }
 
-        // 4. Try to match the exact decimal amount to an active pending 3-minute payment session
+        // 4. Try to match the exact decimal amount to an active pending 3-minute payment session or FluxPay order
+        let session: any = null;
         const sessionQuery = await pool.query(
             `SELECT id, user_id, plan_type, project_data FROM fluxbase_global.payment_sessions 
              WHERE amount = $1 
@@ -173,10 +174,38 @@ export async function POST(req: NextRequest) {
                AND expires_at > NOW()
              ORDER BY created_at DESC LIMIT 1`,
             [amount]
-        );
+        ).catch(() => ({ rows: [] }));
 
         if (sessionQuery.rows.length > 0) {
-            const session = sessionQuery.rows[0];
+            session = sessionQuery.rows[0];
+        } else {
+            // Also check matching FluxPay orders (handles coupon-discounted orders)
+            const fpOrderRes = await pool.query(
+                `SELECT * FROM "flux_tenant_0e3d63b989b94d08".orders 
+                 WHERE final_amount = $1 
+                   AND (status = 'pending' OR (status = 'expired' AND expires_at > NOW() - INTERVAL '30 minutes'))
+                 ORDER BY created_at DESC LIMIT 1`,
+                [amount]
+            ).catch(() => ({ rows: [] }));
+
+            if (fpOrderRes.rows.length > 0) {
+                const o = fpOrderRes.rows[0];
+                const meta = typeof o.metadata === 'string' ? JSON.parse(o.metadata) : (o.metadata || {});
+                if (meta.sessionId) {
+                    const sRes = await pool.query(
+                        'SELECT id, user_id, plan_type, project_data FROM fluxbase_global.payment_sessions WHERE id = $1',
+                        [meta.sessionId]
+                    ).catch(() => ({ rows: [] }));
+                    if (sRes.rows.length > 0) session = sRes.rows[0];
+                }
+                await pool.query(
+                    `UPDATE "flux_tenant_0e3d63b989b94d08".orders SET status = 'paid', paid_at = NOW(), utr = $1 WHERE id = $2`,
+                    [utr, o.id]
+                ).catch(() => {});
+            }
+        }
+
+        if (session) {
             const userId = session.user_id;
             const planType = session.plan_type;
 

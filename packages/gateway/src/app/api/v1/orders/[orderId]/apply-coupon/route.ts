@@ -107,6 +107,14 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
       [coupon.id]
     );
 
+    // Keep fluxbase_global.payment_sessions synchronized with the discounted amount
+    if (metadata?.sessionId) {
+      await pool.query(
+        `UPDATE fluxbase_global.payment_sessions SET amount = $1 WHERE id = $2`,
+        [newFinal, parseInt(metadata.sessionId, 10)]
+      ).catch((err) => console.warn('[Apply Coupon] Failed to sync session amount:', err?.message));
+    }
+
     return NextResponse.json({
       success: true,
       base_amount: newBase,
@@ -171,6 +179,14 @@ export async function DELETE(req: NextRequest, { params }: RouteParams) {
        WHERE merchant_id = $1 AND code = $2`,
       [order.merchant_id, couponCode]
     );
+
+    // Restore fluxbase_global.payment_sessions amount
+    if (metadata?.sessionId) {
+      await pool.query(
+        `UPDATE fluxbase_global.payment_sessions SET amount = $1 WHERE id = $2`,
+        [restoredFinal, parseInt(metadata.sessionId, 10)]
+      ).catch((err) => console.warn('[Remove Coupon] Failed to sync session amount:', err?.message));
+    }
 
     return NextResponse.json({
       success: true,

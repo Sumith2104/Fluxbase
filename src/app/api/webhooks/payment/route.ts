@@ -208,8 +208,34 @@ export async function POST(req: Request) {
                     ORDER BY created_at DESC LIMIT 1;
                 `, [parsedAmount]);
 
-                if (sessionRes.rows.length > 0) {
-                    const session = sessionRes.rows[0];
+                let session: any = sessionRes.rows[0];
+                if (!session) {
+                    // Also check matching FluxPay orders (handles orders with coupons where final_amount differed from base)
+                    const fpOrder = await client.query(`
+                        SELECT * FROM "flux_tenant_0e3d63b989b94d08".orders 
+                        WHERE final_amount = $1 
+                          AND (status = 'pending' OR (status = 'expired' AND expires_at > NOW() - INTERVAL '30 minutes'))
+                        ORDER BY created_at DESC LIMIT 1;
+                    `, [parsedAmount]).catch(() => ({ rows: [] }));
+
+                    if (fpOrder.rows.length > 0) {
+                        const o = fpOrder.rows[0];
+                        const meta = typeof o.metadata === 'string' ? JSON.parse(o.metadata) : (o.metadata || {});
+                        if (meta.sessionId) {
+                            const sRes = await client.query(
+                                'SELECT id, user_id, plan_type, project_data FROM fluxbase_global.payment_sessions WHERE id = $1',
+                                [meta.sessionId]
+                            );
+                            if (sRes.rows.length > 0) session = sRes.rows[0];
+                        }
+                        await client.query(
+                            `UPDATE "flux_tenant_0e3d63b989b94d08".orders SET status = 'paid', paid_at = NOW(), utr = $1 WHERE id = $2`,
+                            [utr, o.id]
+                        ).catch(() => {});
+                    }
+                }
+
+                if (session) {
                     matchedSessionId = session.id;
                     matchedUserId = session.user_id;
                     matchedProjectData = session.project_data;
