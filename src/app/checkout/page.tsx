@@ -29,6 +29,17 @@ function CheckoutHandler() {
             return;
         }
 
+        if (paramStatus === 'expired' || paramStatus === 'failed' || paramStatus === 'cancelled') {
+            setStatus('expired');
+            setMessage(
+                paramStatus === 'cancelled'
+                    ? 'Payment was cancelled. Returning to your dashboard...'
+                    : 'Payment session timed out or was not completed. Returning to dashboard...'
+            );
+            setTimeout(() => router.push('/dashboard/projects'), 2500);
+            return;
+        }
+
         // If returned with sessionId, verify from database
         if (paramSessionId) {
             verifyExistingSession(paramSessionId);

@@ -3,6 +3,17 @@ import { getPgPool } from '@/lib/pg';
 import { getCurrentUserId } from '@/lib/auth';
 import logger from '@/lib/logger';
 
+function resolveAppUrl(req: NextRequest): string {
+    const origin = req.headers.get('origin') || req.headers.get('referer') || '';
+    if (origin.includes('localhost') || origin.includes('127.0.0.1')) {
+        try {
+            const u = new URL(origin);
+            return `${u.protocol}//${u.host}`;
+        } catch {}
+    }
+    return 'https://www.fluxbasedb.me';
+}
+
 export async function POST(req: NextRequest) {
     const userId = await getCurrentUserId();
     if (!userId) {
@@ -148,7 +159,7 @@ export async function POST(req: NextRequest) {
 
                 if (pLink) {
                     const gatewayUrl = process.env.FLUXPAY_GATEWAY_URL || 'https://payments.fluxbasedb.me';
-                    const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://www.fluxbasedb.me';
+                    const appUrl = resolveAppUrl(req);
                     const linkCheckoutUrl = `${gatewayUrl}/pay/link/${pLink.id}?userId=${userId}&email=${encodeURIComponent(user.email || '')}&name=${encodeURIComponent(user.display_name || '')}&plan=${cleanPlan}&callbackUrl=${encodeURIComponent(`${appUrl}/checkout?sessionId=${session.id}`)}`;
 
                     logger.info(`[Create Session] Explicit Payment Link routed: ${pLink.id} (₹${pLink.amount})`);
@@ -184,7 +195,7 @@ export async function POST(req: NextRequest) {
 
         try {
             const { createFluxPayOrder } = await import('@/lib/fluxpay-client');
-            const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://www.fluxbasedb.me';
+            const appUrl = resolveAppUrl(req);
             const orderLabel = orderTitle || `${cleanPlan.toUpperCase()} TIER`;
             const fluxpayRes = await createFluxPayOrder({
                 amount: basePrice,

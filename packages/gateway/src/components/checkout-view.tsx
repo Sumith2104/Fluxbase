@@ -23,6 +23,20 @@ interface CheckoutViewProps {
       original_amount: number;
     } | null;
   };
+function getCleanReturnUrl(rawCallback?: string | null, statusParam: string = 'paid', orderId?: string, utr?: string | null): string {
+  let urlStr = rawCallback || 'https://www.fluxbasedb.me/dashboard/projects';
+  // Strictly rewrite any vercel.app reference to the production domain https://www.fluxbasedb.me
+  urlStr = urlStr.replace(/https?:\/\/[^\/]*vercel\.app/i, 'https://www.fluxbasedb.me');
+  try {
+    const u = new URL(urlStr);
+    u.searchParams.set('status', statusParam);
+    if (orderId) u.searchParams.set('order_id', orderId);
+    if (utr) u.searchParams.set('utr', utr);
+    return u.toString();
+  } catch {
+    const separator = urlStr.includes('?') ? '&' : '?';
+    return `${urlStr}${separator}status=${statusParam}${orderId ? `&order_id=${orderId}` : ''}${utr ? `&utr=${utr}` : ''}`;
+  }
 }
 
 export const CheckoutView: React.FC<CheckoutViewProps> = ({ order }) => {
@@ -115,11 +129,7 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({ order }) => {
     if (redirectCount === null) return;
     if (redirectCount <= 0) {
       if (order.callback_url) {
-        const url = new URL(order.callback_url);
-        url.searchParams.set('order_id', order.id);
-        url.searchParams.set('status', 'paid');
-        if (utr) url.searchParams.set('utr', utr);
-        window.location.href = url.toString();
+        window.location.href = getCleanReturnUrl(order.callback_url, 'paid', order.id, utr);
       }
       return;
     }
@@ -255,7 +265,7 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({ order }) => {
 
               {order.callback_url && (
                 <a
-                  href={`${order.callback_url}?order_id=${order.id}&status=paid${utr ? `&utr=${utr}` : ''}`}
+                  href={getCleanReturnUrl(order.callback_url, 'paid', order.id, utr)}
                   className="inline-block w-full py-2.5 bg-[#ff6600] text-black font-semibold text-xs rounded hover:bg-[#ff7a1a] transition font-mono uppercase"
                 >
                   RETURN TO FLUXBASE NOW
@@ -280,10 +290,10 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({ order }) => {
               </p>
               {order.callback_url && (
                 <a
-                  href={order.callback_url}
-                  className="inline-block px-4 py-2 border border-[#3f3f46] text-[#f4f4f5] text-xs font-mono rounded hover:bg-[#18181b] transition"
+                  href={getCleanReturnUrl(order.callback_url, 'expired', order.id)}
+                  className="inline-block px-5 py-2.5 bg-[#ff6600] text-black font-semibold text-xs font-mono rounded hover:bg-[#ff7a1a] transition uppercase"
                 >
-                  RETURN TO APP
+                  RETURN TO FLUXBASE
                 </a>
               )}
             </div>
@@ -456,6 +466,16 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({ order }) => {
                   <span className="relative inline-flex rounded-full h-2 w-2 bg-[#ff6600]"></span>
                 </span>
                 <span>LISTENING FOR INCOMING PHONE PAYMENT...</span>
+              </div>
+
+              {/* Cancel and Return */}
+              <div className="text-center pt-1">
+                <a
+                  href={getCleanReturnUrl(order.callback_url, 'cancelled', order.id)}
+                  className="text-[11px] font-mono text-[#71717a] hover:text-[#ff6600] transition"
+                >
+                  ← CANCEL AND RETURN TO FLUXBASE
+                </a>
               </div>
 
               {/* Order Meta Footer */}
