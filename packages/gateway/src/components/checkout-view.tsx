@@ -180,7 +180,7 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({ order }) => {
   // Two-step checkout flow: 'review' (Order & Coupon Review) -> 'pay' (Timer & UPI Payment)
   const [viewStep, setViewStep] = useState<'review' | 'pay'>('review');
   const [remainingSeconds, setRemainingSeconds] = useState(180);
-  const [redirectCount, setRedirectCount] = useState<number | null>(null);
+  const [redirectCount, setRedirectCount] = useState<number | null>(order.status === 'paid' ? 3 : null);
 
   // Dynamic pricing and coupon state
   const [baseAmount, setBaseAmount] = useState<number>(order.amount);
@@ -253,9 +253,7 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({ order }) => {
       setUtr(newUtr);
     }
     if (newStatus === 'paid') {
-      if (order.callback_url) {
-        setRedirectCount(2);
-      }
+      setRedirectCount((prev) => (prev === null ? 3 : prev));
     }
   };
 
@@ -362,13 +360,18 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({ order }) => {
     };
   }, [order.id, order.callback_url, status]);
 
-  // Handle redirect countdown
+  // Handle automatic redirect countdown (3 seconds auto redirect to client app, no manual buttons)
   useEffect(() => {
-    if (redirectCount === null) return;
+    if (status !== 'paid') return;
+
+    if (redirectCount === null) {
+      setRedirectCount(3);
+      return;
+    }
+
     if (redirectCount <= 0) {
-      if (order.callback_url) {
-        window.location.href = getCleanReturnUrl(order.callback_url, 'paid', order.id, utr);
-      }
+      const destination = getCleanReturnUrl(order.callback_url, 'paid', order.id, utr);
+      window.location.href = destination;
       return;
     }
 
@@ -377,7 +380,7 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({ order }) => {
     }, 1000);
 
     return () => clearTimeout(timer);
-  }, [redirectCount, order.callback_url, order.id, utr]);
+  }, [redirectCount, status, order.callback_url, order.id, utr]);
 
   // Apply Coupon Handler
   const handleApplyCoupon = async (e: React.FormEvent) => {
@@ -513,22 +516,36 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({ order }) => {
             Amount Paid: <span className="text-[#f4f4f5] font-bold">₹{finalAmountStr}</span>
           </div>
 
-          <div className="p-3 bg-emerald-950/20 border border-emerald-800/40 rounded">
-            <p className="text-xs text-[#ff6600] font-mono font-semibold">
-              {redirectCount !== null
-                ? `Payment confirmed. Returning to Fluxbase in ${redirectCount}s...`
-                : 'Payment complete. Ready to return.'}
+          {/* 3-second automatic redirect progress card (No manual buttons required) */}
+          <div className="bg-[#18181b] border border-[#27272a] rounded-lg p-4 space-y-3 font-mono">
+            <div className="flex items-center justify-between text-xs">
+              <span className="text-zinc-400 flex items-center gap-2">
+                <span className="inline-block w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                REDIRECTING TO CLIENT APP
+              </span>
+              <span className="text-[#ff6600] font-bold">
+                {redirectCount !== null && redirectCount > 0 ? `${redirectCount}s` : 'Redirecting...'}
+              </span>
+            </div>
+
+            {/* 3-second countdown progress bar */}
+            <div className="w-full bg-[#0b0b0b] h-1.5 rounded-full overflow-hidden border border-[#27272a]">
+              <div
+                className="bg-[#ff6600] h-full rounded-full transition-all duration-1000 ease-linear"
+                style={{
+                  width: `${
+                    redirectCount !== null
+                      ? Math.min(100, Math.max(0, ((3 - redirectCount) / 3) * 100))
+                      : 0
+                  }%`,
+                }}
+              />
+            </div>
+
+            <p className="text-[11px] text-zinc-500 text-center">
+              Please wait... Authenticating and redirecting to your workspace.
             </p>
           </div>
-
-          {order.callback_url && (
-            <a
-              href={getCleanReturnUrl(order.callback_url, 'paid', order.id, utr)}
-              className="inline-block w-full py-2.5 bg-[#ff6600] hover:bg-[#ff7a1a] text-black font-semibold text-xs rounded transition font-mono uppercase"
-            >
-              RETURN TO FLUXBASE NOW
-            </a>
-          )}
         </div>
       </div>
     );
