@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getPool } from '@/lib/db';
+import { redis } from '@/lib/redis';
 
 interface RouteParams {
   params: Promise<{ orderId: string }>;
@@ -128,6 +129,18 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
       ).catch((err) => console.warn('[Apply Coupon] Failed to sync session amount:', err?.message));
     }
 
+    // Sync Redis slot key so the old base slot is freed immediately and new base slot is held
+    try {
+      const vpaRes = await pool.query(`SELECT vpa_address FROM vpas WHERE id = $1`, [order.vpa_id]);
+      const vpaAddr = vpaRes.rows[0]?.vpa_address;
+      if (vpaAddr) {
+        await redis.del(`slot:${vpaAddr}:${originalBase}:${offsetCents}`).catch(() => {});
+        await redis.set(`slot:${vpaAddr}:${newBase}:${offsetCents}`, orderId, { ex: 180 }).catch(() => {});
+      }
+    } catch (rErr) {
+      console.warn('[Apply Coupon] Redis slot sync warning:', rErr);
+    }
+
     return NextResponse.json({
       success: true,
       base_amount: newBase,
@@ -199,6 +212,19 @@ export async function DELETE(req: NextRequest, { params }: RouteParams) {
         `UPDATE fluxbase_global.payment_sessions SET amount = $1 WHERE id = $2`,
         [restoredFinal, parseInt(metadata.sessionId, 10)]
       ).catch((err) => console.warn('[Remove Coupon] Failed to sync session amount:', err?.message));
+    }
+
+    // Sync Redis slot key back to original base
+    try {
+      const vpaRes = await pool.query(`SELECT vpa_address FROM vpas WHERE id = $1`, [order.vpa_id]);
+      const vpaAddr = vpaRes.rows[0]?.vpa_address;
+      const currentBase = Math.round(parseFloat(order.base_amount));
+      if (vpaAddr) {
+        await redis.del(`slot:${vpaAddr}:${currentBase}:${offsetCents}`).catch(() => {});
+        await redis.set(`slot:${vpaAddr}:${originalBase}:${offsetCents}`, orderId, { ex: 180 }).catch(() => {});
+      }
+    } catch (rErr) {
+      console.warn('[Remove Coupon] Redis slot sync warning:', rErr);
     }
 
     return NextResponse.json({

@@ -302,6 +302,22 @@ export async function POST(req: Request) {
 
             await client.query('COMMIT');
 
+            // 2.3 Instant Slot Recycling: delete Redis slot keys for this offset so another user gets assigned immediately
+            try {
+                const { redis } = await import('@/lib/redis');
+                const vpaAddr = '918310870493@waaxis';
+                const offsetCents = Math.round((parsedAmount % 1) * 100);
+                if (offsetCents > 0) {
+                    const keys = await redis.keys(`slot:${vpaAddr}:*:${offsetCents}`);
+                    for (const k of keys) {
+                        await redis.del(k).catch(() => {});
+                    }
+                    logger.info(`[Payment Webhook] Instant Slot Recycled for offset .${offsetCents.toString().padStart(2, '0')}`);
+                }
+            } catch (rErr) {
+                logger.warn('[Payment Webhook] Redis slot release warning:', rErr);
+            }
+
             // 2.5 Auto-provision project outside transaction if project_data exists
             if (matchedProjectData && matchedUserId) {
                 try {
@@ -309,8 +325,9 @@ export async function POST(req: Request) {
                     const projName = pData.projectName || 'My Project';
 
                     const existingCheck = await pool.query(
-                        `SELECT project_id FROM fluxbase_global.projects 
-                         WHERE user_id = $1 AND display_name = $2 AND created_at > NOW() - INTERVAL '2 minutes'`,
+                        `SELECT project_id, schema_name FROM fluxbase_global.projects 
+                         WHERE user_id = $1 AND display_name = $2 AND created_at > NOW() - INTERVAL '30 minutes'
+                         ORDER BY created_at DESC LIMIT 1`,
                         [matchedUserId, projName]
                     );
 
@@ -328,11 +345,11 @@ export async function POST(req: Request) {
                             matchedUserId
                         );
 
-                        await TenantProvisioner.createTenantSchema(newProject.project_id, pData.dialect || 'postgresql');
+                        const tenantRes = await TenantProvisioner.createTenantSchema(newProject.project_id, pData.dialect || 'postgresql');
                         const isPayg = (pData.billingPreference === 'pay_as_you_go' || matchedPlanType === 'pay_as_you_go');
                         await pool.query(
-                            'UPDATE fluxbase_global.projects SET creator_role = $1, billing_preference = $2 WHERE project_id = $3',
-                            [pData.userRole || matchedPlanType, isPayg ? 'pay_as_you_go' : (pData.billingPreference || 'monthly'), newProject.project_id]
+                            'UPDATE fluxbase_global.projects SET is_serverless = true, schema_name = $1, creator_role = $2, billing_preference = $3 WHERE project_id = $4',
+                            [tenantRes.schemaName, pData.userRole || matchedPlanType, isPayg ? 'pay_as_you_go' : (pData.billingPreference || 'monthly'), newProject.project_id]
                         );
                         if (isPayg) {
                             try {
@@ -343,6 +360,13 @@ export async function POST(req: Request) {
                             }
                         }
                         logger.info(`[Payment Webhook] Auto-provisioned project ${newProject.project_id} (${newProject.display_name}) for user ${matchedUserId}`);
+                    } else if (!existingCheck.rows[0].schema_name) {
+                        const { TenantProvisioner } = await import('@/lib/tenant-engine');
+                        const tenantRes = await TenantProvisioner.createTenantSchema(existingCheck.rows[0].project_id, pData.dialect || 'postgresql');
+                        await pool.query(
+                            'UPDATE fluxbase_global.projects SET is_serverless = true, schema_name = $1 WHERE project_id = $2',
+                            [tenantRes.schemaName, existingCheck.rows[0].project_id]
+                        );
                     }
                 } catch (provErr) {
                     logger.error('[Payment Webhook] Project auto-provision error:', provErr);

@@ -159,12 +159,26 @@ export async function matchAndFulfillPayment(params: {
     await client.query('COMMIT');
 
     // 5. Instant Slot Recycling: Immediately release Redis lock
+    const meta = typeof matchedOrder.metadata === 'string' ? JSON.parse(matchedOrder.metadata) : (matchedOrder.metadata || {});
+    const origBase = meta?.coupon?.original_amount ? Math.round(parseFloat(meta.coupon.original_amount)) : matchedOrder.base_amount;
+
     await releaseSlot(
       matchedOrder.vpa_address,
       matchedOrder.base_amount,
       matchedOrder.offset_cents,
-      matchedOrder.vpa_id
+      matchedOrder.vpa_id,
+      matchedOrder.id
     );
+
+    if (origBase !== matchedOrder.base_amount) {
+      await releaseSlot(
+        matchedOrder.vpa_address,
+        origBase,
+        matchedOrder.offset_cents,
+        matchedOrder.vpa_id,
+        matchedOrder.id
+      );
+    }
 
     // 6. Trigger outgoing merchant webhook asynchronously
     dispatchWebhook(matchedOrder.id).catch((err) => {

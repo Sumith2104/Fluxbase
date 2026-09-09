@@ -36,15 +36,32 @@ export async function createProjectAction(formData: FormData) {
     const userId = await getCurrentUserId();
     if (!userId) return { error: 'Unauthorized login required to create a project.' };
 
-    // Idempotency guard: Prevent duplicate project creation if already provisioned within last 30s (e.g. by server webhook)
+    // Idempotency guard: Prevent duplicate project creation if already provisioned (e.g. by payment webhook)
     const pool = getPgPool();
     const existingRecent = await pool.query(
-        `SELECT project_id, display_name FROM fluxbase_global.projects 
-         WHERE user_id = $1 AND display_name = $2 AND created_at > NOW() - INTERVAL '30 seconds'`,
+        `SELECT project_id, display_name, schema_name FROM fluxbase_global.projects 
+         WHERE user_id = $1 AND display_name = $2 AND created_at > NOW() - INTERVAL '30 minutes'
+         ORDER BY created_at DESC LIMIT 1`,
         [userId, projectName]
     );
     if (existingRecent.rows.length > 0) {
-        return { success: true, project: existingRecent.rows[0] };
+        const p = existingRecent.rows[0];
+        if (!p.schema_name && actualConnectionType === 'internal') {
+            try {
+                const tenantResult = await TenantProvisioner.createTenantSchema(
+                    p.project_id,
+                    dialect === 'mysql' ? 'mysql' : 'postgresql'
+                );
+                await pool.query(
+                    'UPDATE fluxbase_global.projects SET is_serverless = true, schema_name = $1 WHERE project_id = $2',
+                    [tenantResult.schemaName, p.project_id]
+                );
+                p.schema_name = tenantResult.schemaName;
+            } catch (err) {
+                logger.error('[Provisioning Schema Error]:', err);
+            }
+        }
+        return { success: true, project: p };
     }
 
     if (instanceSize && actualConnectionType === 'internal') {

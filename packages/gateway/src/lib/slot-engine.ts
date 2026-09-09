@@ -104,10 +104,23 @@ export async function releaseSlot(
   vpaAddress: string,
   baseAmount: number,
   offsetCents: number,
-  vpaId?: string
+  vpaId?: string,
+  orderId?: string
 ): Promise<void> {
   const slotKey = `slot:${vpaAddress}:${baseAmount}:${offsetCents}`;
-  await redis.del(slotKey);
+  await redis.del(slotKey).catch(() => {});
+
+  // If orderId is provided, also scan and delete ANY slot keys allocated to this orderId or offset
+  if (orderId) {
+    try {
+      const keys = await redis.keys(`slot:${vpaAddress}:*:${offsetCents}`);
+      for (const k of keys) {
+        await redis.del(k).catch(() => {});
+      }
+    } catch (e) {
+      console.warn('[Slot Engine] Clean slot error:', e);
+    }
+  }
 
   if (vpaId) {
     const pool = getPool();
@@ -117,3 +130,4 @@ export async function releaseSlot(
     ).catch(() => {});
   }
 }
+
