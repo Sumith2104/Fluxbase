@@ -26,6 +26,7 @@ export default async function OrderPaymentPage({ params }: PageProps) {
   }
 
   const order = res.rows[0];
+  const metadata = typeof order.metadata === 'string' ? JSON.parse(order.metadata) : (order.metadata || {});
   const planName = metadata?.plan_name || (metadata?.plan ? `${metadata.plan.toUpperCase()} PLAN SUBSCRIPTION` : undefined);
 
   return (
