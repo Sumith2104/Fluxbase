@@ -83,12 +83,13 @@ export async function POST(req: NextRequest) {
             let flatDiscount = 0;
 
             if (couponCode) {
-                const discRes = await pool.query(
+                const cleanCode = couponCode.trim().toUpperCase();
+                let discRes = await pool.query(
                     `SELECT discount_type, discount_value, max_discount_amount 
                      FROM fluxbase_global.discounts 
-                     WHERE code = $1 AND is_active = true AND (expires_at IS NULL OR expires_at > NOW())
+                     WHERE UPPER(code) = $1 AND is_active = true AND (expires_at IS NULL OR expires_at > NOW())
                      LIMIT 1`,
-                    [couponCode.trim().toUpperCase()]
+                    [cleanCode]
                 );
 
                 if (discRes.rows.length > 0) {
@@ -97,6 +98,23 @@ export async function POST(req: NextRequest) {
                         discountPercentage = parseFloat(d.discount_value);
                     } else if (d.discount_type === 'fixed_amount') {
                         flatDiscount = parseFloat(d.discount_value);
+                    }
+                } else {
+                    // Check Payments app merchant coupons
+                    const tenantC = await pool.query(
+                        `SELECT discount_type, discount_value, max_discount_amount 
+                         FROM "flux_tenant_0e3d63b989b94d08".coupons 
+                         WHERE UPPER(code) = $1 AND is_active = true AND (expires_at IS NULL OR expires_at > NOW())
+                         LIMIT 1`,
+                        [cleanCode]
+                    );
+                    if (tenantC.rows.length > 0) {
+                        const tc = tenantC.rows[0];
+                        if (tc.discount_type === 'percentage') {
+                            discountPercentage = parseFloat(tc.discount_value);
+                        } else if (tc.discount_type === 'flat' || tc.discount_type === 'fixed_amount') {
+                            flatDiscount = parseFloat(tc.discount_value);
+                        }
                     }
                 }
             }
