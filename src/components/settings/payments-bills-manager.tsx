@@ -42,43 +42,9 @@ export function PaymentsBillsManager() {
         fetchBilling();
     }, []);
 
-    const handleStartCheckout = async (planKey: string) => {
+    const handleStartCheckout = (planKey: string) => {
         setUpgradingPlan(planKey);
-        try {
-            const res = await fetch('/api/payments/create-session', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ plan: planKey })
-            });
-            const data = await res.json();
-            if (res.ok && (data.checkoutUrl || data.sessionId)) {
-                toast({
-                    title: 'Redirecting to FluxPay',
-                    description: `Redirecting to payments.fluxbasedb.me to review order and pay...`,
-                });
-                if (data.checkoutUrl) {
-                    let targetUrl = String(data.checkoutUrl).trim();
-                    if (targetUrl.startsWith('//')) {
-                        targetUrl = `https:${targetUrl}`;
-                    } else if (!/^https?:\/\//i.test(targetUrl)) {
-                        targetUrl = `https://${targetUrl.replace(/^\/+/, '')}`;
-                    }
-                    window.location.href = targetUrl;
-                } else {
-                    router.push(`/checkout?sessionId=${data.sessionId}`);
-                }
-            } else {
-                throw new Error(data.error || 'Failed to initialize payment');
-            }
-        } catch (err: any) {
-            toast({
-                variant: 'destructive',
-                title: 'Checkout Error',
-                description: err.message,
-            });
-        } finally {
-            setUpgradingPlan(null);
-        }
+        router.push(`/checkout?plan=${planKey}`);
     };
 
     if (loading) {

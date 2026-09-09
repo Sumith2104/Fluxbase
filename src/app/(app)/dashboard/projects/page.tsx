@@ -526,47 +526,11 @@ export default function SelectProjectPage() {
           workDescription: workDescription.trim()
         }));
 
-        // 2. Redirect to FluxPay Hosted Gateway
+        // 2. Instantly redirect to Order Review Page (Zero delay, instant client navigation!)
         const isPayg = billingPreference === 'pay_as_you_go';
         const planKey = isPayg ? 'pay_as_you_go' : (selectedRole === 'org_owner' ? 'org_owner' : 'employee');
 
         setModalDialect(null);
-        toast({
-          title: 'Redirecting to FluxPay',
-          description: `Redirecting to payments.fluxbasedb.me to review order and pay...`,
-        });
-
-        try {
-          const res = await fetch('/api/payments/create-session', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              plan: planKey,
-              projectData: {
-                projectName: projectName.trim(),
-                dialect: modalDialect,
-                timezone: selectedTimezone,
-                userRole: selectedRole,
-                billingPreference,
-                companyName: companyName.trim(),
-                workDescription: workDescription.trim()
-              }
-            })
-          });
-          const data = await res.json();
-          if (data.checkoutUrl) {
-            let targetUrl = String(data.checkoutUrl).trim();
-            if (targetUrl.startsWith('//')) {
-              targetUrl = `https:${targetUrl}`;
-            } else if (!/^https?:\/\//i.test(targetUrl)) {
-              targetUrl = `https://${targetUrl.replace(/^\/+/, '')}`;
-            }
-            window.location.href = targetUrl;
-            return;
-          }
-        } catch (e) {
-          console.error('Direct checkout redirection error:', e);
-        }
         router.push(`/checkout?plan=${planKey}`);
         return;
       }

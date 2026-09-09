@@ -40,8 +40,13 @@ export async function POST(req: NextRequest) {
             ? discount.applicable_plans 
             : JSON.parse(discount.applicable_plans || '["all"]');
 
+        const normalizedPlan = cleanPlan === 'student_pro' ? 'pro' : 
+                               cleanPlan === 'student_max' ? 'max' : 
+                               cleanPlan === 'org' ? 'org_owner' : 
+                               cleanPlan;
+
         // Check if applicable to current plan
-        if (!applicablePlans.includes('all') && cleanPlan && !applicablePlans.includes(cleanPlan)) {
+        if (!applicablePlans.includes('all') && cleanPlan && !applicablePlans.includes(cleanPlan) && !applicablePlans.includes(normalizedPlan)) {
             return NextResponse.json({
                 success: false,
                 error: `This coupon is not valid for the ${cleanPlan.toUpperCase()} plan.`

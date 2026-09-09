@@ -38,10 +38,12 @@ export async function POST(req: NextRequest) {
         let basePrice = 500;
         const pool = getPgPool();
 
-        // 1. If client app calculated the amount dynamically (e.g. Shopping App, custom tier, multi-seat)
+        // 1. If client app calculated the amount dynamically (e.g. Shopping App, custom tier, review page)
+        let discountAlreadyDeducted = false;
         if (amount !== undefined && !isNaN(parseFloat(amount))) {
-            basePrice = Math.max(1, Math.floor(parseFloat(amount)));
+            basePrice = Math.max(1, Math.round(parseFloat(amount)));
             cleanPlan = plan ? String(plan).toLowerCase() : 'custom_order';
+            discountAlreadyDeducted = true;
         } else {
             // Standard plan fallback
             const validPlans = ['pro', 'max', 'student_pro', 'student_max', 'employee', 'org_owner', 'org', 'pay_as_you_go'];
@@ -75,8 +77,8 @@ export async function POST(req: NextRequest) {
             }
         }
 
-        // 2. Fetch discount rate from fluxbase_global.discounts table if coupon was applied
-        if (isDiscountApplied) {
+        // 2. Fetch discount rate from fluxbase_global.discounts table if coupon was applied AND not already deducted
+        if (isDiscountApplied && !discountAlreadyDeducted) {
             let discountPercentage = 20; // default 20%
             let flatDiscount = 0;
 
@@ -199,7 +201,7 @@ export async function POST(req: NextRequest) {
             const orderLabel = orderTitle || `${cleanPlan.toUpperCase()} TIER`;
             const fluxpayRes = await createFluxPayOrder({
                 amount: basePrice,
-                couponCode: isDiscountApplied ? couponCode : undefined,
+                couponCode: discountAlreadyDeducted ? undefined : (isDiscountApplied ? couponCode : undefined),
                 customerName: user.display_name || 'Fluxbase Customer',
                 customerEmail: user.email || undefined,
                 callbackUrl: `${appUrl}/checkout?sessionId=${session.id}`,
