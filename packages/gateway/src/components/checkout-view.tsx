@@ -373,8 +373,41 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({ order }) => {
     return (
       <div className="min-h-screen bg-[#0b0b0b] text-[#f4f4f5] flex items-center justify-center p-4 selection:bg-[#ff6600] selection:text-black font-sans">
         <div className="w-full max-w-md bg-[#121214] border border-[#27272a] rounded-xl p-8 text-center space-y-4 shadow-2xl">
-          <div className="w-14 h-14 mx-auto rounded-full bg-emerald-950/80 border-2 border-emerald-500 flex items-center justify-center text-emerald-400 font-mono text-xl font-bold">
-            OK
+          {/* Animated Verified Tick Mark */}
+          <div className="relative flex items-center justify-center w-20 h-20 mx-auto">
+            <div className="absolute inset-0 rounded-full bg-emerald-500/20 blur-xl animate-pulse" />
+            <svg
+              className="w-20 h-20 relative z-10 animate-checkmark-pop"
+              viewBox="0 0 64 64"
+              fill="none"
+              style={{
+                filter: 'drop-shadow(0 0 12px rgba(16, 185, 129, 0.4))',
+              }}
+            >
+              {/* Background badge circle */}
+              <circle cx="32" cy="32" r="28" fill="#064e3b" fillOpacity="0.45" />
+
+              {/* Animated drawing outer ring */}
+              <circle
+                cx="32"
+                cy="32"
+                r="28"
+                stroke="#10b981"
+                strokeWidth="2.5"
+                strokeLinecap="round"
+                className="animate-checkmark-circle"
+              />
+
+              {/* Animated drawing checkmark tick */}
+              <path
+                d="M20 32.5L28 40.5L44 23.5"
+                stroke="#34d399"
+                strokeWidth="3.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className="animate-checkmark-check"
+              />
+            </svg>
           </div>
           <div>
             <h2 className="text-lg font-bold text-[#f4f4f5] tracking-tight">
