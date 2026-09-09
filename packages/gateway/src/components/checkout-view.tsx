@@ -244,40 +244,121 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({ order }) => {
     }
   }, [upiIntentUrl, status, finalAmount, viewStep]);
 
-  // Connect to SSE Live Status Stream
+  // Helper to process incoming status update
+  const handleStatusUpdate = (newStatus: string, newUtr?: string) => {
+    if (newStatus) {
+      setStatus(newStatus);
+    }
+    if (newUtr) {
+      setUtr(newUtr);
+    }
+    if (newStatus === 'paid') {
+      if (order.callback_url) {
+        setRedirectCount(2);
+      }
+    }
+  };
+
+  // Multi-tier Realtime Status Engine: Self-healing SSE + 1.5s Polling Failsafe + Instant Visibility Change
   useEffect(() => {
     if (status !== 'pending') return;
 
-    const eventSource = new EventSource(`/api/v1/orders/${order.id}/stream`);
+    let isMounted = true;
+    let es: EventSource | null = null;
+    let reconnectTimer: NodeJS.Timeout | null = null;
 
-    eventSource.onmessage = (event) => {
+    // 1. Direct fetch status check
+    const checkOrderStatus = async () => {
+      if (!isMounted || status !== 'pending') return;
       try {
-        const data = JSON.parse(event.data);
-        if (data.status) {
-          setStatus(data.status);
-        }
-        if (data.utr) {
-          setUtr(data.utr);
-        }
-        if (data.status === 'paid') {
-          eventSource.close();
-          if (order.callback_url) {
-            setRedirectCount(2);
-          }
-        } else if (data.status === 'expired') {
-          eventSource.close();
+        const res = await fetch(`/api/v1/orders/${order.id}`);
+        if (!res.ok) return;
+        const data = await res.json();
+        const current = data.status || data.order?.status;
+        const incomingUtr = data.utr || data.order?.utr;
+        if (current && current !== 'pending') {
+          handleStatusUpdate(current, incomingUtr);
         }
       } catch (err) {
-        console.error('SSE parse error:', err);
+        // Network hiccup; will retry on next poll/SSE
       }
     };
 
-    eventSource.onerror = () => {
-      eventSource.close();
+    // Run immediate check on mount
+    checkOrderStatus();
+
+    // 2. Setup Self-Healing SSE
+    const setupSSE = () => {
+      if (!isMounted || status !== 'pending') return;
+      if (es) {
+        try { es.close(); } catch {}
+      }
+
+      try {
+        es = new EventSource(`/api/v1/orders/${order.id}/stream`);
+
+        es.onmessage = (event) => {
+          try {
+            const data = JSON.parse(event.data);
+            if (data.status && data.status !== 'pending') {
+              handleStatusUpdate(data.status, data.utr);
+              if (es) es.close();
+            }
+          } catch (err) {
+            console.error('SSE parse error:', err);
+          }
+        };
+
+        es.onerror = () => {
+          // Do not abandon! Close dead connection and reconnect in 1.5s
+          if (es) {
+            try { es.close(); } catch {}
+            es = null;
+          }
+          if (isMounted && status === 'pending') {
+            reconnectTimer = setTimeout(setupSSE, 1500);
+          }
+        };
+      } catch (err) {
+        reconnectTimer = setTimeout(setupSSE, 1500);
+      }
     };
 
+    setupSSE();
+
+    // 3. Failsafe Polling Interval (every 1.5 seconds while pending)
+    const pollInterval = setInterval(() => {
+      if (status === 'pending') {
+        checkOrderStatus();
+      }
+    }, 1500);
+
+    // 4. Instant Visibility / Focus Trigger (when returning from UPI app e.g. GPay/PhonePe)
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible' && status === 'pending') {
+        checkOrderStatus();
+        if (!es) setupSSE();
+      }
+    };
+
+    const handleWindowFocus = () => {
+      if (status === 'pending') {
+        checkOrderStatus();
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('focus', handleWindowFocus);
+
     return () => {
-      eventSource.close();
+      isMounted = false;
+      if (es) {
+        try { es.close(); } catch {}
+      }
+      if (reconnectTimer) clearTimeout(reconnectTimer);
+      clearInterval(pollInterval);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('focus', handleWindowFocus);
     };
   }, [order.id, order.callback_url, status]);
 
@@ -366,7 +447,12 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({ order }) => {
   const proceedToPayment = () => {
     setRemainingSeconds(180);
     setViewStep('pay');
+    // Sync fresh 3-minute payment slot in database and Redis
+    fetch(`/api/v1/orders/${order.id}/start-payment`, { method: 'POST' }).catch((err) => {
+      console.warn('[Checkout] Failed to sync payment slot:', err);
+    });
   };
+
 
   // 1. PAID STATE
   if (status === 'paid') {

@@ -29,9 +29,12 @@ export async function GET(
 
   (async () => {
     try {
+      // Send initial SSE connection confirmation
+      await writer.write(encoder.encode(': connected\n\n'));
+
       let loops = 0;
-      // Stream for up to 120 seconds (covering full 90s window + buffer)
-      while (!isClosed && loops < 120) {
+      // Stream for up to 300 seconds (5 minutes)
+      while (!isClosed && loops < 300) {
         loops++;
 
         const res = await pool.query(
@@ -49,9 +52,7 @@ export async function GET(
         }
 
         const order = res.rows[0];
-        const isExpired =
-          order.status === 'pending' && new Date(order.expires_at).getTime() < Date.now();
-        const currentStatus = isExpired ? 'expired' : order.status;
+        const currentStatus = order.status;
 
         const remainingSeconds = Math.max(
           0,
@@ -72,7 +73,12 @@ export async function GET(
           break;
         }
 
-        // Wait 1 second before next poll
+        // Send keep-alive comment every 10 seconds to keep proxy tunnels open
+        if (loops % 10 === 0) {
+          await writer.write(encoder.encode(': ping\n\n'));
+        }
+
+        // Wait 1 second before next check
         await new Promise((resolve) => setTimeout(resolve, 1000));
       }
     } catch (err) {
@@ -81,6 +87,7 @@ export async function GET(
       await closeStream();
     }
   })();
+
 
   return new Response(responseStream.readable, {
     headers: {
