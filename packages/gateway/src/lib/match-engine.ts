@@ -102,7 +102,7 @@ export async function matchAndFulfillPayment(params: {
        JOIN vpas v ON o.vpa_id = v.id
        WHERE o.status = 'pending'
          AND o.final_amount = $1
-         AND o.expires_at > NOW()
+         AND (o.expires_at > NOW() OR o.created_at > (NOW() - INTERVAL '30 minutes'))
        ORDER BY o.created_at ASC
        FOR UPDATE SKIP LOCKED`,
       [finalAmount]
