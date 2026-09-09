@@ -209,7 +209,7 @@ export async function POST(req: NextRequest) {
         // 4. Default / Dynamic Path: Calculate amount in client app & generate FluxPay order
         let fluxpayOrderId: string | null = null;
         let finalAmount = basePrice;
-        let vpa = 'sumith0909@ibl';
+        let vpa = '918310870493@waaxis';
         let checkoutUrl: string | null = null;
         let expiresAt = new Date(Date.now() + 3 * 60 * 1000).toISOString();
 

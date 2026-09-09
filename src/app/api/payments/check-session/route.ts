@@ -45,7 +45,7 @@ export async function GET(req: NextRequest) {
             );
         }
 
-        const upiMerchantVpa = session.fluxpay_vpa || 'sumith0909@ibl';
+        const upiMerchantVpa = session.fluxpay_vpa || '918310870493@waaxis';
 
         return NextResponse.json({
             success: true,

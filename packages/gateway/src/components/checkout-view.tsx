@@ -646,7 +646,7 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({ order }) => {
                     <div className="bg-[#18181b] border border-[#27272a] rounded p-2.5 flex items-center justify-between">
                       <div className="min-w-0 flex-1 mr-2">
                         <div className="text-[10px] font-mono text-[#a1a1aa] uppercase">
-                          UPI ID (STATE BANK OF INDIA POOL)
+                          UPI ID (VERIFIED UPI CHANNEL)
                         </div>
                         <div className="text-xs font-mono text-[#f4f4f5] mt-0.5 font-bold truncate">
                           {order.vpa}
