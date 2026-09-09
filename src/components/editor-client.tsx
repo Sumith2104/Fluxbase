@@ -3,7 +3,6 @@
 import { useInfiniteQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { useGlobalAlert } from '@/components/global-alert-provider';
 import Link from 'next/link';
-import Image from 'next/image';
 import dynamic from 'next/dynamic';
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import type { Table as DbTable, Column as DbColumn, Constraint as DbConstraint } from '@/lib/data';
@@ -834,43 +833,28 @@ export function EditorClient({
 
     const sidebarExplorerContent = (
         <div className="flex flex-col h-full overflow-hidden">
-            <div className="p-2 space-y-2">
-                <Button variant="outline" className="w-full justify-start text-muted-foreground pointer-events-none text-xs font-mono gap-2">
-                    <div className="relative w-4 h-4 shrink-0">
-                        <Image 
-                            src={dialect.toLowerCase() === 'mysql' ? '/mysql-bg.png' : '/postgres-bg.png'} 
-                            alt="" 
-                            width={16} 
-                            height={16} 
-                            className="w-full h-full object-contain invert opacity-80 dark:invert-0 dark:opacity-90" 
-                        />
-                    </div>
-                    <span className="truncate">{dialect.toUpperCase()}</span>
-                </Button>
-
-                {connectionType === 'external_server' && (
-                    <div className="space-y-1">
-                        <label className="text-[10px] uppercase font-bold text-muted-foreground/60 tracking-wider px-1 block">Active Database</label>
-                        {isLoadingDbs ? (
-                            <div className="flex items-center gap-2 px-3 py-2 text-xs text-muted-foreground bg-muted/40 rounded-md border border-white/5">
-                                <Loader2 className="h-3.5 w-3.5 animate-spin text-primary" />
-                                <span className="truncate">Scanning catalogs...</span>
-                            </div>
-                        ) : (
-                            <select
-                                value={currentDb}
-                                onChange={(e) => handleDatabaseChange(e.target.value)}
-                                className="w-full h-10 px-3 rounded-md border border-white/10 bg-background text-sm text-foreground/80 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary focus-visible:border-primary disabled:opacity-50 cursor-pointer"
-                            >
-                                <option value="" disabled>Select database...</option>
-                                {databases.map(db => (
-                                    <option key={db} value={db}>{db}</option>
-                                ))}
-                            </select>
-                        )}
-                    </div>
-                )}
-            </div>
+            {connectionType === 'external_server' && (
+                <div className="p-2 space-y-1">
+                    <label className="text-[10px] uppercase font-bold text-muted-foreground/60 tracking-wider px-1 block">Active Database</label>
+                    {isLoadingDbs ? (
+                        <div className="flex items-center gap-2 px-3 py-2 text-xs text-muted-foreground bg-muted/40 rounded-md border border-white/5">
+                            <Loader2 className="h-3.5 w-3.5 animate-spin text-primary" />
+                            <span className="truncate">Scanning catalogs...</span>
+                        </div>
+                    ) : (
+                        <select
+                            value={currentDb}
+                            onChange={(e) => handleDatabaseChange(e.target.value)}
+                            className="w-full h-10 px-3 rounded-md border border-white/10 bg-background text-sm text-foreground/80 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary focus-visible:border-primary disabled:opacity-50 cursor-pointer"
+                        >
+                            <option value="" disabled>Select database...</option>
+                            {databases.map(db => (
+                                <option key={db} value={db}>{db}</option>
+                            ))}
+                        </select>
+                    )}
+                </div>
+            )}
             <div className="p-2 relative">
                 <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input 
