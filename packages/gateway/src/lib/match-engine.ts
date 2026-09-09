@@ -103,7 +103,7 @@ export async function matchAndFulfillPayment(params: {
        WHERE o.status = 'pending'
          AND o.final_amount = $1
          AND (o.expires_at > NOW() OR o.created_at > (NOW() - INTERVAL '30 minutes'))
-       ORDER BY o.created_at ASC
+       ORDER BY (o.expires_at > NOW()) DESC, o.created_at DESC
        FOR UPDATE SKIP LOCKED`,
       [finalAmount]
     );
