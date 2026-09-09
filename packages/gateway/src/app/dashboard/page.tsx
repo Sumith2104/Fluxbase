@@ -4,6 +4,7 @@ import { redirect } from 'next/navigation';
 import { getPool } from '@/lib/db';
 import { getSessionMerchant } from '@/lib/merchant-session';
 import { StatusBadge } from '@/components/status-badge';
+import { TransactionsManager } from '@/components/transactions-manager';
 
 export const revalidate = 0;
 
@@ -123,82 +124,8 @@ export default async function MerchantDashboardOverview() {
         </div>
       </div>
 
-      {/* Live Transactions Table */}
-      <div className="bg-[#121214] border border-[#27272a] rounded-lg overflow-hidden">
-        <div className="px-6 py-4 border-b border-[#27272a] flex items-center justify-between">
-          <h2 className="text-sm font-bold font-mono tracking-wider uppercase text-[#f4f4f5]">
-            TRANSACTION LEDGER ({orders.length} RECENT)
-          </h2>
-          <span className="text-xs font-mono text-[#a1a1aa]">
-            AUTO-CREDITED VIA MACRODROID
-          </span>
-        </div>
-
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs font-mono">
-            <thead className="bg-[#0b0b0b] text-[#a1a1aa] border-b border-[#27272a] uppercase">
-              <tr>
-                <th className="px-6 py-3">ORDER ID</th>
-                <th className="px-6 py-3">CUSTOMER</th>
-                <th className="px-6 py-3">BASE AMT</th>
-                <th className="px-6 py-3">PAID AMT</th>
-                <th className="px-6 py-3">OFFSET</th>
-                <th className="px-6 py-3">UPI HANDLE</th>
-                <th className="px-6 py-3">STATUS</th>
-                <th className="px-6 py-3">BANK UTR</th>
-                <th className="px-6 py-3">ACTION</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-[#27272a]">
-              {orders.length === 0 ? (
-                <tr>
-                  <td colSpan={9} className="px-6 py-12 text-center text-[#71717a]">
-                    No transactions recorded yet. Generate an order via API or create a Payment Link.
-                  </td>
-                </tr>
-              ) : (
-                orders.map((o: any) => (
-                  <tr key={o.id} className="hover:bg-[#18181b]/60 transition">
-                    <td className="px-6 py-3.5 text-[#f4f4f5] font-bold">
-                      {o.id}
-                    </td>
-                    <td className="px-6 py-3.5 text-[#a1a1aa]">
-                      {o.customer_name || o.customer_email || 'Direct Buyer'}
-                    </td>
-                    <td className="px-6 py-3.5 text-[#a1a1aa]">
-                      ₹{o.base_amount}
-                    </td>
-                    <td className="px-6 py-3.5 text-[#f4f4f5] font-bold">
-                      ₹{parseFloat(o.final_amount).toFixed(2)}
-                    </td>
-                    <td className="px-6 py-3.5 text-[#ff6600]">
-                      +{o.offset_cents}p
-                    </td>
-                    <td className="px-6 py-3.5 text-[#a1a1aa]">
-                      {o.vpa_address}
-                    </td>
-                    <td className="px-6 py-3.5">
-                      <StatusBadge status={o.status} />
-                    </td>
-                    <td className="px-6 py-3.5 text-[#71717a]">
-                      {o.utr || '—'}
-                    </td>
-                    <td className="px-6 py-3.5">
-                      <Link
-                        href={`/pay/${o.id}`}
-                        target="_blank"
-                        className="text-[11px] text-[#ff6600] hover:text-[#ff7a1a] underline"
-                      >
-                        CHECKOUT
-                      </Link>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
+      {/* Interactive Payment Records & Transactions Management Console */}
+      <TransactionsManager initialOrders={orders} />
     </div>
   );
 }

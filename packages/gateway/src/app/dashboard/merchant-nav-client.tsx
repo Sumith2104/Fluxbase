@@ -9,6 +9,7 @@ export const MerchantNavClient: React.FC = () => {
 
   const navItems = [
     { label: 'OVERVIEW', href: '/dashboard' },
+    { label: 'PAYMENTS', href: '/dashboard/payments' },
     { label: 'WITHDRAWALS', href: '/dashboard/withdrawals' },
     { label: 'COUPONS', href: '/dashboard/coupons' },
     { label: 'PAYMENT LINKS', href: '/dashboard/links' },

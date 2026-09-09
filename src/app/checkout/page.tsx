@@ -182,65 +182,18 @@ function CheckoutHandler() {
       });
     }
 
-    setTimeout(() => router.push('/dashboard/projects'), 1800);
+    // Seamless instant transition to projects dashboard (no redundant 2nd confirmation dialog)
+    router.replace('/dashboard/projects');
   };
 
-  // Render: Completed State
+  // Render: Completed State (Minimal transition state, no duplicate modal)
   if (viewMode === 'completed') {
     return (
       <div className="flex min-h-screen items-center justify-center bg-[#0b0b0b] text-[#f4f4f5] p-4 font-sans">
-        <Card className="w-full max-w-md border border-[#27272a] bg-[#121214] shadow-2xl p-6 text-center space-y-4">
-          {/* Animated Verified Tick Mark */}
-          <div className="relative flex items-center justify-center w-20 h-20 mx-auto">
-            <div className="absolute inset-0 rounded-full bg-emerald-500/20 blur-xl animate-pulse" />
-            <svg
-              className="w-20 h-20 relative z-10 animate-checkmark-pop"
-              viewBox="0 0 64 64"
-              fill="none"
-              style={{
-                filter: 'drop-shadow(0 0 12px rgba(16, 185, 129, 0.4))',
-              }}
-            >
-              {/* Background badge circle */}
-              <circle cx="32" cy="32" r="28" fill="#064e3b" fillOpacity="0.45" />
-
-              {/* Animated drawing outer ring */}
-              <circle
-                cx="32"
-                cy="32"
-                r="28"
-                stroke="#10b981"
-                strokeWidth="2.5"
-                strokeLinecap="round"
-                className="animate-checkmark-circle"
-              />
-
-              {/* Animated drawing checkmark tick */}
-              <path
-                d="M20 32.5L28 40.5L44 23.5"
-                stroke="#34d399"
-                strokeWidth="3.5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                className="animate-checkmark-check"
-              />
-            </svg>
-          </div>
-          <div>
-            <h2 className="text-xl font-bold text-[#f4f4f5] tracking-tight">PAYMENT CONFIRMED</h2>
-            <p className="text-xs text-emerald-400 font-mono mt-1">SUBSCRIPTION ACTIVE & PROVISIONED</p>
-            {paramUtr && <p className="text-xs text-zinc-400 font-mono mt-0.5">BANK UTR: {paramUtr}</p>}
-          </div>
-          <p className="text-xs text-[#ff6600] font-mono animate-pulse">
-            Redirecting to your projects dashboard in a moment...
-          </p>
-          <Button
-            onClick={() => router.push('/dashboard/projects')}
-            className="w-full bg-[#ff6600] hover:bg-[#ff7a1a] text-black font-semibold text-xs font-mono uppercase"
-          >
-            Go to Projects Now
-          </Button>
-        </Card>
+        <div className="flex items-center gap-3 text-xs font-mono text-zinc-400 bg-[#121214] border border-[#27272a] rounded-lg px-5 py-3 shadow-xl">
+          <Loader2 className="h-4 w-4 animate-spin text-[#ff6600]" />
+          <span>Opening your projects dashboard...</span>
+        </div>
       </div>
     );
   }

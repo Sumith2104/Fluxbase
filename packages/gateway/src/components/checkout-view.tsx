@@ -181,6 +181,16 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({ order }) => {
   const [viewStep, setViewStep] = useState<'review' | 'pay'>('review');
   const [remainingSeconds, setRemainingSeconds] = useState(180);
   const [redirectCount, setRedirectCount] = useState<number | null>(order.status === 'paid' ? 3 : null);
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      setIsMobile(
+        /Android|iPhone|iPad|iPod|Opera Mini|IEMobile|WPDesktop/i.test(navigator.userAgent) ||
+        window.innerWidth < 768
+      );
+    }
+  }, []);
 
   // Dynamic pricing and coupon state
   const [baseAmount, setBaseAmount] = useState<number>(order.amount);
@@ -687,39 +697,41 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({ order }) => {
                   </button>
                 </div>
 
-                {/* Mobile Quick Pay (1-Tap Intent) */}
-                <div className="space-y-1.5">
-                  <div className="text-[10px] font-mono text-[#a1a1aa] uppercase">
-                    PAY VIA MOBILE APP (1-TAP INTENT)
+                {/* Mobile Quick Pay (1-Tap Intent) - Only visible when app is used from mobile */}
+                {isMobile && (
+                  <div className="space-y-1.5 md:hidden">
+                    <div className="text-[10px] font-mono text-[#a1a1aa] uppercase">
+                      PAY VIA MOBILE APP (1-TAP INTENT)
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <a
+                        href={upiIntentUrl}
+                        className="text-center py-2 px-2 bg-[#18181b] hover:bg-[#202023] border border-[#27272a] rounded text-[11px] font-mono text-[#f4f4f5] transition hover:border-zinc-500"
+                      >
+                        OPEN GPAY
+                      </a>
+                      <a
+                        href={upiIntentUrl}
+                        className="text-center py-2 px-2 bg-[#18181b] hover:bg-[#202023] border border-[#27272a] rounded text-[11px] font-mono text-[#f4f4f5] transition hover:border-zinc-500"
+                      >
+                        OPEN PHONEPE
+                      </a>
+                      <a
+                        href={upiIntentUrl}
+                        className="text-center py-2 px-2 bg-[#18181b] hover:bg-[#202023] border border-[#27272a] rounded text-[11px] font-mono text-[#f4f4f5] transition hover:border-zinc-500"
+                      >
+                        OPEN PAYTM
+                      </a>
+                      <a
+                        href={upiIntentUrl}
+                        style={{ backgroundColor: '#ff6600', color: '#000000' }}
+                        className="text-center py-2 px-2 bg-[#ff6600] hover:bg-[#ff7a1a] text-black font-bold rounded text-[11px] font-mono transition"
+                      >
+                        DEFAULT UPI
+                      </a>
+                    </div>
                   </div>
-                  <div className="grid grid-cols-2 gap-2">
-                    <a
-                      href={upiIntentUrl}
-                      className="text-center py-2 px-2 bg-[#18181b] hover:bg-[#202023] border border-[#27272a] rounded text-[11px] font-mono text-[#f4f4f5] transition hover:border-zinc-500"
-                    >
-                      OPEN GPAY
-                    </a>
-                    <a
-                      href={upiIntentUrl}
-                      className="text-center py-2 px-2 bg-[#18181b] hover:bg-[#202023] border border-[#27272a] rounded text-[11px] font-mono text-[#f4f4f5] transition hover:border-zinc-500"
-                    >
-                      OPEN PHONEPE
-                    </a>
-                    <a
-                      href={upiIntentUrl}
-                      className="text-center py-2 px-2 bg-[#18181b] hover:bg-[#202023] border border-[#27272a] rounded text-[11px] font-mono text-[#f4f4f5] transition hover:border-zinc-500"
-                    >
-                      OPEN PAYTM
-                    </a>
-                    <a
-                      href={upiIntentUrl}
-                      style={{ backgroundColor: '#ff6600', color: '#000000' }}
-                      className="text-center py-2 px-2 bg-[#ff6600] hover:bg-[#ff7a1a] text-black font-bold rounded text-[11px] font-mono transition"
-                    >
-                      DEFAULT UPI
-                    </a>
-                  </div>
-                </div>
+                )}
 
                 {/* Return Links */}
                 <div className="pt-2 flex items-center justify-between text-[11px] font-mono text-zinc-500">
@@ -796,219 +808,158 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({ order }) => {
     );
   }
 
-  // 4. STEP 1: CLEAN ORDER & PROMO CODE REVIEW SCREEN (No Timer Running!)
+  // 4. STEP 1: CLEAN MINIMALIST ORDER & PROMO CODE REVIEW SCREEN
   return (
-    <div className="min-h-screen bg-[#0b0b0b] text-[#f4f4f5] flex items-center justify-center p-4 md:p-6 lg:p-8 selection:bg-[#ff6600] selection:text-black font-sans">
-      <div className="w-full max-w-5xl bg-[#121214] border border-[#27272a] rounded-xl shadow-2xl overflow-hidden">
+    <div className="min-h-screen bg-[#0b0b0b] text-[#f4f4f5] flex items-center justify-center p-4 selection:bg-[#ff6600] selection:text-black font-sans">
+      <div className="w-full max-w-md bg-[#121214] border border-[#27272a] rounded-xl shadow-2xl overflow-hidden font-mono text-xs">
         
-        {/* Top Header Bar */}
-        <div className="px-6 py-4 border-b border-[#27272a] flex flex-wrap items-center justify-between gap-3 bg-[#151518]">
-          <div className="flex items-center gap-3">
+        {/* Minimal Header */}
+        <div className="px-5 py-3.5 border-b border-[#27272a] flex items-center justify-between bg-[#151518]">
+          <div className="flex items-center gap-2.5">
             {order.callback_url && (
               <a
                 href={getCleanReturnUrl(order.callback_url, 'cancelled', order.id)}
-                className="p-1.5 px-2.5 rounded bg-[#1c1c20] border border-[#27272a] hover:border-[#ff6600] text-zinc-400 hover:text-[#f4f4f5] transition text-xs font-mono"
+                className="px-2 py-1 rounded bg-[#1c1c20] border border-[#27272a] hover:border-[#ff6600] text-zinc-400 hover:text-[#f4f4f5] transition text-[11px]"
                 title="Cancel and return to Fluxbase"
               >
                 ← BACK
               </a>
             )}
-            <div>
-              <div className="text-[10px] font-mono text-[#ff6600] uppercase tracking-widest font-bold">
-                FLUXPAY // ORDER REVIEW & SUMMARY
-              </div>
-              <h1 className="text-base font-bold text-[#f4f4f5] tracking-tight">
-                Review Your Subscription Order
-              </h1>
-            </div>
-          </div>
-
-          <div className="text-zinc-500 font-mono text-[11px] uppercase tracking-wider">
-            256-BIT ENCRYPTED
-          </div>
-        </div>
-
-        {/* Provisioning Target Context Banner (if applicable) */}
-        {projectData?.projectName && (
-          <div className="mx-6 lg:mx-8 mt-6 p-3.5 bg-[#0b0b0b] border border-[#27272a] rounded-lg flex items-center justify-between text-xs font-mono">
-            <div className="flex items-center gap-2">
-              <span className="text-[#ff6600] font-bold">[TARGET]</span>
-              <span>
-                PROVISIONING TARGET: <strong className="text-[#f4f4f5]">{projectData.projectName}</strong> (
-                {(projectData.dialect || 'postgresql').toUpperCase()})
-              </span>
-            </div>
-            <span className="text-[10px] text-zinc-500 uppercase px-2 py-0.5 bg-[#18181b] rounded border border-[#27272a]">
-              ACTIVATES UPON PAYMENT
+            <span className="text-zinc-200 font-bold uppercase tracking-wider text-[11px]">
+              ORDER REVIEW
             </span>
           </div>
-        )}
-
-        {/* 2-Column Review Grid: Left Specs & Coupon, Right Billing Summary & Proceed */}
-        <div className="p-6 lg:p-8">
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8 items-start">
-            
-            {/* LEFT COLUMN: Plan Specs & Promo Code (7 cols) */}
-            <div className="lg:col-span-7 space-y-6">
-              
-              {/* Selected Plan Details Card */}
-              <div className="bg-[#0b0b0b] border border-[#27272a] rounded-xl p-5 space-y-4 shadow-xl">
-                <div className="flex items-start justify-between gap-4">
-                  <div>
-                    <span className="text-[10px] font-mono uppercase tracking-widest font-bold px-2 py-0.5 rounded bg-[#ff6600]/10 text-[#ff6600] border border-[#ff6600]/20">
-                      {planMeta?.badge || 'SUBSCRIPTION TIER'}
-                    </span>
-                    <h2 className="text-lg font-bold text-[#f4f4f5] mt-2">
-                      {planMeta?.name || order.title || 'Subscription Plan'}
-                    </h2>
-                    <p className="text-xs text-zinc-400 mt-1 leading-relaxed">
-                      {planMeta?.description || `Subscription package provided by ${order.merchant || 'Fluxbase'}.`}
-                    </p>
-                  </div>
-                  <div className="text-right shrink-0">
-                    <div className="text-2xl font-black font-mono text-[#f4f4f5]">
-                      ₹{(appliedCoupon?.original_amount || baseAmount).toFixed(2)}
-                    </div>
-                    <div className="text-[10px] font-mono text-zinc-500 mt-0.5">
-                      {planMeta?.interval || 'Billed Monthly'}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Specs & Quotas Included */}
-                {planMeta?.specs && (
-                  <div className="pt-3 border-t border-[#1f1f23]">
-                    <div className="text-[10px] font-mono uppercase tracking-wider text-zinc-500 font-semibold mb-2">
-                      INCLUDED QUOTAS & INFRASTRUCTURE SPECS
-                    </div>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs font-mono text-zinc-300">
-                      {planMeta.specs.map((spec, idx) => (
-                        <div key={idx} className="flex items-start gap-2">
-                          <span className="text-emerald-400 font-bold shrink-0">•</span>
-                          <span className="leading-tight">{spec}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* Promo Code / Coupon Box */}
-              <div className="bg-[#0b0b0b] border border-[#27272a] rounded-xl p-5 space-y-3 shadow-xl">
-                <div className="text-xs font-mono font-bold uppercase tracking-wider text-[#f4f4f5]">
-                  HAVE A DISCOUNT PROMO CODE?
-                </div>
-
-                {appliedCoupon ? (
-                  <div className="p-3 bg-emerald-950/30 border border-emerald-800/60 rounded-lg flex items-center justify-between text-xs font-mono text-emerald-400">
-                    <div className="flex items-center gap-2">
-                      <span className="font-bold">COUPON [{appliedCoupon.code}] APPLIED</span>
-                      <span>(-₹{appliedCoupon.discount.toFixed(2)})</span>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={handleRemoveCoupon}
-                      disabled={couponLoading}
-                      className="text-rose-400 hover:text-rose-300 text-[11px] uppercase font-bold underline"
-                    >
-                      REMOVE
-                    </button>
-                  </div>
-                ) : (
-                  <form onSubmit={handleApplyCoupon} className="space-y-2">
-                    <div className="flex gap-2">
-                      <input
-                        type="text"
-                        value={couponCodeInput}
-                        onChange={(e) => setCouponCodeInput(e.target.value.toUpperCase())}
-                        placeholder="ENTER PROMO CODE (E.G. BHAICHARA)"
-                        className="flex-1 bg-[#121214] border border-[#27272a] rounded px-3 py-2 text-xs font-mono uppercase text-[#f4f4f5] focus:outline-none focus:border-[#ff6600]"
-                      />
-                      <button
-                        type="submit"
-                        disabled={couponLoading || !couponCodeInput.trim()}
-                        className="px-4 py-2 bg-[#18181b] hover:bg-[#27272a] border border-[#27272a] hover:border-[#ff6600] text-xs font-mono font-bold text-[#f4f4f5] rounded transition disabled:opacity-50 uppercase"
-                      >
-                        {couponLoading ? 'CHECKING...' : 'APPLY CODE'}
-                      </button>
-                    </div>
-                    {couponError && (
-                      <p className="text-[11px] font-mono text-rose-400">
-                        {couponError}
-                      </p>
-                    )}
-                  </form>
-                )}
-              </div>
-
-            </div>
-
-            {/* RIGHT COLUMN: Billing Summary & Proceed Button (5 cols) */}
-            <div className="lg:col-span-5 space-y-4">
-              <div className="bg-[#0b0b0b] border border-[#27272a] rounded-xl p-6 space-y-4 shadow-xl">
-                <div className="text-xs font-mono font-bold uppercase tracking-wider text-zinc-400 border-b border-[#1f1f23] pb-2">
-                  BILLING SUMMARY
-                </div>
-
-                <div className="space-y-2 text-xs font-mono">
-                  <div className="flex items-center justify-between text-zinc-300">
-                    <span>Base Plan Rate:</span>
-                    <span>₹{(appliedCoupon?.original_amount || baseAmount).toFixed(2)}</span>
-                  </div>
-
-                  {appliedCoupon && (
-                    <div className="flex items-center justify-between text-emerald-400 font-semibold">
-                      <span>Discount ({appliedCoupon.code}):</span>
-                      <span>-₹{appliedCoupon.discount.toFixed(2)}</span>
-                    </div>
-                  )}
-
-                  <div className="flex items-center justify-between text-zinc-400 text-[11px]">
-                    <span>Gateway & Slot Fee:</span>
-                    <span className="text-emerald-400 font-bold">FREE</span>
-                  </div>
-
-                  <div className="border-t border-[#27272a] pt-3 flex items-baseline justify-between">
-                    <span className="font-bold text-sm text-[#f4f4f5]">TOTAL PAYABLE:</span>
-                    <span className="text-2xl font-black font-mono text-[#ff6600]">
-                      ₹{finalAmountStr}
-                    </span>
-                  </div>
-                </div>
-
-                {/* Primary Proceed Action */}
-                <button
-                  type="button"
-                  onClick={proceedToPayment}
-                  className="w-full py-3.5 bg-[#ff6600] hover:bg-[#ff7a1a] text-black font-bold text-xs font-mono uppercase tracking-wider rounded transition"
-                >
-                  PROCEED TO PAYMENT →
-                </button>
-
-                {/* Guarantees & Cancel (Clean text, no icons, no emojis) */}
-                <div className="pt-2 border-t border-[#1f1f23] space-y-1.5 text-[10px] font-mono text-zinc-500">
-                  <div className="flex items-center justify-between">
-                    <span>Verified Instant Slot Allocation</span>
-                    {order.callback_url && (
-                      <a
-                        href={getCleanReturnUrl(order.callback_url, 'cancelled', order.id)}
-                        className="text-zinc-500 hover:text-[#ff6600] transition"
-                      >
-                        Cancel and return
-                      </a>
-                    )}
-                  </div>
-                  <div>
-                    <span>Auto-provisioned upon UPI transfer</span>
-                  </div>
-                </div>
-
-              </div>
-            </div>
-
-          </div>
+          <span className="text-[10px] text-zinc-500 uppercase tracking-widest">
+            256-BIT ENCRYPTED
+          </span>
         </div>
 
+        {/* Minimal Content */}
+        <div className="p-5 space-y-4">
+          
+          {/* Plan & Target Info */}
+          <div className="bg-[#0b0b0b] border border-[#27272a] rounded-lg p-3.5 space-y-2">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <span className="text-[9px] uppercase tracking-wider font-bold px-1.5 py-0.5 rounded bg-[#ff6600]/10 text-[#ff6600] border border-[#ff6600]/20">
+                  {planMeta?.badge || 'SUBSCRIPTION'}
+                </span>
+                <div className="text-sm font-bold text-[#f4f4f5] mt-1">
+                  {planMeta?.name || order.title || 'Subscription Plan'}
+                </div>
+              </div>
+              <div className="text-right shrink-0">
+                <div className="text-base font-bold text-[#f4f4f5]">
+                  ₹{(appliedCoupon?.original_amount || baseAmount).toFixed(2)}
+                </div>
+                <div className="text-[10px] text-zinc-500">
+                  {planMeta?.interval || 'Billed Monthly'}
+                </div>
+              </div>
+            </div>
+
+            {projectData?.projectName && (
+              <div className="pt-2 border-t border-[#1a1a1e] flex items-center justify-between text-[11px] text-zinc-400">
+                <span>Target Project:</span>
+                <span className="text-zinc-200 font-bold">
+                  {projectData.projectName} ({(projectData.dialect || 'postgresql').toUpperCase()})
+                </span>
+              </div>
+            )}
+          </div>
+
+          {/* Minimal Promo Code Box */}
+          <div>
+            {appliedCoupon ? (
+              <div className="p-2.5 bg-emerald-950/30 border border-emerald-800/50 rounded-lg flex items-center justify-between text-emerald-400">
+                <span className="font-semibold">
+                  COUPON [{appliedCoupon.code}] (-₹{appliedCoupon.discount.toFixed(2)})
+                </span>
+                <button
+                  type="button"
+                  onClick={handleRemoveCoupon}
+                  disabled={couponLoading}
+                  className="text-rose-400 hover:text-rose-300 text-[10px] uppercase font-bold underline"
+                >
+                  REMOVE
+                </button>
+              </div>
+            ) : (
+              <form onSubmit={handleApplyCoupon} className="space-y-1.5">
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={couponCodeInput}
+                    onChange={(e) => setCouponCodeInput(e.target.value.toUpperCase())}
+                    placeholder="ENTER PROMO CODE"
+                    className="flex-1 bg-[#0b0b0b] border border-[#27272a] rounded px-3 py-2 text-xs uppercase text-[#f4f4f5] focus:outline-none focus:border-[#ff6600] placeholder:text-zinc-600"
+                  />
+                  <button
+                    type="submit"
+                    disabled={couponLoading || !couponCodeInput.trim()}
+                    className="px-3 py-2 bg-[#18181b] hover:bg-[#27272a] border border-[#27272a] hover:border-[#ff6600] text-xs font-bold text-[#f4f4f5] rounded transition disabled:opacity-40 uppercase shrink-0"
+                  >
+                    {couponLoading ? '...' : 'APPLY'}
+                  </button>
+                </div>
+                {couponError && (
+                  <p className="text-[10px] text-rose-400">
+                    {couponError}
+                  </p>
+                )}
+              </form>
+            )}
+          </div>
+
+          {/* Minimal Billing Breakdown */}
+          <div className="bg-[#0b0b0b] border border-[#27272a] rounded-lg p-3.5 space-y-2">
+            <div className="flex items-center justify-between text-zinc-400">
+              <span>Base Plan Rate:</span>
+              <span>₹{(appliedCoupon?.original_amount || baseAmount).toFixed(2)}</span>
+            </div>
+
+            {appliedCoupon && (
+              <div className="flex items-center justify-between text-emerald-400 font-semibold">
+                <span>Discount:</span>
+                <span>-₹{appliedCoupon.discount.toFixed(2)}</span>
+              </div>
+            )}
+
+            <div className="flex items-center justify-between text-zinc-500 text-[11px]">
+              <span>Gateway Fee:</span>
+              <span className="text-emerald-400 font-bold">FREE</span>
+            </div>
+
+            <div className="border-t border-[#27272a] pt-2.5 flex items-baseline justify-between">
+              <span className="font-bold text-[#f4f4f5]">TOTAL PAYABLE:</span>
+              <span className="text-xl font-bold text-[#ff6600]">
+                ₹{finalAmountStr}
+              </span>
+            </div>
+          </div>
+
+          {/* Action Button */}
+          <button
+            type="button"
+            onClick={proceedToPayment}
+            className="w-full py-3 bg-[#ff6600] hover:bg-[#ff7a1a] text-black font-bold text-xs uppercase tracking-wider rounded transition"
+          >
+            PROCEED TO PAYMENT →
+          </button>
+
+          {/* Minimal Subtext */}
+          {order.callback_url && (
+            <div className="text-center pt-1">
+              <a
+                href={getCleanReturnUrl(order.callback_url, 'cancelled', order.id)}
+                className="text-[11px] text-zinc-500 hover:text-[#ff6600] transition"
+              >
+                Cancel and return
+              </a>
+            </div>
+          )}
+
+        </div>
       </div>
     </div>
   );
