@@ -42,11 +42,24 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
 
     // Look up coupon
     const code = coupon_code.trim().toUpperCase();
-    const couponRes = await pool.query(
+    let couponRes = await pool.query(
       `SELECT * FROM coupons 
-       WHERE merchant_id = $1 AND code = $2 AND is_active = true`,
+       WHERE merchant_id = $1 AND UPPER(code) = $2 AND is_active = true`,
       [order.merchant_id, code]
     );
+
+    if (couponRes.rows.length === 0) {
+      const globalRes = await pool.query(
+        `SELECT id, $1 as merchant_id, code, discount_type, discount_value, 0 as min_order_amount, max_discount_amount, is_active, expires_at, 0 as used_count, NULL as usage_limit
+         FROM fluxbase_global.discounts 
+         WHERE UPPER(code) = $2 AND is_active = true AND (expires_at IS NULL OR expires_at > NOW())
+         LIMIT 1`,
+        [order.merchant_id, code]
+      );
+      if (globalRes.rows.length > 0) {
+        couponRes = globalRes;
+      }
+    }
 
     if (couponRes.rows.length === 0) {
       return NextResponse.json({ error: 'Invalid or inactive coupon code' }, { status: 404 });
