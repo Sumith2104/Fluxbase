@@ -265,7 +265,7 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({ order }) => {
 
     let isMounted = true;
     let es: EventSource | null = null;
-    let reconnectTimer: NodeJS.Timeout | null = null;
+    let reconnectTimer: any = null;
 
     // 1. Direct fetch status check
     const checkOrderStatus = async () => {

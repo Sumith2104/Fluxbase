@@ -111,4 +111,24 @@ export const redis = {
     }
     return 0;
   },
+
+  async keys(pattern: string): Promise<string[]> {
+    if (client) {
+      try {
+        return await client.keys(pattern);
+      } catch (err) {
+        console.warn(`[Gateway Redis] keys failed for pattern "${pattern}":`, err);
+      }
+    }
+    const now = Date.now();
+    const matches: string[] = [];
+    const regex = new RegExp('^' + pattern.replace(/\*/g, '.*') + '$');
+    for (const [k, v] of inMemoryCache.entries()) {
+      if (v.expiresAt > now && regex.test(k)) {
+        matches.push(k);
+      }
+    }
+    return matches;
+  },
 };
+
