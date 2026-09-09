@@ -753,10 +753,10 @@ export async function createProject(
                 await mysqlPool.query(safeSql`CREATE DATABASE ${safeDbName}`);
                 console.log(`[Fluxbase Native] Successfully provisioned MySQL DB: project_${projectId}`);
             } else {
-                // Default PostgreSQL Schema approach
-                const safeSchemaName = quotePgProjectSchemaSafe(projectId);
-                await pool.query(safeSql`CREATE SCHEMA IF NOT EXISTS ${safeSchemaName}`);
-                console.log(`[Fluxbase Native] Successfully provisioned PG Schema: project_${projectId}`);
+                // Default PostgreSQL Schema approach: provision isolated tenant schema
+                const safeSchemaName = `flux_tenant_${projectId}`;
+                await pool.query(`CREATE SCHEMA IF NOT EXISTS "${safeSchemaName}"`);
+                console.log(`[Fluxbase Native] Successfully provisioned PG Schema: ${safeSchemaName}`);
             }
         } catch (dbError) {
             console.error(`[Fluxbase Native] Failed to provision native environment for project_${projectId}`, dbError);
