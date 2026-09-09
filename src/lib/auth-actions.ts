@@ -45,6 +45,7 @@ export async function deleteUserAccount(userId: string) {
     // 2. Delete each project natively (Drop schema)
     for (const row of result.rows) {
         await pool.query(`DROP SCHEMA IF EXISTS "project_${row.project_id}" CASCADE`);
+        await pool.query(`DROP SCHEMA IF EXISTS "flux_tenant_${row.project_id}" CASCADE`);
     }
 
     // 3. Delete user profile (Also remove projects from metadata table)
