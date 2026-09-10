@@ -41,7 +41,7 @@ export async function getUserPlanAction() {
         if (rows.length > 0) {
             return {
                 plan: rows[0].planType || 'free',
-                role: rows[0].userRole || 'student',
+                role: rows[0].userRole || rows[0].planType || 'student',
                 billing_cycle_end: rows[0].billingCycleEnd,
                 status: rows[0].status || 'active'
             };
@@ -53,11 +53,12 @@ export async function getUserPlanAction() {
     }
 }
 
-export async function getBillingDetailsAction(): Promise<{ success: boolean; data?: BillingDetails; error?: string }> {
+export async function getBillingDetailsAction(showTestPayments: boolean = false): Promise<{ success: boolean; data?: BillingDetails; error?: string }> {
     const userId = await getCurrentUserId();
     if (!userId) return { success: false, error: 'Unauthorized' };
 
-    const cached = _billingCache.get(userId);
+    const cacheKey = `${userId}:${showTestPayments ? 'all' : 'live'}`;
+    const cached = _billingCache.get(cacheKey);
     if (cached) {
         return { success: true, data: cached };
     }
@@ -72,11 +73,15 @@ export async function getBillingDetailsAction(): Promise<{ success: boolean; dat
         );
         const userRow = userRes.rows[0] || {};
         const plan = (userRow.planType || 'free').toLowerCase();
-        const role = userRow.userRole || 'student';
+        const role = userRow.userRole || userRow.planType || 'student';
 
         // 2. Fetch payments history
         let invoices: BillingDetails['invoices'] = [];
         try {
+            const filterClause = showTestPayments
+                ? ''
+                : "AND NOT (p.amount <= 2.5 AND (p.razorpay_payment_id LIKE 'upi_session_%' OR p.razorpay_payment_id LIKE 'upi_utr_%' OR p.razorpay_payment_id LIKE 'utr_%'))";
+
             const paymentsRes = await pool.query(
                 `SELECT 
                     p.id, 
@@ -90,13 +95,14 @@ export async function getBillingDetailsAction(): Promise<{ success: boolean; dat
                  LEFT JOIN fluxbase_global.payment_sessions ps 
                     ON p.razorpay_payment_id = CONCAT('upi_session_', ps.id::text)
                  WHERE p.user_id = $1::text 
-                 ORDER BY p.created_at DESC LIMIT 10`,
+                 ${filterClause}
+                 ORDER BY p.created_at DESC LIMIT 50`,
                 [userId]
             );
             invoices = paymentsRes.rows.map(r => {
                 const amt = parseFloat(r.amount) || 0;
                 let label = r.sessionPlan ? `${r.sessionPlan.toUpperCase()} Plan` : 'Payment';
-                if (amt <= 2 && (r.paymentId || '').startsWith('upi_session_')) {
+                if (amt <= 2.5 && (r.paymentId || '').match(/^(upi_session_|upi_utr_|utr_)/)) {
                     label = 'UPI Test / Verification';
                 }
                 return {
@@ -184,7 +190,7 @@ export async function getBillingDetailsAction(): Promise<{ success: boolean; dat
             invoices
         };
 
-        _billingCache.set(userId, resultData);
+        _billingCache.set(cacheKey, resultData);
 
         return {
             success: true,

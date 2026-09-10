@@ -243,7 +243,7 @@ export async function POST(req: NextRequest) {
 
                 await client.query(
                     `UPDATE fluxbase_global.users 
-                     SET plan_type = $1, billing_cycle_end = NOW() + INTERVAL '1 month', status = 'active'
+                     SET plan_type = $1, user_role = $1, billing_cycle_end = NOW() + INTERVAL '1 month', status = 'active'
                      WHERE id = $2`,
                     [planType, userId]
                 );

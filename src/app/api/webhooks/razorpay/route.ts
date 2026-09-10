@@ -37,7 +37,7 @@ export async function POST(req: Request) {
             if (userId && (status === 'active' || status === 'authenticated')) {
                 await pool.query(`
                     UPDATE fluxbase_global.users 
-                    SET plan_type = $1, razorpay_customer_id = $2, razorpay_subscription_id = $3, billing_cycle_end = $4
+                    SET plan_type = $1, user_role = $1, razorpay_customer_id = $2, razorpay_subscription_id = $3, billing_cycle_end = $4
                     WHERE id = $5
                 `, [planType, customerId, subscription.id, currentEnd.toISOString(), userId]);
 

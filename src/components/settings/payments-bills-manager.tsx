@@ -9,21 +9,24 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { 
     CreditCard, Activity, HardDrive, Cpu, 
     Receipt, Building2, Briefcase, GraduationCap, 
-    Loader2, RefreshCw 
+    Loader2, RefreshCw, Eye, EyeOff, Filter 
 } from 'lucide-react';
 import { getBillingDetailsAction, BillingDetails } from '@/app/(app)/settings/billing-actions';
 import { useRouter } from 'next/navigation';
+import { cn } from '@/lib/utils';
 
 export function PaymentsBillsManager() {
     const router = useRouter();
     const [billingData, setBillingData] = useState<BillingDetails | null>(null);
     const [loading, setLoading] = useState(true);
     const [upgradingPlan, setUpgradingPlan] = useState<string | null>(null);
+    const [showTestPayments, setShowTestPayments] = useState(false);
+    const [refreshingPayments, setRefreshingPayments] = useState(false);
 
-    const fetchBilling = async () => {
+    const fetchBilling = async (withTestPayments: boolean = showTestPayments) => {
         setLoading(true);
         try {
-            const res = await getBillingDetailsAction();
+            const res = await getBillingDetailsAction(withTestPayments);
             if (res.success && res.data) {
                 setBillingData(res.data);
             } else {
@@ -60,8 +63,24 @@ export function PaymentsBillsManager() {
     };
 
     useEffect(() => {
-        fetchBilling();
+        fetchBilling(false);
     }, []);
+
+    const toggleTestPayments = async () => {
+        const nextState = !showTestPayments;
+        setShowTestPayments(nextState);
+        setRefreshingPayments(true);
+        try {
+            const res = await getBillingDetailsAction(nextState);
+            if (res.success && res.data) {
+                setBillingData(res.data);
+            }
+        } catch (e: any) {
+            console.error('Error toggling test payments:', e);
+        } finally {
+            setRefreshingPayments(false);
+        }
+    };
 
     const handleStartCheckout = (planKey: string) => {
         setUpgradingPlan(planKey);
@@ -140,7 +159,7 @@ export function PaymentsBillsManager() {
                             <Badge variant="secondary" className="font-mono text-xs uppercase px-2.5 py-1 bg-primary/10 text-primary border-primary/20">
                                 {role === 'org_owner' ? 'Org Owner Tier' : (role === 'employee' ? 'Employee Tier' : 'Student Tier')}
                             </Badge>
-                            <Button size="sm" variant="ghost" onClick={fetchBilling} className="h-8 px-2 text-xs text-muted-foreground hover:text-foreground">
+                            <Button size="sm" variant="ghost" onClick={() => fetchBilling()} className="h-8 px-2 text-xs text-muted-foreground hover:text-foreground">
                                 <RefreshCw className="h-3.5 w-3.5" />
                             </Button>
                         </div>
@@ -301,10 +320,39 @@ export function PaymentsBillsManager() {
 
                     {/* ── 4. Invoices & Transaction Receipts History ── */}
                     <div>
-                        <h4 className="text-xs font-mono uppercase tracking-wider text-muted-foreground mb-3 flex items-center gap-1.5">
-                            <Receipt className="h-3.5 w-3.5 text-primary" />
-                            Invoices & Payment Receipts
-                        </h4>
+                        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-3">
+                            <h4 className="text-xs font-mono uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+                                <Receipt className="h-3.5 w-3.5 text-primary" />
+                                Invoices & Payment Receipts
+                            </h4>
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={toggleTestPayments}
+                                disabled={refreshingPayments}
+                                className={cn(
+                                    "h-7 px-2.5 text-[11px] font-mono gap-1.5 transition-colors border",
+                                    showTestPayments
+                                        ? "border-amber-500/40 bg-amber-500/10 text-amber-500 hover:bg-amber-500/20 hover:text-amber-400"
+                                        : "border-border/70 text-muted-foreground hover:text-foreground hover:bg-secondary/40"
+                                )}
+                            >
+                                {refreshingPayments ? (
+                                    <Loader2 className="h-3 w-3 animate-spin" />
+                                ) : showTestPayments ? (
+                                    <EyeOff className="h-3 w-3" />
+                                ) : (
+                                    <Eye className="h-3 w-3" />
+                                )}
+                                {showTestPayments ? 'Hide Test Transactions' : 'Show Test Transactions'}
+                            </Button>
+                        </div>
+
+                        {showTestPayments && (
+                            <p className="text-[11px] text-amber-500/80 mb-2.5 font-mono flex items-center gap-1">
+                                <span>*</span> Displaying all transactions including ₹1.01 UPI test/verification sessions.
+                            </p>
+                        )}
 
                         {(!billingData?.invoices || billingData.invoices.length === 0) ? (
                             <div className="p-6 rounded-xl border border-dashed border-border/60 text-center bg-secondary/20">
@@ -327,7 +375,16 @@ export function PaymentsBillsManager() {
                                         {billingData.invoices.map((inv) => (
                                             <tr key={inv.id} className="hover:bg-secondary/40 transition-colors">
                                                 <td className="p-3 font-mono">{inv.date}</td>
-                                                <td className="p-3 font-medium text-foreground">{inv.plan}</td>
+                                                <td className="p-3 font-medium">
+                                                    {inv.plan === 'UPI Test / Verification' ? (
+                                                        <span className="inline-flex items-center gap-1.5 text-muted-foreground text-[11px]">
+                                                            <span className="h-1.5 w-1.5 rounded-full bg-amber-400/80" />
+                                                            {inv.plan}
+                                                        </span>
+                                                    ) : (
+                                                        <span className="text-foreground font-semibold">{inv.plan}</span>
+                                                    )}
+                                                </td>
                                                 <td className="p-3 font-mono text-muted-foreground text-[11px] truncate max-w-[120px]">{inv.transactionId}</td>
                                                 <td className="p-3 font-mono font-bold text-foreground">₹{(inv.amount || 0).toFixed(2)}</td>
                                                 <td className="p-3">

@@ -392,7 +392,7 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
                     />
                     {selectedProject && (() => {
                         const liveProject = projects.find(p => p.project_id === selectedProject.project_id) || selectedProject;
-                        const accountRole = (user as any)?.user_role || (user as any)?.plan_type || liveProject.creator_role || 'student';
+                        const accountRole = (user as any)?.plan_type || (user as any)?.user_role || liveProject.creator_role || 'student';
                         const effectiveRole = accountRole === 'employee' || accountRole === 'org_owner' ? accountRole : (liveProject.creator_role || 'student');
                         const isStudent = effectiveRole === 'student';
                         const rawBilling = liveProject.billing_preference || selectedProject.billing_preference || (user as any)?.billing_preference;

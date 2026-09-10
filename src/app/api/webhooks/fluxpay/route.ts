@@ -53,7 +53,7 @@ export async function POST(req: NextRequest) {
       const cleanPlan = plan === 'student_max' ? 'max' : plan === 'student_pro' ? 'pro' : plan;
       await pool.query(
         `UPDATE fluxbase_global.users 
-         SET plan_type = $1, updated_at = NOW() 
+         SET plan_type = $1, user_role = $1, updated_at = NOW() 
          WHERE id = $2`,
         [cleanPlan, userId]
       );
