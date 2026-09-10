@@ -3,6 +3,7 @@ import { getAnalyticsStatsAction } from '@/app/(app)/dashboard/analytics-actions
 
 export interface AnalyticsStats {
     total_requests: number;
+    all_time_requests?: number;
     type_api_call: number;
     type_sql_execution: number;
     type_storage_read: number;

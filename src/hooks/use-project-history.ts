@@ -5,15 +5,17 @@ export interface ProjectHistory {
     daily?: Record<string, number>;
     monthly?: Record<string, number>;
     yearly?: Record<string, number>;
-    requests: { val: number }[];
-    apiCalls: { val: number }[];
-    sessions: { val: number }[];
+    requests: { val: number; timeLabel?: string }[];
+    apiCalls: { val: number; timeLabel?: string }[];
+    sessions: { val: number; timeLabel?: string }[];
+    totalHistory?: { val: number; timeLabel?: string }[];
 }
 
 const FALLBACK: ProjectHistory = {
     requests: Array(24).fill({ val: 0 }),
     apiCalls: Array(24).fill({ val: 0 }),
     sessions: Array(24).fill({ val: 0 }),
+    totalHistory: Array(30).fill({ val: 0 }),
 };
 
 export function useProjectHistory(projectId: string | undefined): ProjectHistory {
@@ -33,6 +35,7 @@ export function useProjectHistory(projectId: string | undefined): ProjectHistory
             requests: raw?.requests || FALLBACK.requests,
             apiCalls: raw?.apiCalls || FALLBACK.apiCalls,
             sessions: raw?.sessions || FALLBACK.sessions,
+            totalHistory: raw?.totalHistory || FALLBACK.totalHistory,
         }),
     });
 

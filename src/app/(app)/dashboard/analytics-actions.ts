@@ -34,6 +34,7 @@ export async function getAnalyticsStatsAction(projectId: string) {
         const pool = getPgPool();
         const stats = {
             total_requests: 0,
+            all_time_requests: 0,
             type_api_call: 0,
             type_sql_execution: 0,
             type_storage_read: 0,
@@ -130,6 +131,19 @@ export async function getAnalyticsStatsAction(projectId: string) {
         // Ensure total_requests reflects real distinct interactions without double-counting
         stats.total_requests = Math.max(stats.total_requests, stats.type_api_call, stats.type_sql_execution);
         stats.type_api_call = Math.max(stats.type_api_call, stats.total_requests);
+
+        // Fetch cumulative all-time total requests from audit_logs
+        let allTimeRequests = 0;
+        try {
+            const allTimeRes = await pool.query(
+                'SELECT COUNT(*) as total FROM fluxbase_global.audit_logs WHERE project_id = $1',
+                [projectId]
+            );
+            allTimeRequests = parseInt(allTimeRes.rows[0]?.total || '0', 10);
+        } catch (allTimeErr) {
+            logger.warn('All-time stats error:', allTimeErr);
+        }
+        (stats as any).all_time_requests = Math.max(allTimeRequests, stats.total_requests);
 
         // 4. Fetch Live Sessions directly from active real-time subscribers
         try {
@@ -359,13 +373,52 @@ export async function getProjectHistoryAction(projectId: string) {
             sessionsArr[23] = realtimeManager.getSubscriberCount(projectId);
         } catch {}
 
+        // 4. Fetch 30-day daily distribution for Total Requests bar chart
+        const totalHistoryArr: { val: number; timeLabel: string }[] = [];
+        try {
+            const dailyRes = await pool.query(`
+                SELECT date_trunc('day', created_at) as day_ts, COUNT(*) as count 
+                FROM fluxbase_global.audit_logs 
+                WHERE project_id = $1 AND created_at >= NOW() - INTERVAL '30 days' 
+                GROUP BY 1 
+                ORDER BY 1 ASC
+            `, [projectId]);
+
+            const dayMap = new Map<string, number>();
+            for (let i = 29; i >= 0; i--) {
+                const d = new Date(now - i * 24 * 60 * 60 * 1000);
+                const key = d.toISOString().slice(0, 10);
+                dayMap.set(key, 0);
+            }
+
+            for (const row of dailyRes.rows) {
+                const key = new Date(row.day_ts).toISOString().slice(0, 10);
+                if (dayMap.has(key)) {
+                    dayMap.set(key, parseInt(row.count, 10) || 0);
+                }
+            }
+
+            for (let i = 29; i >= 0; i--) {
+                const d = new Date(now - i * 24 * 60 * 60 * 1000);
+                const key = d.toISOString().slice(0, 10);
+                const label = d.toLocaleDateString([], { month: 'short', day: 'numeric' });
+                totalHistoryArr.push({
+                    val: dayMap.get(key) || 0,
+                    timeLabel: label
+                });
+            }
+        } catch (dailyErr) {
+            logger.warn('Daily history error:', dailyErr);
+        }
+
         const payload = {
             daily: { 'today': requestsArr[23] || 0 },
             monthly: {},
             yearly: {},
             requests: requestsArr.map(val => ({ val })),
             apiCalls: apiCallsArr.map(val => ({ val })),
-            sessions: sessionsArr.map(val => ({ val }))
+            sessions: sessionsArr.map(val => ({ val })),
+            totalHistory: totalHistoryArr.length > 0 ? totalHistoryArr : requestsArr.map(val => ({ val }))
         };
 
         _projectHistoryCache.set(projectId, payload);
@@ -380,7 +433,8 @@ export async function getProjectHistoryAction(projectId: string) {
             daily: {}, monthly: {}, yearly: {},
             requests: Array(24).fill({ val: 0 }),
             apiCalls: Array(24).fill({ val: 0 }),
-            sessions: Array(24).fill({ val: 0 })
+            sessions: Array(24).fill({ val: 0 }),
+            totalHistory: Array(30).fill({ val: 0 })
         };
     }
 }

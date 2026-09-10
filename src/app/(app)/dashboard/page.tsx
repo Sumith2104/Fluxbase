@@ -174,23 +174,23 @@ export default function DashboardPage() {
                 {/* 4 Analytics Boxes in One Single Row */}
                 <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
                     <SparklineCard
-                        title="API Calls"
-                        value={realtimeStats?.type_api_call ?? 0}
-                        subtitle="Data Fetches"
+                        title="24h Activity"
+                        value={realtimeStats?.total_requests ?? 0}
+                        subtitle="Requests (Last 24 Hours)"
                         type="bar"
-                        color="#fb923c"
+                        color="#f97316"
                         defaultColor="#3f3f46"
-                        data={historyStats.apiCalls}
+                        data={historyStats.requests}
                     />
 
                     <SparklineCard
-                        title="Real-Time Activity"
-                        value={realtimeStats?.total_requests ?? 0}
-                        subtitle="Live Incoming Requests"
-                        type="line"
-                        color="#f97316"
+                        title="Total Requests"
+                        value={realtimeStats?.all_time_requests ?? realtimeStats?.total_requests ?? 0}
+                        subtitle="All-Time Invocations"
+                        type="bar"
+                        color="#38bdf8"
                         defaultColor="#52525b"
-                        data={historyStats.requests}
+                        data={historyStats.totalHistory || historyStats.requests}
                     />
 
                     <QueryTypeChart stats={realtimeStats} />
