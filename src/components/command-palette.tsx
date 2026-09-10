@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import { useState, useEffect, useCallback, useContext } from 'react';
 import { useRouter } from 'next/navigation';
@@ -13,7 +13,7 @@ import {
     LayoutDashboard, Table, Database, BrainCircuit, BarChart3,
     Code, Globe, Folder, Settings, Search, ArrowRight,
     Users, Key, Webhook, Shield, GitBranch,
-    Bell, Archive
+    Bell, Archive, CreditCard
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useKeyboardShortcuts } from '@/hooks/use-keyboard-shortcuts';
@@ -43,6 +43,7 @@ const getStaticItems = (projectId?: string): CommandItem[] => {
         { id: 'storage', label: 'Storage', description: 'File & object storage', icon: <Folder className="h-4 w-4" />, href: projectHref('/storage'), category: 'Navigation', keywords: ['files', 's3', 'upload'] },
         // Settings
         { id: 'settings', label: 'Settings', description: 'Project settings', icon: <Settings className="h-4 w-4" />, href: projectHref('/settings'), category: 'Settings', keywords: ['config', 'preferences'] },
+        { id: 'billing', label: 'Billing & Usage', description: 'Plans, usage meters & invoices', icon: <CreditCard className="h-4 w-4" />, href: projectHref('/settings/billing'), category: 'Settings', keywords: ['billing', 'subscription', 'plan', 'invoices', 'payg'] },
         { id: 'api-keys', label: 'API Keys', description: 'Manage API keys', icon: <Key className="h-4 w-4" />, href: projectHref('/settings/api-keys'), category: 'Settings', keywords: ['tokens', 'auth'] },
         { id: 'webhooks', label: 'Webhooks', description: 'Manage webhook endpoints', icon: <Webhook className="h-4 w-4" />, href: projectHref('/settings/webhooks'), category: 'Settings', keywords: ['events', 'notifications'] },
         // New pages

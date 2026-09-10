@@ -4,7 +4,7 @@ import { ReactNode } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
-import { Settings, Key, Webhook, Bot, Activity, Users, Bell, Archive, BookOpen } from 'lucide-react';
+import { Settings, Key, Webhook, Bot, Activity, Users, Bell, Archive, BookOpen, CreditCard } from 'lucide-react';
 import { BackButton } from "@/components/back-button";
 
 const sidebarNavItems = [
@@ -12,6 +12,11 @@ const sidebarNavItems = [
         title: "General",
         href: "/settings",
         icon: Settings,
+    },
+    {
+        title: "Billing & Usage",
+        href: "/settings/billing",
+        icon: CreditCard,
     },
     {
         title: "API Keys",
@@ -73,8 +78,6 @@ export default function SettingsLayout({ children }: { children: ReactNode }) {
             <div className="flex min-w-0 flex-col space-y-6 lg:flex-row lg:space-x-8 lg:space-y-0 items-start">
                 <aside
                     className="w-full lg:w-56 shrink-0 lg:sticky lg:top-4 lg:self-start max-h-[calc(100vh-8rem)] overflow-y-auto custom-scrollbar"
-                    data-scroll-container="true"
-                    style={{ willChange: 'scroll-position' }}
                 >
                     <nav className="flex space-x-2 lg:flex-col lg:space-x-0 lg:space-y-1 overflow-x-auto pb-2 lg:pb-0 hide-scrollbar">
                         {sidebarNavItems.map((item) => {

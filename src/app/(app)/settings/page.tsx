@@ -1,13 +1,11 @@
 'use client';
 
-import { useState, useContext, useEffect } from 'react';
+import { useState, useContext, useEffect, useMemo } from 'react';
 import Image from 'next/image';
-import QRCode from 'qrcode';
-import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card"
-import { Label } from "@/components/ui/label"
-import { Input } from "@/components/ui/input"
-import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
+import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card";
+import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 import { ProjectContext } from '@/contexts/project-context';
 import {
     AlertDialog,
@@ -21,7 +19,13 @@ import {
     AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { Checkbox } from "@/components/ui/checkbox";
-import { deleteProjectAction, clearOrganizationAction, updateProjectSettingsAction, toggleOrganizationSuspensionAction, toggleProjectSuspensionAction } from './actions';
+import {
+    deleteProjectAction,
+    clearOrganizationAction,
+    updateProjectSettingsAction,
+    toggleOrganizationSuspensionAction,
+    toggleProjectSuspensionAction
+} from './actions';
 import {
     get2FAStatusAction,
     setup2FAAction,
@@ -32,25 +36,32 @@ import { useToast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
 import { logoutAction } from '../actions';
 import {
-    Copy, Check, Shield, Clock, Table as TableIcon,
-    Key, Loader2, AlertTriangle, Database, ChevronRight
+    Copy, Check, Shield, Clock,
+    Key, Loader2, AlertTriangle, Database, Sparkles
 } from "lucide-react";
 import {
     Select, SelectContent, SelectItem, SelectTrigger, SelectValue
 } from "@/components/ui/select";
-import {
-    CreditCard, Zap, Sparkles, Building2, HelpCircle
-} from "lucide-react";
-import { getTablesForProject, Table as DbTable } from '@/lib/data';
 import { getUserPlanAction } from './billing-actions';
 import { Skeleton } from '@/components/ui/skeleton';
-import { WebhooksManager } from '@/components/settings/webhooks-manager';
-import { PaymentsBillsManager } from '@/components/settings/payments-bills-manager';
-import { PaygMeterCard } from '@/components/billing/payg-meter-card';
 import { ThemeToggleCard } from '@/components/settings/theme-toggle-card';
 import { cn } from "@/lib/utils";
 
-const timezones = Intl.supportedValuesOf('timeZone');
+const COMMON_TIMEZONES = [
+    { value: 'UTC', label: 'UTC (Coordinated Universal Time)' },
+    { value: 'Asia/Kolkata', label: 'Asia/Kolkata (IST, +05:30)' },
+    { value: 'America/New_York', label: 'America/New_York (EST/EDT, -05:00/-04:00)' },
+    { value: 'America/Chicago', label: 'America/Chicago (CST/CDT, -06:00/-05:00)' },
+    { value: 'America/Denver', label: 'America/Denver (MST/MDT, -07:00/-06:00)' },
+    { value: 'America/Los_Angeles', label: 'America/Los_Angeles (PST/PDT, -08:00/-07:00)' },
+    { value: 'Europe/London', label: 'Europe/London (GMT/BST, +00:00/+01:00)' },
+    { value: 'Europe/Paris', label: 'Europe/Paris (CET/CEST, +01:00/+02:00)' },
+    { value: 'Europe/Berlin', label: 'Europe/Berlin (CET/CEST, +01:00/+02:00)' },
+    { value: 'Asia/Dubai', label: 'Asia/Dubai (GST, +04:00)' },
+    { value: 'Asia/Singapore', label: 'Asia/Singapore (SGT, +08:00)' },
+    { value: 'Asia/Tokyo', label: 'Asia/Tokyo (JST, +09:00)' },
+    { value: 'Australia/Sydney', label: 'Australia/Sydney (AEST/AEDT, +10:00/+11:00)' },
+];
 
 function CopyableField({ label, value }: { label: string, value: string }) {
     const { toast } = useToast();
@@ -73,7 +84,7 @@ function CopyableField({ label, value }: { label: string, value: string }) {
                 {hasCopied ? <Check className="h-4 w-4 text-green-500" /> : <Copy className="h-4 w-4" />}
             </Button>
         </div>
-    )
+    );
 }
 
 export default function GeneralSettingsPage() {
@@ -88,8 +99,6 @@ export default function GeneralSettingsPage() {
 
     const [timezone, setTimezone] = useState(selectedProject?.timezone || 'UTC');
     const [savingTimezone, setSavingTimezone] = useState(false);
-    const [tables, setTables] = useState<DbTable[]>([]);
-    const [loadingTables, setLoadingTables] = useState(false);
 
     // 2FA State
     const [is2faEnabled, setIs2faEnabled] = useState(false);
@@ -101,12 +110,8 @@ export default function GeneralSettingsPage() {
     const [isVerifying, setIsVerifying] = useState(false);
     const [qrCodeDataUrl, setQrCodeDataUrl] = useState('');
 
-    // Billing State
+    // Organization & Suspension State
     const [userPlan, setUserPlan] = useState<{ plan: string; billing_cycle_end: string | null; status?: string }>({ plan: 'free', billing_cycle_end: null, status: 'active' });
-    const [isBillingLoading, setIsBillingLoading] = useState(true);
-    const [upgradingPlan, setUpgradingPlan] = useState<string | null>(null);
-
-    // Suspension State
     const [suspendConfirmation, setSuspendConfirmation] = useState('');
     const [suspendOrgAckChecked, setSuspendOrgAckChecked] = useState(false);
     const [isSuspending, setIsSuspending] = useState(false);
@@ -119,27 +124,30 @@ export default function GeneralSettingsPage() {
     const [clearOrgConfirmation, setClearOrgConfirmation] = useState('');
     const [clearOrgAckChecked, setClearOrgAckChecked] = useState(false);
     const [isClearingOrg, setIsClearingOrg] = useState(false);
+
+    const timezoneOptions = useMemo(() => {
+        if (timezone && !COMMON_TIMEZONES.some(t => t.value === timezone)) {
+            return [{ value: timezone, label: `${timezone} (Current)` }, ...COMMON_TIMEZONES];
+        }
+        return COMMON_TIMEZONES;
+    }, [timezone]);
+
     useEffect(() => {
-        // Load User Plan
         getUserPlanAction().then(res => {
             setUserPlan(res);
-            setIsBillingLoading(false);
-        });
+        }).catch(() => {});
     }, []);
 
     useEffect(() => {
         if (selectedProject) {
             setTimezone(selectedProject.timezone || 'UTC');
 
-            setLoadingTables(true);
-            getTablesForProject(selectedProject.project_id)
-                .then(setTables)
-                .finally(() => setLoadingTables(false));
-
             // Check 2FA Status
             get2FAStatusAction().then(res => {
                 setIs2faEnabled(res.enabled ?? false);
                 setHas2faSecret(res.hasSecret ?? false);
+                setIs2faLoading(false);
+            }).catch(() => {
                 setIs2faLoading(false);
             });
         }
@@ -266,6 +274,7 @@ export default function GeneralSettingsPage() {
         if (res.success && res.secret && res.qrUrl) {
             setSetupData({ secret: res.secret, qrUrl: res.qrUrl });
             try {
+                const QRCode = (await import('qrcode')).default;
                 const dataUrl = await QRCode.toDataURL(res.qrUrl);
                 setQrCodeDataUrl(dataUrl);
             } catch (err) {
@@ -306,71 +315,10 @@ export default function GeneralSettingsPage() {
         }
     };
 
-    const handleUpgradePlan = async (planType: string) => {
-        if (!process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID) {
-            toast({ variant: 'destructive', title: 'Error', description: 'Razorpay Key ID is not configured.' });
-            return;
-        }
-
-        setUpgradingPlan(planType);
-
-        try {
-            // Map plan display names to IDs
-            const planToIdMap: Record<string, string | undefined> = {
-                'pro': process.env.NEXT_PUBLIC_RAZORPAY_PRO_PLAN_ID,
-                'max': process.env.NEXT_PUBLIC_RAZORPAY_MAX_PLAN_ID
-            };
-
-            const targetPlanId = planToIdMap[planType.toLowerCase()];
-            if (!targetPlanId) throw new Error('Invalid plan selected');
-
-            const response = await fetch('/api/subscriptions/create', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ planId: targetPlanId })
-            });
-
-            const data = await response.json();
-            if (data.error) throw new Error(data.error);
-
-            // Dynamically load Razorpay
-            const script = document.createElement('script');
-            script.src = 'https://checkout.razorpay.com/v1/checkout.js';
-            script.async = true;
-            script.onload = () => {
-                const options = {
-                    key: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID,
-                    subscription_id: data.subscriptionId,
-                    name: 'Fluxbase Subscription',
-                    description: `Upgrade to ${planType} plan`,
-                    image: '/logo.png', // Fallback or placeholder
-                    theme: { color: '#ef4444' }, // Premium red
-                    handler: function () {
-                        toast({ title: "Payment Successful", description: "Your subscription has been updated." });
-                        getUserPlanAction().then(res => {
-                            setUserPlan(res);
-                            setIsBillingLoading(false);
-                        });
-                        if (typeof window !== 'undefined') {
-                            window.dispatchEvent(new CustomEvent('flux:projects-refresh'));
-                        }
-                    }
-                };
-                const rzp = new (window as any).Razorpay(options);
-                rzp.open();
-            };
-            document.head.appendChild(script);
-
-        } catch (err: any) {
-            toast({ variant: 'destructive', title: 'Checkout Failed', description: err.message });
-        } finally {
-            setUpgradingPlan(null);
-        }
-    };
-
     return (
         <div className="space-y-6">
             <div className="grid gap-6 lg:grid-cols-2">
+                {/* 1. Project Identity */}
                 <Card className="lg:col-span-1">
                     <CardHeader>
                         <CardTitle className="flex items-center gap-2">
@@ -390,6 +338,7 @@ export default function GeneralSettingsPage() {
                     </CardContent>
                 </Card>
 
+                {/* 2. Regional Settings (Curated Timezones) */}
                 <Card className="lg:col-span-1">
                     <CardHeader>
                         <CardTitle className="flex items-center gap-2">
@@ -406,8 +355,8 @@ export default function GeneralSettingsPage() {
                                     <SelectValue placeholder="Select a timezone" />
                                 </SelectTrigger>
                                 <SelectContent className="max-h-[300px]">
-                                    {timezones.map(tz => (
-                                        <SelectItem key={tz} value={tz}>{tz}</SelectItem>
+                                    {timezoneOptions.map(tz => (
+                                        <SelectItem key={tz.value} value={tz.value}>{tz.label}</SelectItem>
                                     ))}
                                 </SelectContent>
                             </Select>
@@ -422,14 +371,7 @@ export default function GeneralSettingsPage() {
                     </CardFooter>
                 </Card>
 
-                {/* Live Webhooks Section */}
-                {selectedProject && (
-                    <div className="lg:col-span-2">
-                        <WebhooksManager projectId={selectedProject.project_id} tables={tables} />
-                    </div>
-                )}
-
-                {/* 2FA Section */}
+                {/* 3. Account Security (2FA) */}
                 <Card className="lg:col-span-1">
                     <CardHeader>
                         <CardTitle className="flex items-center gap-2">
@@ -573,55 +515,11 @@ export default function GeneralSettingsPage() {
                     </CardContent>
                 </Card>
 
-                {/* Appearance & Theme Settings */}
+                {/* 4. Appearance & Theme Settings */}
                 <ThemeToggleCard />
-
-                {/* 28-Day Pay-As-You-Go Resource Meter */}
-                {selectedProject && (
-                    <div className="lg:col-span-2">
-                        <PaygMeterCard projectId={selectedProject.project_id} />
-                    </div>
-                )}
-
-                {/* Billing & Subscription Section */}
-                <div className="lg:col-span-2">
-                    <PaymentsBillsManager />
-                </div>
             </div>
 
-            <Card>
-                <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                        <TableIcon className="h-5 w-5 text-muted-foreground" />
-                        Project Tables
-                    </CardTitle>
-                    <CardDescription>Quick reference for table names in the current project.</CardDescription>
-                </CardHeader>
-                <CardContent>
-                    {!selectedProject ? (
-                        <div className="py-8 text-center text-sm text-muted-foreground border-2 border-dashed rounded-lg">
-                            Please select a project to view its tables.
-                        </div>
-                    ) : loadingTables ? (
-                        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                            {[1, 2, 3, 4, 5, 6].map(i => (
-                                <Skeleton key={i} className="h-12 w-full rounded-lg" />
-                            ))}
-                        </div>
-                    ) : tables.length === 0 ? (
-                        <div className="py-8 text-center text-sm text-muted-foreground border-2 border-dashed rounded-lg">
-                            No tables found in this project.
-                        </div>
-                    ) : (
-                        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                            {tables.map(table => (
-                                <CopyableField key={table.table_id} label={table.table_name} value={table.table_name} />
-                            ))}
-                        </div>
-                    )}
-                </CardContent>
-            </Card>
-
+            {/* 5. Danger Zone */}
             {(!selectedProject?.role || selectedProject?.role === 'admin' || selectedProject?.role === 'owner') && (
                 <Card className="border-destructive/50 bg-destructive/5 rounded-none">
                     <CardHeader>
@@ -990,6 +888,5 @@ export default function GeneralSettingsPage() {
                 </Card>
             )}
         </div>
-    )
+    );
 }
-
