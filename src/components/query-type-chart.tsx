@@ -47,11 +47,11 @@ export function QueryTypeChart({ stats }: { stats: AnalyticsStats | null }) {
     const [isHovered, setIsHovered] = React.useState(false);
 
     const chartData = React.useMemo(() => {
-        const selectColor = isHovered ? "#f97316" : "#71717a";
-        const insertColor = isHovered ? "#10b981" : "#52525b";
-        const updateColor = isHovered ? "#38bdf8" : "#3f3f46";
-        const deleteColor = isHovered ? "#f43f5e" : "#27272a";
-        const alterColor  = isHovered ? "#a855f7" : "#18181b";
+        const selectColor = isHovered ? "#f97316" : "rgba(249, 115, 22, 0.85)";
+        const insertColor = isHovered ? "#10b981" : "rgba(16, 185, 129, 0.85)";
+        const updateColor = isHovered ? "#38bdf8" : "rgba(56, 189, 248, 0.85)";
+        const deleteColor = isHovered ? "#f43f5e" : "rgba(244, 63, 94, 0.85)";
+        const alterColor  = isHovered ? "#a855f7" : "rgba(168, 85, 247, 0.85)";
 
         const totalReq = stats?.total_requests || 0;
         const hasAnySpecific = ((stats?.type_sql_select || 0) + (stats?.type_sql_insert || 0) + (stats?.type_sql_update || 0) + (stats?.type_sql_delete || 0) + (stats?.type_sql_alter || 0)) > 0;

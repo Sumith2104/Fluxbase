@@ -46,8 +46,11 @@ export async function setCachedTableRows(projectId: string, tableId: string, pag
 
 export async function invalidateTableCache(projectId: string, tableId: string): Promise<void> {
     try {
-        const { invalidateTableCountCache } = await import('@/lib/data');
+        const { invalidateTableCountCache, invalidateProjectAnalyticsCache } = await import('@/lib/data');
         invalidateTableCountCache(tableId);
+        if (invalidateProjectAnalyticsCache) {
+            invalidateProjectAnalyticsCache(projectId);
+        }
     } catch { /* ignore */ }
 
     // Invalidate enough pages to cover what the UI would request after a large import.
@@ -63,5 +66,11 @@ export async function invalidateTableCache(projectId: string, tableId: string): 
 }
 
 export async function invalidateProjectCache(projectId: string): Promise<void> {
+    try {
+        const { invalidateProjectAnalyticsCache } = await import('@/lib/data');
+        if (invalidateProjectAnalyticsCache) {
+            invalidateProjectAnalyticsCache(projectId);
+        }
+    } catch { /* ignore */ }
     logger.info(`[Redis Cache] Project ${projectId} tables will naturally expire.`);
 }

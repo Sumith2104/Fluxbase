@@ -12,10 +12,10 @@ export interface ProjectHistory {
 }
 
 const FALLBACK: ProjectHistory = {
-    requests: Array(24).fill({ val: 0 }),
-    apiCalls: Array(24).fill({ val: 0 }),
-    sessions: Array(24).fill({ val: 0 }),
-    totalHistory: Array(30).fill({ val: 0 }),
+    requests: Array.from({ length: 24 }, () => ({ val: 0 })),
+    apiCalls: Array.from({ length: 24 }, () => ({ val: 0 })),
+    sessions: Array.from({ length: 24 }, () => ({ val: 0 })),
+    totalHistory: Array.from({ length: 30 }, () => ({ val: 0 })),
 };
 
 export function useProjectHistory(projectId: string | undefined): ProjectHistory {

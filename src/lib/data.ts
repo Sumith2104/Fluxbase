@@ -161,6 +161,18 @@ export async function invalidateTableCountCache(tableName?: string) {
     }
 }
 
+export async function invalidateProjectAnalyticsCache(projectId?: string) {
+    if (projectId) {
+        _projectAnalyticsCache.delete(projectId);
+        try {
+            const { redis } = await import('@/lib/redis');
+            await redis.del(`analytics_fast:${projectId}`);
+        } catch {}
+    } else {
+        _projectAnalyticsCache.clear();
+    }
+}
+
 // Terminal log throttling: avoids spamming the console 10 times a second during DNS outages.
 let _lastHealthLogTime = 0;
 const HEALTH_LOG_THROTTLE_MS = 60000;
@@ -2106,10 +2118,21 @@ export async function getTableData(
                             return c;
                         }).catch(() => 0)
                     : mysqlPool.query(`SELECT TABLE_ROWS as count FROM information_schema.TABLES WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ?`, [targetDb || dbName || '', safeTableName])
-                        .then(([cnt]: any) => {
-                            const c = parseInt(cnt?.[0]?.count || '0', 10);
-                            _tableCountCache.set(countKey, c);
-                            return c;
+                        .then(async ([cnt]: any) => {
+                            const est = parseInt(cnt?.[0]?.count || '0', 10);
+                            if (est <= 0 || est < 50000) {
+                                try {
+                                    const [exact]: any = await mysqlPool.query(`SELECT COUNT(*) as count FROM ${fromTable}`);
+                                    const c = parseInt(exact?.[0]?.count ?? est, 10);
+                                    _tableCountCache.set(countKey, c);
+                                    return c;
+                                } catch {
+                                    _tableCountCache.set(countKey, est);
+                                    return est;
+                                }
+                            }
+                            _tableCountCache.set(countKey, est);
+                            return est;
                         }).catch(() => 0)
                   )
                 : Promise.resolve(cachedCount ?? 0);
@@ -2124,8 +2147,8 @@ export async function getTableData(
                 pkPromise
             ]);
 
-            totalRows = countVal;
             const rawRows = dataResult || [];
+            totalRows = Math.max(countVal, rawRows.length);
             hasMore = rawRows.length > limit;
             const slicedRows = hasMore ? rawRows.slice(0, limit) : rawRows;
 
@@ -2179,10 +2202,22 @@ export async function getTableData(
                         JOIN pg_namespace n ON n.oid = c.relnamespace
                         WHERE n.nspname = $1 AND c.relname = $2
                       `, [targetSchema, safeTableName])
-                        .then(r => {
-                            const c = Math.max(0, parseInt(r.rows[0]?.count || '0', 10));
-                            _tableCountCache.set(countKey, c);
-                            return c;
+                        .then(async r => {
+                            const est = parseInt(r.rows[0]?.count ?? '-1', 10);
+                            if (est <= 0 || est < 50000) {
+                                try {
+                                    const exact = await pool.query(`SELECT COUNT(*) as count FROM "${targetSchema}"."${safeTableName}"`);
+                                    const c = parseInt(exact.rows[0]?.count || '0', 10);
+                                    _tableCountCache.set(countKey, c);
+                                    return c;
+                                } catch {
+                                    const c = Math.max(0, est);
+                                    _tableCountCache.set(countKey, c);
+                                    return c;
+                                }
+                            }
+                            _tableCountCache.set(countKey, est);
+                            return est;
                         }).catch(() => 0)
                   )
                 : Promise.resolve(cachedCount ?? 0);
@@ -2193,8 +2228,8 @@ export async function getTableData(
                 pkPromise
             ]);
 
-            totalRows = countVal;
             const rawRows = dataResult.rows || [];
+            totalRows = Math.max(countVal, rawRows.length);
             hasMore = rawRows.length > limit;
             const slicedRows = hasMore ? rawRows.slice(0, limit) : rawRows;
 
@@ -2501,10 +2536,21 @@ export async function getProjectAnalytics(projectId: string, explicitUserId?: st
                 AND table_name NOT LIKE '\\_flux\\_%'
             `, [targetDb]);
 
-            tablesStats = (rows || []).map((r: any) => ({
-                name: r.name || r.NAME,
-                rows: Math.max(0, parseInt(r.row_count || r.rows || r.ROWS || '0', 10)),
-                size: parseInt(r.size || r.SIZE || '0', 10)
+            tablesStats = await Promise.all((rows || []).map(async (r: any) => {
+                const name = r.name || r.NAME;
+                let rowsCount = Math.max(0, parseInt(r.row_count || r.rows || r.ROWS || '0', 10));
+                const size = parseInt(r.size || r.SIZE || '0', 10);
+                if (rowsCount <= 0 || rowsCount < 100000) {
+                    try {
+                        const [cRows]: any = await mysqlPool.query(`SELECT COUNT(*) as count FROM \`${targetDb}\`.\`${name}\``);
+                        rowsCount = parseInt(cRows[0]?.count ?? rowsCount, 10);
+                    } catch {}
+                }
+                return {
+                    name,
+                    rows: rowsCount,
+                    size
+                };
             }));
         } else {
             const pool = await getTenantPgPool(project);
@@ -2540,11 +2586,23 @@ export async function getProjectAnalytics(projectId: string, explicitUserId?: st
                 `);
             }
 
-            tablesStats = result.rows.map(r => ({
-                name: r.name,
-                schemaName: r.schema_name || activeSchema,
-                rows: Math.max(0, parseInt(r.rows || '0', 10)),
-                size: parseInt(r.size || '0', 10)
+            tablesStats = await Promise.all(result.rows.map(async (r) => {
+                const name = r.name;
+                const schema = r.schema_name || activeSchema;
+                let rowsCount = Math.max(0, parseInt(r.rows || '0', 10));
+                const size = parseInt(r.size || '0', 10);
+                if (rowsCount <= 0 || rowsCount < 100000) {
+                    try {
+                        const countRes = await pool.query(`SELECT COUNT(*) as count FROM "${schema}"."${name}"`);
+                        rowsCount = parseInt(countRes.rows[0]?.count ?? rowsCount, 10);
+                    } catch {}
+                }
+                return {
+                    name,
+                    schemaName: schema,
+                    rows: rowsCount,
+                    size
+                };
             }));
         }
 

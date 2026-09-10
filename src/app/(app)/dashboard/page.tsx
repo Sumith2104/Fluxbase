@@ -179,7 +179,6 @@ export default function DashboardPage() {
                         subtitle="Requests (Last 24 Hours)"
                         type="bar"
                         color="#f97316"
-                        defaultColor="#3f3f46"
                         data={historyStats.requests}
                     />
 
@@ -189,7 +188,6 @@ export default function DashboardPage() {
                         subtitle="All-Time Invocations"
                         type="bar"
                         color="#38bdf8"
-                        defaultColor="#52525b"
                         data={historyStats.totalHistory || historyStats.requests}
                     />
 
@@ -201,7 +199,6 @@ export default function DashboardPage() {
                         subtitle="Active Connections"
                         type="area"
                         color="#10b981"
-                        defaultColor="#52525b"
                         data={historyStats.sessions}
                     />
                 </div>

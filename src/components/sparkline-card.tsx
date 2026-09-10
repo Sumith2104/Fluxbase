@@ -20,11 +20,12 @@ export function SparklineCard({
     subtitle, 
     type, 
     color = "#f97316", 
-    defaultColor = "#52525b", 
+    defaultColor, 
     data 
 }: SparklineCardProps) {
     const [isHovered, setIsHovered] = useState(false);
-    const activeColor = isHovered ? color : defaultColor;
+    // Use the theme color so bars are vibrant and clearly visible, highlighting on hover
+    const activeColor = isHovered ? color : (defaultColor || color);
 
     const [now, setNow] = useState(0);
     useEffect(() => {
@@ -33,20 +34,23 @@ export function SparklineCard({
 
     // Use the real history data directly, and inject localized 1-hour timestamps
     // dynamically on the client so it perfectly matches the user's timezone.
-    const chartData = data.map((d, i) => {
-        if (now === 0) return d;
-        const date = new Date(now - ((data.length - 1 - i) * 60 * 60 * 1000));
+    const chartData = (data || []).map((d, i) => {
+        const val = Number(d?.val) || 0;
+        if (now === 0) return { ...d, val };
+        const date = new Date(now - (((data?.length || 24) - 1 - i) * 60 * 60 * 1000));
         return {
             ...d,
-            timeLabel: d.timeLabel || date.toLocaleTimeString([], { hour: 'numeric', hour12: true })
+            val,
+            timeLabel: d?.timeLabel || date.toLocaleTimeString([], { hour: 'numeric', hour12: true })
         };
     });
 
     // Y-axis: always ensure a visible scale.
-    // Use a small negative lower bound so a flat zero line isn't glued to the bottom edge.
-    const dataMax = Math.max(...chartData.map(d => d.val));
+    // Safe bounds prevent NaN or -Infinity when data is empty or all zeroes.
+    const rawVals = chartData.map(d => Number(d.val) || 0);
+    const dataMax = rawVals.length > 0 ? Math.max(...rawVals) : 0;
     const yMin = dataMax === 0 ? -0.5 : 0;
-    const yMax = dataMax === 0 ? 3 : dataMax * 1.3;
+    const yMax = dataMax === 0 ? 3 : dataMax * 1.25;
 
     const tooltipStyle = {
         contentStyle: { backgroundColor: "#18181b", borderColor: "#27272a", borderRadius: "8px", color: "#fff", fontSize: "12px", padding: "8px 12px" },
@@ -61,14 +65,14 @@ export function SparklineCard({
             onMouseEnter={() => setIsHovered(true)}
             onMouseLeave={() => setIsHovered(false)}
         >
-            {/* Background Sparkline layer */}
-            <div className="absolute inset-0 z-0 opacity-40 group-hover:opacity-100 transition-opacity duration-500 pb-4">
+            {/* Background Sparkline layer - clearly visible by default at 70% opacity, 100% on hover */}
+            <div className="absolute inset-0 z-0 opacity-70 group-hover:opacity-100 transition-opacity duration-300 pb-2">
                 <ResponsiveContainer width="100%" height="100%">
                     {type === "line" ? (
-                        <LineChart data={chartData}>
+                        <LineChart data={chartData} margin={{ top: 20, right: 2, left: 2, bottom: 0 }}>
                             <XAxis dataKey="timeLabel" hide />
                             <Tooltip
-                                cursor={{ stroke: "rgba(255,255,255,0.1)", strokeWidth: 1, strokeDasharray: "4 4" }}
+                                cursor={{ stroke: "rgba(255,255,255,0.15)", strokeWidth: 1, strokeDasharray: "4 4" }}
                                 {...tooltipStyle}
                             />
                             <YAxis hide domain={[yMin, yMax]} />
@@ -76,43 +80,43 @@ export function SparklineCard({
                                 type="monotone"
                                 dataKey="val"
                                 stroke={activeColor}
-                                strokeWidth={3}
+                                strokeWidth={2.5}
                                 dot={false}
                                 isAnimationActive={true}
-                                animationDuration={1800}
+                                animationDuration={600}
                                 animationEasing="ease-out"
                             />
                         </LineChart>
                     ) : type === "bar" ? (
-                        <BarChart data={chartData} margin={{ top: 20, right: 0, left: 0, bottom: -10 }}>
+                        <BarChart data={chartData} margin={{ top: 20, right: 2, left: 2, bottom: 0 }}>
                             <XAxis dataKey="timeLabel" hide />
                             <Tooltip
-                                cursor={{ fill: "rgba(255,255,255,0.08)" }}
+                                cursor={{ fill: "rgba(255,255,255,0.1)" }}
                                 {...tooltipStyle}
                             />
                             <YAxis hide domain={[yMin, yMax]} />
                             <Bar
                                 dataKey="val"
                                 fill={activeColor}
-                                radius={[4, 4, 0, 0]}
+                                radius={[3, 3, 0, 0]}
                                 isAnimationActive={true}
-                                animationDuration={1800}
+                                animationDuration={600}
                                 animationEasing="ease-out"
-                                minPointSize={2}
+                                minPointSize={1}
                             />
                         </BarChart>
                     ) : (
-                        <AreaChart data={chartData}>
+                        <AreaChart data={chartData} margin={{ top: 20, right: 0, left: 0, bottom: 0 }}>
                             <XAxis dataKey="timeLabel" hide />
                             <Tooltip
-                                cursor={{ stroke: "rgba(255,255,255,0.1)", strokeWidth: 1, strokeDasharray: "4 4" }}
+                                cursor={{ stroke: "rgba(255,255,255,0.15)", strokeWidth: 1, strokeDasharray: "4 4" }}
                                 {...tooltipStyle}
                             />
                             <YAxis hide domain={[yMin, yMax]} />
                             <defs>
                                 <linearGradient id={`color-${title.replace(/\s+/g, '')}`} x1="0" y1="0" x2="0" y2="1">
                                     <stop offset="5%" stopColor={activeColor} stopOpacity={0.8} />
-                                    <stop offset="95%" stopColor={activeColor} stopOpacity={0} />
+                                    <stop offset="95%" stopColor={activeColor} stopOpacity={0.05} />
                                 </linearGradient>
                             </defs>
                             <Area
@@ -122,7 +126,7 @@ export function SparklineCard({
                                 fillOpacity={1}
                                 fill={`url(#color-${title.replace(/\s+/g, '')})`}
                                 isAnimationActive={true}
-                                animationDuration={1800}
+                                animationDuration={600}
                                 animationEasing="ease-out"
                                 strokeWidth={2}
                             />

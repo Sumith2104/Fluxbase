@@ -376,14 +376,6 @@ export async function getProjectHistoryAction(projectId: string) {
         // 4. Fetch 30-day daily distribution for Total Requests bar chart
         const totalHistoryArr: { val: number; timeLabel: string }[] = [];
         try {
-            const dailyRes = await pool.query(`
-                SELECT date_trunc('day', created_at) as day_ts, COUNT(*) as count 
-                FROM fluxbase_global.audit_logs 
-                WHERE project_id = $1 AND created_at >= NOW() - INTERVAL '30 days' 
-                GROUP BY 1 
-                ORDER BY 1 ASC
-            `, [projectId]);
-
             const dayMap = new Map<string, number>();
             const nowDate = new Date();
             for (let i = 29; i >= 0; i--) {
@@ -392,11 +384,48 @@ export async function getProjectHistoryAction(projectId: string) {
                 dayMap.set(key, 0);
             }
 
-            for (const row of dailyRes.rows) {
+            // High-performance query: Query analytics_rollups for daily aggregate buckets (<100ms)
+            const rollupsDailyRes = await pool.query(`
+                SELECT date_trunc('day', period_start) as day_ts, SUM(count) as count
+                FROM fluxbase_global.analytics_rollups
+                WHERE project_id = $1 AND period_start >= NOW() - INTERVAL '30 days'
+                GROUP BY 1
+                ORDER BY 1 ASC
+            `, [projectId]);
+
+            for (const row of rollupsDailyRes.rows) {
                 const key = new Date(row.day_ts).toISOString().slice(0, 10);
                 if (dayMap.has(key)) {
                     dayMap.set(key, parseInt(row.count, 10) || 0);
                 }
+            }
+
+            // If rollups table has no historical data for this project, fall back to audit_logs
+            if (rollupsDailyRes.rows.length === 0) {
+                try {
+                    const dailyRes = await pool.query(`
+                        SELECT date_trunc('day', created_at) as day_ts, COUNT(*) as count 
+                        FROM fluxbase_global.audit_logs 
+                        WHERE project_id = $1 AND created_at >= NOW() - INTERVAL '30 days' 
+                        GROUP BY 1 
+                        ORDER BY 1 ASC
+                    `, [projectId]);
+                    for (const row of dailyRes.rows) {
+                        const key = new Date(row.day_ts).toISOString().slice(0, 10);
+                        if (dayMap.has(key)) {
+                            dayMap.set(key, parseInt(row.count, 10) || 0);
+                        }
+                    }
+                } catch (fallbackErr) {
+                    logger.warn('Daily history fallback error:', fallbackErr);
+                }
+            }
+
+            // Always incorporate today's fresh live count from requestsArr into today's bucket
+            const todayKey = nowDate.toISOString().slice(0, 10);
+            const todayRequestsSum = requestsArr.reduce((a, b) => a + b, 0);
+            if (todayRequestsSum > 0) {
+                dayMap.set(todayKey, Math.max(dayMap.get(todayKey) || 0, todayRequestsSum));
             }
 
             for (let i = 29; i >= 0; i--) {
@@ -432,10 +461,10 @@ export async function getProjectHistoryAction(projectId: string) {
         logger.error('getProjectHistoryAction error:', e);
         return {
             daily: {}, monthly: {}, yearly: {},
-            requests: Array(24).fill({ val: 0 }),
-            apiCalls: Array(24).fill({ val: 0 }),
-            sessions: Array(24).fill({ val: 0 }),
-            totalHistory: Array(30).fill({ val: 0 })
+            requests: Array.from({ length: 24 }, () => ({ val: 0 })),
+            apiCalls: Array.from({ length: 24 }, () => ({ val: 0 })),
+            sessions: Array.from({ length: 24 }, () => ({ val: 0 })),
+            totalHistory: Array.from({ length: 30 }, () => ({ val: 0 }))
         };
     }
 }
