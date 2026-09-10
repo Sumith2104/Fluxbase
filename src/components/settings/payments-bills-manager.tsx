@@ -327,7 +327,7 @@ export function PaymentsBillsManager() {
                                         {billingData.invoices.map((inv) => (
                                             <tr key={inv.id} className="hover:bg-secondary/40 transition-colors">
                                                 <td className="p-3 font-mono">{inv.date}</td>
-                                                <td className="p-3 font-medium capitalize text-foreground">{inv.plan} Subscription</td>
+                                                <td className="p-3 font-medium text-foreground">{inv.plan}</td>
                                                 <td className="p-3 font-mono text-muted-foreground text-[11px] truncate max-w-[120px]">{inv.transactionId}</td>
                                                 <td className="p-3 font-mono font-bold text-foreground">₹{(inv.amount || 0).toFixed(2)}</td>
                                                 <td className="p-3">

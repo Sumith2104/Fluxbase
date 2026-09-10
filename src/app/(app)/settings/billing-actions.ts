@@ -78,20 +78,36 @@ export async function getBillingDetailsAction(): Promise<{ success: boolean; dat
         let invoices: BillingDetails['invoices'] = [];
         try {
             const paymentsRes = await pool.query(
-                `SELECT id, amount, currency, status, created_at as "createdAt", razorpay_payment_id as "paymentId" 
-                 FROM fluxbase_global.payments 
-                 WHERE user_id = $1::text 
-                 ORDER BY created_at DESC LIMIT 10`,
+                `SELECT 
+                    p.id, 
+                    p.amount, 
+                    p.currency, 
+                    p.status, 
+                    p.created_at as "createdAt", 
+                    p.razorpay_payment_id as "paymentId",
+                    ps.plan_type as "sessionPlan"
+                 FROM fluxbase_global.payments p
+                 LEFT JOIN fluxbase_global.payment_sessions ps 
+                    ON p.razorpay_payment_id = CONCAT('upi_session_', ps.id::text)
+                 WHERE p.user_id = $1::text 
+                 ORDER BY p.created_at DESC LIMIT 10`,
                 [userId]
             );
-            invoices = paymentsRes.rows.map(r => ({
-                id: r.id.toString(),
-                amount: parseFloat(r.amount) || 0,
-                plan: plan,
-                status: r.status || 'paid',
-                date: new Date(r.createdAt).toLocaleDateString(),
-                transactionId: r.paymentId || `TXN_${r.id}`
-            }));
+            invoices = paymentsRes.rows.map(r => {
+                const amt = parseFloat(r.amount) || 0;
+                let label = r.sessionPlan ? `${r.sessionPlan.toUpperCase()} Plan` : 'Payment';
+                if (amt <= 2 && (r.paymentId || '').startsWith('upi_session_')) {
+                    label = 'UPI Test / Verification';
+                }
+                return {
+                    id: r.id.toString(),
+                    amount: amt,
+                    plan: label,
+                    status: r.status || 'paid',
+                    date: new Date(r.createdAt).toLocaleDateString(),
+                    transactionId: r.paymentId || `TXN_${r.id}`
+                };
+            });
         } catch (payErr) {
             logger.warn('[Billing] Error fetching payments history:', payErr);
         }
