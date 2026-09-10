@@ -47,11 +47,11 @@ export function QueryTypeChart({ stats }: { stats: AnalyticsStats | null }) {
     const [isHovered, setIsHovered] = React.useState(false);
 
     const chartData = React.useMemo(() => {
-        const selectColor = isHovered ? "#f97316" : "rgba(249, 115, 22, 0.85)";
-        const insertColor = isHovered ? "#10b981" : "rgba(16, 185, 129, 0.85)";
-        const updateColor = isHovered ? "#38bdf8" : "rgba(56, 189, 248, 0.85)";
-        const deleteColor = isHovered ? "#f43f5e" : "rgba(244, 63, 94, 0.85)";
-        const alterColor  = isHovered ? "#a855f7" : "rgba(168, 85, 247, 0.85)";
+        const selectColor = isHovered ? "#f97316" : "#71717a";
+        const insertColor = isHovered ? "#10b981" : "#52525b";
+        const updateColor = isHovered ? "#38bdf8" : "#64748b";
+        const deleteColor = isHovered ? "#f43f5e" : "#475569";
+        const alterColor  = isHovered ? "#a855f7" : "#3f3f46";
 
         const totalReq = stats?.total_requests || 0;
         const hasAnySpecific = ((stats?.type_sql_select || 0) + (stats?.type_sql_insert || 0) + (stats?.type_sql_update || 0) + (stats?.type_sql_delete || 0) + (stats?.type_sql_alter || 0)) > 0;
@@ -93,7 +93,7 @@ export function QueryTypeChart({ stats }: { stats: AnalyticsStats | null }) {
             <CardContent className="flex-1 pt-6 pb-6 flex items-center justify-center">
                 <ChartContainer
                     config={chartConfig}
-                    className="mx-auto aspect-square w-full max-h-[250px]"
+                    className="mx-auto aspect-square w-full max-h-[250px] [&_.recharts-pie-sector]:transition-colors [&_.recharts-pie-sector]:duration-300"
                 >
                     <PieChart>
                         <ChartTooltip
@@ -120,9 +120,7 @@ export function QueryTypeChart({ stats }: { stats: AnalyticsStats | null }) {
                             nameKey="browser"
                             stroke="rgba(24,24,27,0.8)" /* zinc-900 border separating slices */
                             strokeWidth={2}
-                            isAnimationActive={true}
-                            animationDuration={1800}
-                            animationEasing="ease-out"
+                            isAnimationActive={false}
                         />
                     </PieChart>
                 </ChartContainer>

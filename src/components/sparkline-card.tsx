@@ -20,12 +20,13 @@ export function SparklineCard({
     subtitle, 
     type, 
     color = "#f97316", 
-    defaultColor, 
+    defaultColor = "#71717a", 
     data 
 }: SparklineCardProps) {
     const [isHovered, setIsHovered] = useState(false);
-    // Use the theme color so bars are vibrant and clearly visible, highlighting on hover
-    const activeColor = isHovered ? color : (defaultColor || color);
+    // When hovered, the chart bursts into its vibrant brand color.
+    // When idle, it shows a clean, clearly visible muted zinc tone.
+    const activeColor = isHovered ? color : (defaultColor || "#71717a");
 
     const [now, setNow] = useState(0);
     useEffect(() => {
@@ -54,7 +55,7 @@ export function SparklineCard({
 
     const tooltipStyle = {
         contentStyle: { backgroundColor: "#18181b", borderColor: "#27272a", borderRadius: "8px", color: "#fff", fontSize: "12px", padding: "8px 12px" },
-        itemStyle: { color: activeColor, fontWeight: 600 },
+        itemStyle: { color: color, fontWeight: 600 },
         labelStyle: { display: "block", color: "#a1a1aa", marginBottom: "4px", fontWeight: 600, fontSize: "10px", textTransform: "uppercase" as const },
         formatter: (val: number) => [val === 0 ? "—" : val.toLocaleString(), title],
     };
@@ -65,8 +66,8 @@ export function SparklineCard({
             onMouseEnter={() => setIsHovered(true)}
             onMouseLeave={() => setIsHovered(false)}
         >
-            {/* Background Sparkline layer - clearly visible by default at 70% opacity, 100% on hover */}
-            <div className="absolute inset-0 z-0 opacity-70 group-hover:opacity-100 transition-opacity duration-300 pb-2">
+            {/* Background Sparkline layer - visible grey by default, brightly colored on hover */}
+            <div className="absolute inset-0 z-0 opacity-60 group-hover:opacity-100 transition-all duration-300 pb-2 [&_.recharts-bar-rectangle]:transition-colors [&_.recharts-bar-rectangle]:duration-300 [&_.recharts-line-curve]:transition-colors [&_.recharts-line-curve]:duration-300">
                 <ResponsiveContainer width="100%" height="100%">
                     {type === "line" ? (
                         <LineChart data={chartData} margin={{ top: 20, right: 2, left: 2, bottom: 0 }}>
@@ -82,9 +83,7 @@ export function SparklineCard({
                                 stroke={activeColor}
                                 strokeWidth={2.5}
                                 dot={false}
-                                isAnimationActive={true}
-                                animationDuration={600}
-                                animationEasing="ease-out"
+                                isAnimationActive={false}
                             />
                         </LineChart>
                     ) : type === "bar" ? (
@@ -99,9 +98,7 @@ export function SparklineCard({
                                 dataKey="val"
                                 fill={activeColor}
                                 radius={[3, 3, 0, 0]}
-                                isAnimationActive={true}
-                                animationDuration={600}
-                                animationEasing="ease-out"
+                                isAnimationActive={false}
                                 minPointSize={1}
                             />
                         </BarChart>
@@ -115,7 +112,7 @@ export function SparklineCard({
                             <YAxis hide domain={[yMin, yMax]} />
                             <defs>
                                 <linearGradient id={`color-${title.replace(/\s+/g, '')}`} x1="0" y1="0" x2="0" y2="1">
-                                    <stop offset="5%" stopColor={activeColor} stopOpacity={0.8} />
+                                    <stop offset="5%" stopColor={activeColor} stopOpacity={isHovered ? 0.8 : 0.4} />
                                     <stop offset="95%" stopColor={activeColor} stopOpacity={0.05} />
                                 </linearGradient>
                             </defs>
@@ -125,9 +122,7 @@ export function SparklineCard({
                                 stroke={activeColor}
                                 fillOpacity={1}
                                 fill={`url(#color-${title.replace(/\s+/g, '')})`}
-                                isAnimationActive={true}
-                                animationDuration={600}
-                                animationEasing="ease-out"
+                                isAnimationActive={false}
                                 strokeWidth={2}
                             />
                         </AreaChart>
