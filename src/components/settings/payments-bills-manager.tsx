@@ -1,24 +1,20 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
+import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Skeleton } from '@/components/ui/skeleton';
 import { 
-    CreditCard, Zap, Activity, HardDrive, Cpu, 
-    ArrowUpRight, Clock, CheckCircle2, Receipt, 
-    Sparkles, Building2, Briefcase, GraduationCap, 
-    Loader2, ChevronRight, ShieldCheck, RefreshCw 
+    CreditCard, Activity, HardDrive, Cpu, 
+    Receipt, Building2, Briefcase, GraduationCap, 
+    Loader2, RefreshCw 
 } from 'lucide-react';
 import { getBillingDetailsAction, BillingDetails } from '@/app/(app)/settings/billing-actions';
-import { useToast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
-import { cn } from '@/lib/utils';
 
 export function PaymentsBillsManager() {
-    const { toast } = useToast();
     const router = useRouter();
     const [billingData, setBillingData] = useState<BillingDetails | null>(null);
     const [loading, setLoading] = useState(true);
@@ -30,9 +26,34 @@ export function PaymentsBillsManager() {
             const res = await getBillingDetailsAction();
             if (res.success && res.data) {
                 setBillingData(res.data);
+            } else {
+                setBillingData({
+                    plan: 'free',
+                    role: 'student',
+                    billing_cycle_end: null,
+                    status: 'active',
+                    queriesUsed: 0,
+                    queriesLimit: 50000,
+                    storageUsedGb: 0,
+                    storageLimitGb: 0.5,
+                    unbilledAmount: 0,
+                    invoices: []
+                });
             }
         } catch (e: any) {
             console.error('Error fetching billing details:', e);
+            setBillingData({
+                plan: 'free',
+                role: 'student',
+                billing_cycle_end: null,
+                status: 'active',
+                queriesUsed: 0,
+                queriesLimit: 50000,
+                storageUsedGb: 0,
+                storageLimitGb: 0.5,
+                unbilledAmount: 0,
+                invoices: []
+            });
         } finally {
             setLoading(false);
         }
@@ -87,8 +108,14 @@ export function PaymentsBillsManager() {
 
     const plan = billingData?.plan || 'free';
     const role = billingData?.role || 'student';
-    const queriesPercentage = Math.min(100, Math.round(((billingData?.queriesUsed || 0) / (billingData?.queriesLimit || 1)) * 100));
-    const storagePercentage = Math.min(100, Math.round(((billingData?.storageUsedGb || 0) / (billingData?.storageLimitGb || 1)) * 100));
+    const queriesUsed = billingData?.queriesUsed ?? 0;
+    const queriesLimit = billingData?.queriesLimit ?? 50000;
+    const storageUsedGb = billingData?.storageUsedGb ?? 0;
+    const storageLimitGb = billingData?.storageLimitGb ?? 0.5;
+    const unbilledAmount = billingData?.unbilledAmount ?? 0;
+
+    const queriesPercentage = Math.min(100, Math.round((queriesUsed / (queriesLimit || 1)) * 100));
+    const storagePercentage = Math.min(100, Math.round((storageUsedGb / (storageLimitGb || 1)) * 100));
 
     return (
         <div className="space-y-6">
@@ -159,7 +186,7 @@ export function PaymentsBillsManager() {
                                 Pay-As-You-Go Consumption & Meters
                             </h4>
                             <span className="text-xs font-mono text-muted-foreground">
-                                Current Cycle Unbilled: <strong className="text-foreground font-bold font-mono">₹{billingData?.unbilledAmount.toFixed(2)}</strong>
+                                Current Cycle Unbilled: <strong className="text-foreground font-bold font-mono">₹{unbilledAmount.toFixed(2)}</strong>
                             </span>
                         </div>
 
@@ -172,7 +199,7 @@ export function PaymentsBillsManager() {
                                         SQL Query Executions
                                     </span>
                                     <span className="font-mono text-muted-foreground">
-                                        {billingData?.queriesUsed.toLocaleString()} / {billingData?.queriesLimit.toLocaleString()}
+                                        {queriesUsed.toLocaleString()} / {queriesLimit.toLocaleString()}
                                     </span>
                                 </div>
                                 <Progress value={queriesPercentage} className="h-1.5 bg-secondary" />
@@ -190,7 +217,7 @@ export function PaymentsBillsManager() {
                                         Database NVMe Storage
                                     </span>
                                     <span className="font-mono text-muted-foreground">
-                                        {billingData?.storageUsedGb} GB / {billingData?.storageLimitGb} GB
+                                        {storageUsedGb.toFixed(2)} GB / {storageLimitGb.toFixed(1)} GB
                                     </span>
                                 </div>
                                 <Progress value={storagePercentage} className="h-1.5 bg-secondary" />
@@ -302,7 +329,7 @@ export function PaymentsBillsManager() {
                                                 <td className="p-3 font-mono">{inv.date}</td>
                                                 <td className="p-3 font-medium capitalize text-foreground">{inv.plan} Subscription</td>
                                                 <td className="p-3 font-mono text-muted-foreground text-[11px] truncate max-w-[120px]">{inv.transactionId}</td>
-                                                <td className="p-3 font-mono font-bold text-foreground">₹{inv.amount.toFixed(2)}</td>
+                                                <td className="p-3 font-mono font-bold text-foreground">₹{(inv.amount || 0).toFixed(2)}</td>
                                                 <td className="p-3">
                                                     <Badge variant="outline" className="text-[10px] font-mono text-green-400 bg-green-500/10 border-green-500/20">
                                                         {inv.status}
