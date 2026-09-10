@@ -798,16 +798,18 @@ export async function resetProjectData(projectId: string) {
     const project = await ensureRole(await getProjectById(projectId, userId), ['admin']);
 
     if (project.dialect?.toLowerCase() === 'mysql') {
-        const { getMysqlPool } = await import('@/lib/mysql');
-        const mysqlPool = getMysqlPool();
-        const safeDbName = quoteMysqlProjectSchemaSafe(projectId);
+        const mysqlPool = await getTenantMysqlPool(project);
+        const { dbName } = getProjectDbAndSchema(project);
+        const safeDbName = quoteMysqlIdentifierSafe(dbName);
         await mysqlPool.query(safeSql`DROP DATABASE IF EXISTS ${safeDbName}`);
         await mysqlPool.query(safeSql`CREATE DATABASE ${safeDbName}`);
     } else {
-        const safeSchemaName = quotePgProjectSchemaSafe(projectId);
+        const tenantPool = await getTenantPgPool(project);
+        const { schemaName } = getProjectDbAndSchema(project);
+        const safeSchemaName = quotePgIdentifierSafe(schemaName);
         // Drop and recreate schema to wipe all data natively
-        await pool.query(safeSql`DROP SCHEMA IF EXISTS ${safeSchemaName} CASCADE`);
-        await pool.query(safeSql`CREATE SCHEMA ${safeSchemaName}`);
+        await tenantPool.query(safeSql`DROP SCHEMA IF EXISTS ${safeSchemaName} CASCADE`);
+        await tenantPool.query(safeSql`CREATE SCHEMA ${safeSchemaName}`);
     }
 
     try {

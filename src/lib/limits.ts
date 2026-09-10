@@ -116,22 +116,40 @@ export async function checkRowLimit(projectId: string, userId: string, tableName
 
     let currentRows = 0;
 
+    const safeTable = tableName.replace(/[^a-zA-Z0-9_]/g, '');
+
     if (project.dialect?.toLowerCase() === 'mysql') {
-        const { getMysqlPool } = await import('@/lib/mysql');
-        const mysqlPool = getMysqlPool();
-        const dbName = `project_${projectId}`;
+        const { getTenantMysqlPool, getProjectDbAndSchema } = await import('@/lib/tenant-pools');
+        const mysqlPool = await getTenantMysqlPool(project);
+        const { dbName } = getProjectDbAndSchema(project);
+        const fromTable = dbName ? `\`${dbName}\`.\`${safeTable}\`` : `\`${safeTable}\``;
         try {
-            const [rows]: any = await mysqlPool.query(`SELECT COUNT(*) as count FROM \`${dbName}\`.\`${tableName}\``);
+            const [rows]: any = await mysqlPool.query(`SELECT COUNT(*) as count FROM ${fromTable}`);
             currentRows = parseInt(rows[0].count, 10);
         } catch {
             // Table might not exist yet, which is fine
             currentRows = 0;
         }
     } else {
-        const pool = getPgPool();
-        const schemaName = `project_${projectId}`;
+        const { getTenantPgPool, getProjectDbAndSchema } = await import('@/lib/tenant-pools');
+        const pool = await getTenantPgPool(project);
+        const { schemaName } = getProjectDbAndSchema(project);
+        let targetSchema = schemaName || 'public';
         try {
-            const res = await pool.query(`SELECT COUNT(*) as count FROM "${schemaName}"."${tableName}"`);
+            const check = await pool.query(
+                `SELECT schemaname FROM pg_tables WHERE schemaname = $1 AND tablename = $2 LIMIT 1`,
+                [schemaName, safeTable]
+            );
+            if (check.rows.length === 0) {
+                const fallbackCheck = await pool.query(
+                    `SELECT schemaname FROM pg_tables WHERE tablename = $1 AND schemaname NOT IN ('pg_catalog', 'information_schema') LIMIT 1`,
+                    [safeTable]
+                );
+                if (fallbackCheck.rows.length > 0 && fallbackCheck.rows[0].schemaname) {
+                    targetSchema = fallbackCheck.rows[0].schemaname;
+                }
+            }
+            const res = await pool.query(`SELECT COUNT(*) as count FROM "${targetSchema}"."${safeTable}"`);
             currentRows = parseInt(res.rows[0].count, 10);
         } catch {
             currentRows = 0;

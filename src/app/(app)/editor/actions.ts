@@ -1,4 +1,4 @@
-﻿'use server';
+'use server';
 
 import { v4 as uuidv4 } from 'uuid';
 import { getCurrentUserId } from '@/lib/auth';
@@ -354,7 +354,7 @@ export async function editRowAction(formData: FormData) {
 
 export async function deleteRowAction(projectId: string, tableId: string, tableName: string, rowIds: string[]) {
     const userId = await getCurrentUserId();
-    if (!projectId || !tableName || !userId || !rowIds || rowIds.length === 0) {
+    if (!projectId || (!tableName && !tableId) || !userId || !rowIds || rowIds.length === 0) {
         return { error: 'Missing required fields for deletion.' };
     }
 
@@ -363,32 +363,61 @@ export async function deleteRowAction(projectId: string, tableId: string, tableN
         if (!project) return { error: 'Project not found.' };
 
         // Resolve the PK column once (not N times)
-        const cols = await getColumnsForTable(projectId, tableId);
-        const pkCol = cols.find(c => c.is_primary_key);
-        if (!pkCol) return { error: 'Table has no primary key â€” cannot delete rows.' };
+        let cols = await getColumnsForTable(projectId, tableId);
+        if (!cols.length && tableName) {
+            cols = await getColumnsForTable(projectId, tableName);
+        }
+        let pkCol = cols.find(c => c.is_primary_key);
+        if (!pkCol) {
+            // Fallback: check if 'id' or '_id' exists in the table
+            pkCol = cols.find(c => c.column_name.toLowerCase() === 'id' || c.column_name.toLowerCase() === '_id');
+        }
+        if (!pkCol) return { error: 'Table has no primary key — cannot delete rows.' };
 
-        const safeTable = tableName.replace(/[^a-zA-Z0-9_]/g, '');
+        const safeTable = (tableName || tableId).replace(/[^a-zA-Z0-9_]/g, '');
         const pkName = pkCol.column_name;
         let deletedCount = 0;
 
         if (project.dialect?.toLowerCase() === 'mysql') {
-            const { getMysqlPool } = await import('@/lib/mysql');
-            const mysqlPool = getMysqlPool();
-            const dbName = `project_${projectId}`;
+            const { getTenantMysqlPool, getProjectDbAndSchema } = await import('@/lib/tenant-pools');
+            const mysqlPool = await getTenantMysqlPool(project);
+            const { dbName } = getProjectDbAndSchema(project);
+            const fromTable = dbName ? `\`${dbName}\`.\`${safeTable}\`` : `\`${safeTable}\``;
+
             // Single batch DELETE
             const placeholders = rowIds.map(() => '?').join(', ');
             const [result]: any = await mysqlPool.query(
-                `DELETE FROM \`${dbName}\`.\`${safeTable}\` WHERE \`${pkName}\` IN (${placeholders})`,
+                `DELETE FROM ${fromTable} WHERE \`${pkName}\` IN (${placeholders})`,
                 rowIds
             );
             deletedCount = result.affectedRows ?? rowIds.length;
         } else {
-            const { getPgPool } = await import('@/lib/pg');
-            const pool = getPgPool();
-            const schemaName = `project_${projectId}`;
+            const { getTenantPgPool, getProjectDbAndSchema } = await import('@/lib/tenant-pools');
+            const pool = await getTenantPgPool(project);
+            const { schemaName } = getProjectDbAndSchema(project);
+
+            let targetSchema = schemaName || 'public';
+            try {
+                const check = await pool.query(
+                    `SELECT schemaname FROM pg_tables WHERE schemaname = $1 AND tablename = $2 LIMIT 1`,
+                    [schemaName, safeTable]
+                );
+                if (check.rows.length === 0) {
+                    const fallbackCheck = await pool.query(
+                        `SELECT schemaname FROM pg_tables WHERE tablename = $1 AND schemaname NOT IN ('pg_catalog', 'information_schema') LIMIT 1`,
+                        [safeTable]
+                    );
+                    if (fallbackCheck.rows.length > 0 && fallbackCheck.rows[0].schemaname) {
+                        targetSchema = fallbackCheck.rows[0].schemaname;
+                    }
+                }
+            } catch (schemaResolveErr) {
+                logger.warn('[deleteRowAction] Schema resolution warning:', schemaResolveErr);
+            }
+
             // Cast pk to text so this works for uuid, integer, varchar, etc.
             const result = await pool.query(
-                `DELETE FROM "${schemaName}"."${safeTable}" WHERE "${pkName}"::text = ANY($1::text[])`,
+                `DELETE FROM "${targetSchema}"."${safeTable}" WHERE "${pkName}"::text = ANY($1::text[])`,
                 [rowIds]
             );
             deletedCount = result.rowCount ?? rowIds.length;
@@ -397,6 +426,9 @@ export async function deleteRowAction(projectId: string, tableId: string, tableN
         // Invalidate cache once for the whole batch
         const { invalidateTableCache } = await import('@/lib/cache');
         await invalidateTableCache(projectId, tableId);
+        if (tableName && tableName !== tableId) {
+            await invalidateTableCache(projectId, tableName);
+        }
 
         return { success: true, deletedCount };
 
@@ -405,6 +437,7 @@ export async function deleteRowAction(projectId: string, tableId: string, tableN
         return { error: `An unexpected error occurred: ${(error as Error).message}` };
     }
 }
+
 
 // --- Column Actions ---
 
@@ -486,7 +519,9 @@ export async function deleteColumnAction(formData: FormData) {
             return { error: `Cannot delete column '${columnName}' being used in a constraint.` };
         }
 
-        await deleteColumn(projectId, tableId, columnId);
+        const targetTable = (formData.get('tableName') as string) || tableId;
+        const targetColumn = columnName || columnId;
+        await deleteColumn(projectId, targetTable, targetColumn);
         await broadcastSchemaUpdate(projectId);
         return { success: true };
     } catch (error) {
@@ -565,7 +600,8 @@ export async function deleteTableAction(projectId: string, tableId: string, tabl
         const project = await getProjectById(projectId, userId);
         if (!project) return { error: 'Forbidden: Project not found or insufficient access.' };
 
-        await deleteTable(projectId, tableId);
+        const targetTable = tableName || tableId;
+        await deleteTable(projectId, targetTable);
         await broadcastSchemaUpdate(projectId);
         revalidatePath(`/dashboard?projectId=${projectId}`);
         return { success: true };
