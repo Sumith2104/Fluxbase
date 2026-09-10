@@ -101,7 +101,9 @@ export async function getBillingDetailsAction(showTestPayments: boolean = false)
             );
             invoices = paymentsRes.rows.map(r => {
                 const amt = parseFloat(r.amount) || 0;
-                let label = r.sessionPlan ? `${r.sessionPlan.toUpperCase()} Plan` : 'Payment';
+                let label = r.sessionPlan 
+                    ? `${r.sessionPlan.replace(/_/g, ' ').toUpperCase()} Plan` 
+                    : 'Payment';
                 if (amt <= 2.5 && (r.paymentId || '').match(/^(upi_session_|upi_utr_|utr_)/)) {
                     label = 'UPI Test / Verification';
                 }
@@ -118,25 +120,52 @@ export async function getBillingDetailsAction(showTestPayments: boolean = false)
             logger.warn('[Billing] Error fetching payments history:', payErr);
         }
 
-        // 3. Compute limits based on active tier / plan
+        // 3. Auto-initialize any active projects missing an active PAYG cycle
+        try {
+            const missingCycles = await pool.query(`
+                SELECT p.project_id 
+                FROM fluxbase_global.projects p
+                LEFT JOIN fluxbase_global.payg_usage_cycles c 
+                    ON p.project_id = c.project_id AND c.status = 'active'
+                WHERE p.user_id = $1::text AND p.status = 'active' AND c.id IS NULL
+            `, [userId]);
+
+            if (missingCycles.rows.length > 0) {
+                const { getOrCreateCurrentCycle } = await import('@/lib/payg-engine');
+                for (const mRow of missingCycles.rows) {
+                    try {
+                        await getOrCreateCurrentCycle(mRow.project_id, userId);
+                    } catch (mErr) {
+                        logger.warn(`[Billing] Auto-init cycle failed for ${mRow.project_id}:`, mErr);
+                    }
+                }
+            }
+        } catch (missingErr) {
+            logger.warn('[Billing] Error checking missing project cycles:', missingErr);
+        }
+
+        // 4. Compute limits based on active tier / plan
         let queriesLimit = 50000;
         let storageLimitGb = 0.5;
 
-        if (role === 'employee' || plan === 'employee') {
-            queriesLimit = 500000;
-            storageLimitGb = 10;
-        } else if (role === 'org_owner' || plan === 'org_owner' || plan === 'org') {
+        if (role === 'org_owner' || plan === 'org_owner' || plan === 'org') {
             queriesLimit = 5000000;
             storageLimitGb = 100;
-        } else if (plan === 'pro') {
-            queriesLimit = 250000;
-            storageLimitGb = 5;
+        } else if (role === 'employee' || plan === 'employee') {
+            queriesLimit = 500000;
+            storageLimitGb = 10;
         } else if (plan === 'max') {
             queriesLimit = 1000000;
             storageLimitGb = 20;
+        } else if (plan === 'pro') {
+            queriesLimit = 250000;
+            storageLimitGb = 5;
+        } else if (plan === 'pay_as_you_go' || plan === 'payg') {
+            queriesLimit = 50000;
+            storageLimitGb = 0.1;
         }
 
-        // 4. Fetch aggregated real usage from indexed payg_usage_cycles (instant, avoids multi-million audit_logs scan)
+        // 5. Fetch aggregated real usage from indexed payg_usage_cycles (instant, avoids multi-million audit_logs scan)
         let queriesUsed = 0;
         let storageUsedGb = 0;
         let unbilledAmount = 0;
@@ -155,26 +184,32 @@ export async function getBillingDetailsAction(showTestPayments: boolean = false)
                 queriesUsed = parseInt(paygRes.rows[0].total_requests, 10) || 0;
                 const totalMb = parseFloat(paygRes.rows[0].total_storage_mb) || 0;
                 storageUsedGb = Number((totalMb / 1024).toFixed(3));
-                unbilledAmount = Number(parseFloat(paygRes.rows[0].unbilled_amount || '0').toFixed(2));
+
+                const isPayg = plan === 'pay_as_you_go' || plan === 'payg';
+                const queryRatePer10k = (role === 'org_owner' || plan === 'org_owner') ? 2.00 : 0.50;
+                const storageRatePerGb = (role === 'org_owner' || plan === 'org_owner') ? 15.00 : 5.00;
+
+                if (isPayg) {
+                    // For PAYG users, bill comes directly from the calculated amounts of active cycles
+                    unbilledAmount = Number(parseFloat(paygRes.rows[0].unbilled_amount || '0').toFixed(2));
+                } else {
+                    // For subscription tiers (org_owner, employee, max, pro, free), the base plan
+                    // includes full quota up to queriesLimit and storageLimitGb.
+                    // Overage is ONLY billed when total usage strictly exceeds their plan limit.
+                    unbilledAmount = 0;
+                    if (queriesUsed > queriesLimit) {
+                        const excessQueries = queriesUsed - queriesLimit;
+                        unbilledAmount += Math.ceil(excessQueries / 10000) * queryRatePer10k;
+                    }
+                    if (storageUsedGb > storageLimitGb) {
+                        const excessStorage = storageUsedGb - storageLimitGb;
+                        unbilledAmount += excessStorage * storageRatePerGb;
+                    }
+                    unbilledAmount = Number(unbilledAmount.toFixed(2));
+                }
             }
         } catch (paygErr) {
             logger.warn('[Billing] Error reading payg_usage_cycles:', paygErr);
-        }
-
-        // 5. Calculate excess usage unbilled amount if not already accounted
-        const queryRatePer10k = (role === 'org_owner' || plan === 'org_owner') ? 2.00 : 0.50;
-        const storageRatePerGb = (role === 'org_owner' || plan === 'org_owner') ? 15.00 : 5.00;
-
-        if (unbilledAmount === 0) {
-            if (queriesUsed > queriesLimit) {
-                const excessQueries = queriesUsed - queriesLimit;
-                unbilledAmount += Math.ceil(excessQueries / 10000) * queryRatePer10k;
-            }
-            if (storageUsedGb > storageLimitGb) {
-                const excessStorage = storageUsedGb - storageLimitGb;
-                unbilledAmount += excessStorage * storageRatePerGb;
-            }
-            unbilledAmount = Number(unbilledAmount.toFixed(2));
         }
 
         const resultData: BillingDetails = {

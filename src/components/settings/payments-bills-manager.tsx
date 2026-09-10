@@ -9,7 +9,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { 
     CreditCard, Activity, HardDrive, Cpu, 
     Receipt, Building2, Briefcase, GraduationCap, 
-    Loader2, RefreshCw, Eye, EyeOff, Filter 
+    Loader2, RefreshCw, Eye, EyeOff, Filter, Sparkles 
 } from 'lucide-react';
 import { getBillingDetailsAction, BillingDetails } from '@/app/(app)/settings/billing-actions';
 import { useRouter } from 'next/navigation';
@@ -157,7 +157,17 @@ export function PaymentsBillsManager() {
 
                         <div className="flex items-center gap-2">
                             <Badge variant="secondary" className="font-mono text-xs uppercase px-2.5 py-1 bg-primary/10 text-primary border-primary/20">
-                                {role === 'org_owner' ? 'Org Owner Tier' : (role === 'employee' ? 'Employee Tier' : 'Student Tier')}
+                                {role === 'org_owner' || plan === 'org_owner'
+                                    ? 'Org Owner Tier'
+                                    : role === 'employee' || plan === 'employee'
+                                        ? 'Employee Tier'
+                                        : plan === 'max'
+                                            ? 'Max Tier'
+                                            : plan === 'pro'
+                                                ? 'Pro Tier'
+                                                : plan === 'pay_as_you_go' || plan === 'payg'
+                                                    ? 'Pay-As-You-Go'
+                                                    : 'Student Tier'}
                             </Badge>
                             <Button size="sm" variant="ghost" onClick={() => fetchBilling()} className="h-8 px-2 text-xs text-muted-foreground hover:text-foreground">
                                 <RefreshCw className="h-3.5 w-3.5" />
@@ -172,19 +182,47 @@ export function PaymentsBillsManager() {
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between p-4 rounded-xl bg-secondary/40 border border-border/60 gap-4">
                         <div className="flex items-center gap-3.5">
                             <div className="p-3 rounded-lg bg-primary/10 text-primary">
-                                {role === 'org_owner' ? <Building2 className="h-6 w-6" /> : (role === 'employee' ? <Briefcase className="h-6 w-6" /> : <GraduationCap className="h-6 w-6" />)}
+                                {role === 'org_owner' || plan === 'org_owner' ? (
+                                    <Building2 className="h-6 w-6" />
+                                ) : role === 'employee' || plan === 'employee' ? (
+                                    <Briefcase className="h-6 w-6" />
+                                ) : plan === 'max' ? (
+                                    <Sparkles className="h-6 w-6" />
+                                ) : (
+                                    <GraduationCap className="h-6 w-6" />
+                                )}
                             </div>
                             <div>
                                 <div className="flex items-center gap-2">
                                     <h3 className="font-bold text-base text-foreground capitalize">
-                                        {role === 'org_owner' ? 'Organization Owner (Top-Grade Enterprise)' : (role === 'employee' ? 'Employee (High-Performance Dedicated)' : `Student (${plan.toUpperCase()} Plan)`)}
+                                        {role === 'org_owner' || plan === 'org_owner'
+                                            ? 'Organization Owner (Top-Grade Enterprise)'
+                                            : role === 'employee' || plan === 'employee'
+                                                ? 'Employee (High-Performance Dedicated)'
+                                                : plan === 'max'
+                                                    ? 'Developer Max (High Scale Architecture)'
+                                                    : plan === 'pro'
+                                                        ? 'Developer Pro Plan'
+                                                        : plan === 'pay_as_you_go' || plan === 'payg'
+                                                            ? 'Pay-As-You-Go Metered Plan'
+                                                            : 'Student / Free Plan'}
                                     </h3>
                                     <Badge variant="outline" className="text-[10px] font-mono text-green-400 bg-green-500/10 border-green-500/20">
                                         Active
                                     </Badge>
                                 </div>
                                 <p className="text-xs text-muted-foreground mt-0.5">
-                                    {role === 'org_owner' ? '₹5,000 / month • 8 vCPU Dedicated Xeon, 32GB RAM, 100GB NVMe' : (role === 'employee' ? '₹500 / month • 2 vCPU Dedicated, 4GB RAM, 10GB SSD' : 'Student Tier • Shared Micro Compute with instant serverless provisioning')}
+                                    {role === 'org_owner' || plan === 'org_owner'
+                                        ? 'Top-Tier Organization Owner • 5,000,000 queries, 100GB storage included'
+                                        : role === 'employee' || plan === 'employee'
+                                            ? 'Dedicated Employee Tier • 500,000 queries, 10GB storage included'
+                                            : plan === 'max'
+                                                ? 'Max Tier • 1,000,000 queries, 20GB storage included'
+                                                : plan === 'pro'
+                                                    ? 'Pro Tier • 250,000 queries, 5GB storage included'
+                                                    : plan === 'pay_as_you_go' || plan === 'payg'
+                                                        ? 'Pay-As-You-Go • ₹0 baseline, metered on actual resource consumption'
+                                                        : 'Student Free Tier • 50,000 queries, 500MB storage included'}
                                 </p>
                             </div>
                         </div>
