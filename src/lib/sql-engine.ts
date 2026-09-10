@@ -259,28 +259,26 @@ export class SqlEngine {
         try {
             // Batch all analytics tracking into ONE pipeline round-trip to Redis
             if (!options.skipTracking) {
-                const d = new Date();
-                d.setMinutes(0, 0, 0);
-                const period = d.getTime();
-                const keys = [
-                    `analytics_rollup:${this.projectId}:${period}:api_call`,
-                    `analytics_rollup:${this.projectId}:${period}:sql_execution`,
-                ];
+                const now = Date.now();
+                const minuteStartMs = Math.floor(now / 60000) * 60000;
+                const hourStartMs = Math.floor(now / 3600000) * 3600000;
+                
+                const eventTypes = ['api_call', 'sql_execution'];
                 const sqlType = `sql_${firstWord.toLowerCase()}`;
                 const validSqlTypes = ['sql_select', 'sql_insert', 'sql_update', 'sql_delete', 'sql_alter', 'sql_create', 'sql_drop'];
                 if (validSqlTypes.includes(sqlType)) {
-                    keys.push(`analytics_rollup:${this.projectId}:${period}:${sqlType}`);
+                    eventTypes.push(sqlType);
                 }
                 
                 const pipe = redis.pipeline();
-                for (const key of keys) {
-                    pipe.incr(key);
-                }
-                // Probabilistic registration
-                if (Math.random() < 0.10) {
-                    for (const key of keys) {
-                        pipe.sadd('analytics_keys_to_flush', key);
-                    }
+                for (const evt of eventTypes) {
+                    const minuteKey = `analytics_minute:${this.projectId}:${minuteStartMs}:${evt}`;
+                    const hourKey = `analytics_rollup:${this.projectId}:${hourStartMs}:${evt}`;
+                    pipe.incr(minuteKey);
+                    pipe.expire(minuteKey, 7200); // 2 hours
+                    pipe.incr(hourKey);
+                    pipe.expire(hourKey, 172800); // 48 hours
+                    pipe.sadd('analytics_keys_to_flush', hourKey);
                 }
                 pipe.exec().catch(e => logger.warn('[SqlEngine] Analytics batch failed:', e));
             }

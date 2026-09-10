@@ -97,10 +97,16 @@ export async function getAnalyticsStatsAction(projectId: string) {
             }
         } catch {}
 
-        // 3. Merge "In-Flight" data from Redis (Unsynced)
+        // 3. Merge "In-Flight" data from Redis (Unsynced - strictly last 24 hours only)
         try {
+            const now = Date.now();
+            const last24hCutoff = now - 24 * 60 * 60 * 1000;
             const allFlushKeys = await redis.smembers('analytics_keys_to_flush');
-            const projectKeys = (allFlushKeys || []).filter(k => k.startsWith(`analytics_rollup:${projectId}:`));
+            const projectKeys = (allFlushKeys || []).filter(k => {
+                if (!k.startsWith(`analytics_rollup:${projectId}:`)) return false;
+                const periodMs = parseInt(k.split(':')[2], 10);
+                return !isNaN(periodMs) && periodMs >= last24hCutoff;
+            });
             
             if (projectKeys.length > 0) {
                 const values = await redis.mget(...projectKeys);
@@ -112,6 +118,7 @@ export async function getAnalyticsStatsAction(projectId: string) {
                     if (type === 'api_call') stats.type_api_call += val;
                     if (type === 'storage_read') stats.type_storage_read += val;
                     if (type === 'storage_write') stats.type_storage_write += val;
+                    if (type === 'sql_execution') stats.type_sql_execution += val;
                     if (type?.startsWith('sql_')) {
                         const sqlAction = `type_${type}` as keyof typeof stats;
                         if (stats[sqlAction] !== undefined) (stats as any)[sqlAction] += val;
@@ -120,21 +127,17 @@ export async function getAnalyticsStatsAction(projectId: string) {
             }
         } catch {}
 
-        // Ensure total_requests reflects all interactions
-        stats.total_requests = Math.max(stats.total_requests, stats.type_api_call + stats.type_sql_execution);
-        if (stats.type_api_call === 0 && stats.total_requests > 0) {
-            stats.type_api_call = stats.total_requests;
-        }
+        // Ensure total_requests reflects real distinct interactions without double-counting
+        stats.total_requests = Math.max(stats.total_requests, stats.type_api_call, stats.type_sql_execution);
+        stats.type_api_call = Math.max(stats.type_api_call, stats.total_requests);
 
-        // 4. Fetch Live Sessions
+        // 4. Fetch Live Sessions directly from active real-time subscribers
         try {
             const realtimeManager = (await import('@/lib/realtime-manager')).default;
             const activeLocal = realtimeManager.getSubscriberCount(projectId);
-            const liveSessions = await redis.get(`live_sessions:${projectId}`);
-            const redisVal = parseInt(liveSessions as string || '0', 10);
-            (stats as any).live_sessions = Math.max(1, activeLocal, redisVal);
+            (stats as any).live_sessions = activeLocal;
         } catch {
-            (stats as any).live_sessions = 1;
+            (stats as any).live_sessions = 0;
         }
 
         _analyticsStatsCache.set(projectId, stats);
@@ -215,11 +218,11 @@ export async function getRealtimeHistoryAction(projectId: string) {
 
             const pgCount = minuteCounts.get(time) || 0;
             if (pgCount > 0) {
-                apiVal += pgCount;
                 sqlVal += pgCount;
+                apiVal = Math.max(apiVal, sqlVal);
             }
 
-            const totalVal = apiVal + sqlVal;
+            const totalVal = Math.max(apiVal, sqlVal);
 
             historyPoints.push({
                 timestamp: time,
@@ -261,10 +264,10 @@ export async function getProjectHistoryAction(projectId: string) {
         const pool = getPgPool();
         const now = Date.now();
 
-        // 24 hourly buckets
+        // 24 hourly buckets (initialized to 0)
         const requestsArr = Array(24).fill(0);
         const apiCallsArr = Array(24).fill(0);
-        const sessionsArr = Array(24).fill(1);
+        const sessionsArr = Array(24).fill(0);
 
         // 1. Fetch aggregated hourly distribution from audit_logs for the last 24 hours
         try {
@@ -289,7 +292,7 @@ export async function getProjectHistoryAction(projectId: string) {
             logger.warn('Audit logs history error:', auditErr);
         }
 
-        // 2. Fetch from rollups
+        // 2. Fetch from rollups (last 24 hours only)
         try {
             const rollupRes = await pool.query(`
                 SELECT period_start, event_type, SUM(count) as total
@@ -318,10 +321,15 @@ export async function getProjectHistoryAction(projectId: string) {
             }
         } catch {}
 
-        // 3. Merge in-flight Redis metrics
+        // 3. Merge in-flight Redis metrics (strictly last 24 hours only)
         try {
+            const last24hCutoff = now - 24 * 60 * 60 * 1000;
             const allFlushKeys = await redis.smembers('analytics_keys_to_flush');
-            const projectKeys = (allFlushKeys || []).filter(k => k.startsWith(`analytics_rollup:${projectId}:`));
+            const projectKeys = (allFlushKeys || []).filter(k => {
+                if (!k.startsWith(`analytics_rollup:${projectId}:`)) return false;
+                const periodMs = parseInt(k.split(':')[2], 10);
+                return !isNaN(periodMs) && periodMs >= last24hCutoff;
+            });
             
             if (projectKeys.length > 0) {
                 const values = await redis.mget(...projectKeys);
@@ -334,26 +342,22 @@ export async function getProjectHistoryAction(projectId: string) {
 
                     if (hoursAgo >= 0 && hoursAgo < 24) {
                         const index = 23 - hoursAgo;
-                        if (type === 'api_call' || type === 'sql_execution') requestsArr[index] += val;
-                        if (type === 'api_call') apiCallsArr[index] += val;
+                        if (type === 'api_call' || type === 'sql_execution') {
+                            requestsArr[index] = Math.max(requestsArr[index], val);
+                        }
+                        if (type === 'api_call') {
+                            apiCallsArr[index] = Math.max(apiCallsArr[index], val);
+                        }
                     }
                 }
             }
         } catch {}
 
-        // Graceful distribution if events were recorded without hour breakdown
-        const totalHistoricalRequests = requestsArr.reduce((a, b) => a + b, 0);
-        const stats = await getAnalyticsStatsAction(projectId);
-        const totalFromStats = stats?.total_requests || 0;
-
-        if (totalHistoricalRequests === 0 && totalFromStats > 0) {
-            for (let i = 0; i < 24; i++) {
-                const factor = 0.4 + 0.6 * Math.sin((i / 23) * Math.PI);
-                const share = Math.round((totalFromStats / 24) * factor);
-                requestsArr[i] = Math.max(1, share);
-                apiCallsArr[i] = Math.max(1, share);
-            }
-        }
+        // Real-time active subscribers for the current hour
+        try {
+            const realtimeManager = (await import('@/lib/realtime-manager')).default;
+            sessionsArr[23] = realtimeManager.getSubscriberCount(projectId);
+        } catch {}
 
         const payload = {
             daily: { 'today': requestsArr[23] || 0 },
@@ -376,7 +380,7 @@ export async function getProjectHistoryAction(projectId: string) {
             daily: {}, monthly: {}, yearly: {},
             requests: Array(24).fill({ val: 0 }),
             apiCalls: Array(24).fill({ val: 0 }),
-            sessions: Array(24).fill({ val: 1 })
+            sessions: Array(24).fill({ val: 0 })
         };
     }
 }

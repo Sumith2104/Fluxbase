@@ -220,12 +220,31 @@ export async function fetchProjectRealtimeMetrics(projectId: string, dialect: st
         logger.warn('[PAYG Meter] Error fetching API keys:', e);
     }
 
+    // Resolve tenant database and schema dynamically
+    let project: any = null;
+    try {
+        const projectRes = await pool.query(
+            'SELECT project_id, dialect, connection_type, connection_config, schema_name, is_serverless FROM fluxbase_global.projects WHERE project_id = $1',
+            [projectId]
+        );
+        project = projectRes.rows[0];
+    } catch (e) {
+        logger.warn('[PAYG Meter] Error fetching project record:', e);
+    }
+
+    const { getProjectDbAndSchema } = await import('@/lib/tenant-pools');
+    const dbInfo = project ? getProjectDbAndSchema(project) : {
+        dbName: `project_${projectId}`,
+        schemaName: `project_${projectId}`
+    };
+    const dbName = dbInfo.dbName || `project_${projectId}`;
+    const schemaName = dbInfo.schemaName || `project_${projectId}`;
+
     // 3. Database Tables, Rows, and Storage
     if (isMysql) {
         try {
             const { getMysqlPool } = await import('@/lib/mysql');
             const mysqlPool = getMysqlPool();
-            const dbName = `project_${projectId}`;
             const [rows]: any = await mysqlPool.query(`
                 SELECT 
                     COUNT(*) as table_count,
@@ -233,6 +252,8 @@ export async function fetchProjectRealtimeMetrics(projectId: string, dialect: st
                     COALESCE(SUM(data_length + index_length), 0) as total_bytes
                 FROM information_schema.tables 
                 WHERE table_schema = ?
+                  AND table_type = 'BASE TABLE'
+                  AND table_name NOT LIKE '\\_flux\\_%'
             `, [dbName]);
 
             if (rows && rows[0]) {
@@ -245,14 +266,13 @@ export async function fetchProjectRealtimeMetrics(projectId: string, dialect: st
         }
     } else {
         // PostgreSQL tenant schema
-        const schemaName = `project_${projectId}`;
         try {
             const schemaStats = await pool.query(`
                 SELECT 
-                    (SELECT COUNT(*) FROM pg_tables WHERE schemaname = $1) as table_count,
-                    (SELECT COALESCE(SUM(n_live_tup), 0) FROM pg_stat_user_tables WHERE schemaname = $1) as row_count,
+                    (SELECT COUNT(*) FROM pg_tables WHERE schemaname = $1 AND tablename NOT LIKE '_flux_%') as table_count,
+                    (SELECT COALESCE(SUM(n_live_tup), 0) FROM pg_stat_user_tables WHERE schemaname = $1 AND relname NOT LIKE '_flux_%') as row_count,
                     (SELECT COALESCE(SUM(pg_total_relation_size(quote_ident(schemaname) || '.' || quote_ident(tablename))), 0) 
-                     FROM pg_tables WHERE schemaname = $1) as total_bytes
+                     FROM pg_tables WHERE schemaname = $1 AND tablename NOT LIKE '_flux_%') as total_bytes
             `, [schemaName]);
 
             if (schemaStats.rows.length > 0) {
@@ -264,6 +284,20 @@ export async function fetchProjectRealtimeMetrics(projectId: string, dialect: st
         } catch (e) {
             logger.warn('[PAYG Meter] Error fetching Postgres schema metrics:', e);
         }
+    }
+
+    // 4. S3 Object Storage
+    try {
+        const s3Res = await pool.query(`
+            SELECT COALESCE(SUM(size), 0) as s3_bytes
+            FROM fluxbase_global.storage_objects
+            WHERE project_id = $1
+        `, [projectId]);
+        const s3Bytes = parseInt(s3Res.rows[0]?.s3_bytes || '0', 10);
+        const s3Mb = s3Bytes / (1024 * 1024);
+        storageMb = Number((storageMb + s3Mb).toFixed(2));
+    } catch (e) {
+        logger.warn('[PAYG Meter] Error fetching S3 object storage metrics:', e);
     }
 
     return {

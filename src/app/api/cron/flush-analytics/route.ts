@@ -40,7 +40,10 @@ export async function GET(request: Request) {
                 val = parseInt(rawVal as string || '0', 10);
             }
 
-            if (val === 0) continue;
+            if (val === 0) {
+                await redis.srem('analytics_keys_to_flush', key);
+                continue;
+            }
 
             const query = `
                 INSERT INTO fluxbase_global.analytics_rollups (project_id, period_start, event_type, count)
@@ -59,6 +62,7 @@ export async function GET(request: Request) {
             }
             
             await redis.del(key);
+            await redis.srem('analytics_keys_to_flush', key);
             inserted++;
         }
 

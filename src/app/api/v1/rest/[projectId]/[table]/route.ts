@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAuthContextFromRequest } from '@/lib/auth';
 import { requireWriteScope } from '@/lib/require-scope';
-import { getProjectById, type Project } from '@/lib/data';
+import { getProjectById, logAuditAction, type Project } from '@/lib/data';
+import { trackApiRequest } from '@/lib/analytics';
 import {
     listRows,
     getRow,
@@ -13,6 +14,19 @@ import {
 import logger from '@/lib/logger';
 
 export const dynamic = 'force-dynamic';
+
+function trackRestCall(projectId: string, userId: string, method: string, table: string) {
+    trackApiRequest(projectId, 'api_call').catch(() => {});
+    trackApiRequest(projectId, 'sql_execution').catch(() => {});
+    const methodType = method === 'GET' ? 'sql_select'
+                     : method === 'POST' ? 'sql_insert'
+                     : method === 'PUT' ? 'sql_update'
+                     : method === 'DELETE' ? 'sql_delete' : null;
+    if (methodType) {
+        trackApiRequest(projectId, methodType as any).catch(() => {});
+    }
+    logAuditAction(projectId, userId, `REST_${method}`, `${method} ${table}`, { table, method }).catch(() => {});
+}
 
 /**
  * GET /api/v1/rest/[projectId]/[table]
@@ -55,6 +69,7 @@ export async function GET(
         }
 
         const result = await listRows(project, table, options);
+        trackRestCall(projectId, authContext.userId, 'GET', table);
         return NextResponse.json(result);
     } catch (error: any) {
         logger.error('[REST GET] Error:', error);
@@ -95,6 +110,7 @@ export async function POST(
         }
 
         const row = await insertRow(project, table, body);
+        trackRestCall(projectId, authContext.userId, 'POST', table);
         return NextResponse.json(row, { status: 201 });
     } catch (error: any) {
         if (error.message === 'FORBIDDEN') {
@@ -142,6 +158,7 @@ export async function PUT(
         if (!row) {
             return NextResponse.json({ success: false, error: { message: 'Row not found', code: 'NOT_FOUND' } }, { status: 404 });
         }
+        trackRestCall(projectId, authContext.userId, 'PUT', table);
         return NextResponse.json(row);
     } catch (error: any) {
         if (error.message === 'FORBIDDEN') {
@@ -189,6 +206,7 @@ export async function DELETE(
         if (!deleted) {
             return NextResponse.json({ success: false, error: { message: 'Row not found', code: 'NOT_FOUND' } }, { status: 404 });
         }
+        trackRestCall(projectId, authContext.userId, 'DELETE', table);
         return NextResponse.json({ success: true });
     } catch (error: any) {
         if (error.message === 'FORBIDDEN') {

@@ -33,31 +33,14 @@ export async function trackSession(projectId: string, userId: string): Promise<v
         const hourTimestamp = date.getTime();
 
         const analyticsKey = `analytics_rollup:${projectId}:${hourTimestamp}:sessions`;
-        const liveKey = `live_sessions:${projectId}`;
-        const liveWindowKey = `live_session_member:${projectId}:${userId}`;
 
-        // Use a pipeline to reduce Redis commands to a single round-trip (Network Efficiency)
-        const pipe = redis.pipeline();
-        
         // 1. Analytics Rollup (Unique user set)
+        const pipe = redis.pipeline();
         pipe.sadd(analyticsKey, userId);
         pipe.sadd('analytics_keys_to_flush', analyticsKey);
         pipe.expire(analyticsKey, 172800); // 48 hours
 
-        // 2. Simple Live Presence (Check if already counted in 5m window)
-        // We'll use a transaction/script style or just chain them.
-        // For simplicity with Upstash pipeline, we check existence separately or just set with condition.
-        pipe.get(liveWindowKey);
-        
-        const results = await pipe.exec();
-        const memberExists = results[3]; // Result of 'get liveWindowKey'
-
-        if (!memberExists) {
-            const innerPipe = redis.pipeline();
-            innerPipe.incr(liveKey);
-            innerPipe.set(liveWindowKey, '1', { ex: 300 }); // 5 minutes
-            await innerPipe.exec();
-        }
+        await pipe.exec();
 
         // Cleanup local cache occasionally to prevent memory leaks in long-running containers
         if (sessionCache.size > 10000) {

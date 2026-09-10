@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAuthContextFromRequest } from '@/lib/auth';
 import { SqlEngine } from '@/lib/sql-engine';
-import { getProjectById, logAuditAction, ensureNotSuspended, getColumnsForTable } from '@/lib/data';
+import { getProjectById, ensureNotSuspended, getColumnsForTable } from '@/lib/data';
 import { invalidateTableCache } from '@/lib/cache';
 import { fireWebhooks } from '@/lib/webhooks';
 import { ERROR_CODES, FluxbaseError } from '@/lib/error-codes';
@@ -10,7 +10,6 @@ import { getPgPool, handleDatabaseError } from '@/lib/pg';
 import { type WebhookEvent } from '@/lib/webhooks';
 import { Parser } from 'node-sql-parser';
 import { assertProjectScope } from '@/lib/project-auth';
-import { trackApiRequest } from '@/lib/analytics';
 import logger from '@/lib/logger';
 
 import { getCorsOrigin, buildCorsHeaders, corsPreflightResponse } from '@/lib/cors';
@@ -214,39 +213,6 @@ export async function POST(req: NextRequest) {
 
         // 1. Post-Execution Pipeline Optimization: Do NOT await side-effects
         if (result) {
-            // Build audit metadata — only include the metric that applies to this statement type
-            const auditMeta: Record<string, any> = {
-                duration_ms: duration,
-                status: 'success',
-                ...(isDML
-                    ? {
-                        rows_affected: rowsAffected,
-                        ...(hasConflictClause ? { conflict_clause: true } : {}),
-                    }
-                    : {
-                        rows_returned: rowsReturned,
-                    }),
-            };
-
-            backgroundTasks.push(
-                logAuditAction(projectId, userId, 'SQL_EXECUTION', query, auditMeta)
-                    .catch(e => logger.error('[Audit Error]', e))
-            );
-
-            // Track Real-time Analytics
-            backgroundTasks.push(trackApiRequest(projectId, 'sql_execution'));
-            backgroundTasks.push(trackApiRequest(projectId, 'api_call'));
-            if (upperQuery.startsWith('SELECT') || upperQuery.startsWith('WITH')) {
-                backgroundTasks.push(trackApiRequest(projectId, 'sql_select'));
-            } else if (upperQuery.startsWith('INSERT')) {
-                backgroundTasks.push(trackApiRequest(projectId, 'sql_insert'));
-            } else if (upperQuery.startsWith('UPDATE')) {
-                backgroundTasks.push(trackApiRequest(projectId, 'sql_update'));
-            } else if (upperQuery.startsWith('DELETE')) {
-                backgroundTasks.push(trackApiRequest(projectId, 'sql_delete'));
-            } else if (upperQuery.startsWith('ALTER') || upperQuery.startsWith('CREATE') || upperQuery.startsWith('DROP')) {
-                backgroundTasks.push(trackApiRequest(projectId, 'sql_alter'));
-            }
 
             // --- ABSOLUTE TABLE DETECTION (AST-BASED) ---
             let mutatedTable: string | null = null;

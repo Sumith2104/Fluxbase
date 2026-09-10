@@ -2442,11 +2442,27 @@ export interface ProjectAnalytics {
     tables: { name: string; rows: number; size: number }[];
 }
 
-export async function getProjectAnalytics(projectId: string): Promise<ProjectAnalytics> {
+export async function getProjectAnalytics(projectId: string, explicitUserId?: string): Promise<ProjectAnalytics> {
     const cachedLocal = _projectAnalyticsCache.get(projectId);
     if (cachedLocal) return cachedLocal;
 
-    const userId = await getCurrentUserId();
+    let userId: string | null | undefined = explicitUserId;
+    if (!userId) {
+        try {
+            userId = await getCurrentUserId();
+        } catch {
+            // Outside request context
+        }
+    }
+
+    if (!userId) {
+        try {
+            const pool = getPgPool();
+            const res = await pool.query('SELECT user_id FROM fluxbase_global.projects WHERE project_id = $1', [projectId]);
+            userId = res.rows[0]?.user_id;
+        } catch {}
+    }
+
     if (!userId) {
         return { totalSize: 0, totalRows: 0, tables: [] };
     }
@@ -2480,7 +2496,7 @@ export async function getProjectAnalytics(projectId: string): Promise<ProjectAna
                     COALESCE(data_length + index_length, 0) AS size
                 FROM information_schema.tables
                 WHERE table_schema = ? AND table_type = 'BASE TABLE'
-                AND table_name NOT LIKE '\\_flux\\_internal\\_%'
+                AND table_name NOT LIKE '\\_flux\\_%'
             `, [targetDb]);
 
             tablesStats = (rows || []).map((r: any) => ({
@@ -2504,7 +2520,7 @@ export async function getProjectAnalytics(projectId: string): Promise<ProjectAna
                 JOIN pg_namespace n ON n.oid = c.relnamespace
                 WHERE n.nspname = $1 
                   AND c.relkind IN ('r', 'p')
-                  AND c.relname NOT LIKE '_flux_internal_%';
+                  AND c.relname NOT LIKE '_flux_%';
             `, [activeSchema]);
 
             if (isExternal && result.rows.length === 0 && activeSchema !== 'public') {
@@ -2518,7 +2534,7 @@ export async function getProjectAnalytics(projectId: string): Promise<ProjectAna
                     JOIN pg_namespace n ON n.oid = c.relnamespace
                     WHERE n.nspname = 'public' 
                       AND c.relkind IN ('r', 'p')
-                      AND c.relname NOT LIKE '_flux_internal_%';
+                      AND c.relname NOT LIKE '_flux_%';
                 `);
             }
 
@@ -2531,7 +2547,19 @@ export async function getProjectAnalytics(projectId: string): Promise<ProjectAna
         }
 
         const totalRows = tablesStats.reduce((sum, stat) => sum + stat.rows, 0);
-        const totalSize = tablesStats.reduce((sum, stat) => sum + stat.size, 0);
+        let totalSize = tablesStats.reduce((sum, stat) => sum + stat.size, 0);
+
+        try {
+            const globalPool = getPgPool();
+            const s3Res = await globalPool.query(
+                `SELECT COALESCE(SUM(size), 0) as s3_bytes FROM fluxbase_global.storage_objects WHERE project_id = $1`,
+                [projectId]
+            );
+            const s3Bytes = parseInt(s3Res.rows[0]?.s3_bytes || '0', 10);
+            totalSize += s3Bytes;
+        } catch (s3Err) {
+            console.warn('[Analytics] Failed to fetch storage_objects size:', s3Err);
+        }
 
         const analyticsResult: ProjectAnalytics = {
             totalRows,

@@ -21,6 +21,7 @@ export async function trackApiRequest(projectId: string, type: AnalyticsType) {
         p.incr(minuteKey);
         p.expire(minuteKey, 7200);
         p.incr(hourKey);
+        p.expire(hourKey, 172800); // 48 hours TTL
         p.sadd('analytics_keys_to_flush', hourKey);
         await p.exec();
 
