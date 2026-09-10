@@ -1,6 +1,7 @@
 import { getPool } from './db';
 import { releaseSlot } from './slot-engine';
 import { dispatchWebhook } from './webhook-dispatcher';
+import { logGatewayAudit } from './audit';
 
 export interface PaymentMatchResult {
   matched: boolean;
@@ -157,6 +158,12 @@ export async function matchAndFulfillPayment(params: {
     );
 
     await client.query('COMMIT');
+
+    logGatewayAudit({
+      action: 'UPDATE',
+      statement: `UPDATE orders SET status = 'paid', utr = '${finalUtr || ''}' WHERE id = '${matchedOrder.id}'`,
+      metadata: { order_id: matchedOrder.id, amount: finalAmount, utr: finalUtr, status: 'paid', type: 'gateway_payment' },
+    }).catch(() => {});
 
     // 5. Instant Slot Recycling: Immediately release Redis lock
     const meta = typeof matchedOrder.metadata === 'string' ? JSON.parse(matchedOrder.metadata) : (matchedOrder.metadata || {});

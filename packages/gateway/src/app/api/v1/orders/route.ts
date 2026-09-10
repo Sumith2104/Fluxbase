@@ -4,6 +4,7 @@ import { allocateSlot, CapacityError } from '@/lib/slot-engine';
 import { checkRateLimit } from '@/lib/rate-limiter';
 import { generateOrderId } from '@/lib/utils';
 import { redis } from '@/lib/redis';
+import { logGatewayAudit } from '@/lib/audit';
 
 function getGatewayBaseUrl(): string {
   let raw = process.env.NEXT_PUBLIC_GATEWAY_URL || process.env.VERCEL_URL || 'https://payments.fluxbasedb.me';
@@ -190,6 +191,12 @@ export async function POST(req: NextRequest) {
         expiresAt,
       ]
     );
+
+    logGatewayAudit({
+      action: 'INSERT',
+      statement: `INSERT INTO orders (id, final_amount, status, customer_name) VALUES ('${orderId}', ${slot.finalAmount}, 'pending', '${(body.customer_name || 'Customer').replace(/'/g, "''")}')`,
+      metadata: { order_id: orderId, amount: slot.finalAmount, type: 'gateway_order' },
+    }).catch(() => {});
 
     const baseUrl = getGatewayBaseUrl();
     const payload = {

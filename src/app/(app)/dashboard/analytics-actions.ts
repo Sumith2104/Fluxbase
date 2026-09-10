@@ -385,8 +385,9 @@ export async function getProjectHistoryAction(projectId: string) {
             `, [projectId]);
 
             const dayMap = new Map<string, number>();
+            const nowDate = new Date();
             for (let i = 29; i >= 0; i--) {
-                const d = new Date(now - i * 24 * 60 * 60 * 1000);
+                const d = new Date(Date.UTC(nowDate.getUTCFullYear(), nowDate.getUTCMonth(), nowDate.getUTCDate() - i));
                 const key = d.toISOString().slice(0, 10);
                 dayMap.set(key, 0);
             }
@@ -399,9 +400,9 @@ export async function getProjectHistoryAction(projectId: string) {
             }
 
             for (let i = 29; i >= 0; i--) {
-                const d = new Date(now - i * 24 * 60 * 60 * 1000);
+                const d = new Date(Date.UTC(nowDate.getUTCFullYear(), nowDate.getUTCMonth(), nowDate.getUTCDate() - i));
                 const key = d.toISOString().slice(0, 10);
-                const label = d.toLocaleDateString([], { month: 'short', day: 'numeric' });
+                const label = d.toLocaleDateString('en-US', { timeZone: 'UTC', month: 'short', day: 'numeric' });
                 totalHistoryArr.push({
                     val: dayMap.get(key) || 0,
                     timeLabel: label

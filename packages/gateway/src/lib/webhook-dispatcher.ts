@@ -1,5 +1,6 @@
 import { getPool } from './db';
 import { computeHmac } from './utils';
+import { logGatewayAudit } from './audit';
 
 const RETRY_DELAYS_SECONDS = [0, 30, 120, 600, 3600]; // immediate, 30s, 2m, 10m, 1h
 
@@ -88,6 +89,13 @@ export async function executeDeliveryAttempt(
          WHERE id = $2`,
         [nextAttempt, deliveryId]
       );
+
+      logGatewayAudit({
+        action: 'POST',
+        statement: `POST webhook delivery to merchant for order ${payload?.order_id}`,
+        metadata: { delivery_id: deliveryId, order_id: payload?.order_id, type: 'gateway_webhook' },
+      }).catch(() => {});
+
       return true;
     }
 
