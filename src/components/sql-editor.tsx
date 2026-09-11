@@ -288,7 +288,7 @@ export function SqlEditor({ projectId, query, setQuery, onRun, isGenerating, res
                     <Button variant="ghost" size="sm" className="h-7 px-2 text-[11px] text-muted-foreground hover:text-foreground" onClick={handleFormatSql} title="Format SQL (Ctrl+Shift+F)"><AlignLeft className="h-3 w-3 mr-1" /> Format</Button>
                     <Separator orientation="vertical" className="h-4 mx-1" />
                     <Button variant="ghost" size="sm" className="h-7 px-2 text-[11px] text-muted-foreground hover:text-foreground" onClick={handleImportSql}><Upload className="h-3 w-3 mr-1" /> Import</Button>
-                    <Button variant="ghost" size="sm" className="h-7 px-2 text-[11px] text-muted-foreground hover:text-foreground hover:bg-orange-500/10 group" onClick={handleExplainQuery}><Activity className="h-3 w-3 mr-1 text-orange-500 group-hover:animate-pulse" /> Explain</Button>
+                    <Button variant="ghost" size="sm" className="h-7 px-2 text-[11px] text-muted-foreground hover:text-foreground group" onClick={handleExplainQuery}><Activity className="h-3 w-3 mr-1 text-primary group-hover:animate-pulse" /> Explain</Button>
                     <Button variant="ghost" size="sm" className="h-7 px-2 text-[11px] text-muted-foreground hover:text-foreground" onClick={handleSaveQuery}><Save className="h-3 w-3 mr-1" /> Save</Button>
                     <Button variant="ghost" size="sm" className="h-7 px-2 text-[11px] text-muted-foreground hover:text-foreground" onClick={handleShareQuery}><Share2 className="h-3 w-3 mr-1" /> Share</Button>
                 </div>

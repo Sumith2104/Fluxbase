@@ -363,18 +363,18 @@ function ColQuickFilter({ col, onFilter, active }: {
   return (
     <div ref={ref} className="relative">
       <button
-        className={`absolute right-2 top-1/2 -translate-y-1/2 p-0.5 rounded hover:bg-muted/80 z-10 transition-colors ${active ? 'text-primary' : 'text-transparent group-hover/hdr:text-muted-foreground/50 hover:!text-primary'}`}
+        className={`absolute right-2 top-1/2 -translate-y-1/2 p-0.5 rounded-md hover:bg-muted/80 z-10 transition-colors ${active ? 'text-primary' : 'text-transparent group-hover/hdr:text-muted-foreground/50 hover:!text-primary'}`}
         onClick={e => { e.stopPropagation(); setOpen(!open); }}
         title="Quick filter"
       ><Search className="h-3 w-3" /></button>
       {open && (
-        <div className="absolute right-0 top-full mt-1 z-50 w-52 p-2 rounded-md border bg-card/95 backdrop-blur-xl shadow-xl" onClick={e => e.stopPropagation()}>
+        <div className="absolute right-0 top-full mt-1.5 z-50 w-52 p-2.5 rounded-xl border bg-card/95 backdrop-blur-xl shadow-xl" onClick={e => e.stopPropagation()}>
           <div className="text-[10px] uppercase font-bold text-muted-foreground mb-1.5">Filter {col.headerName}</div>
-          <Input className="h-7 text-xs" placeholder="Contains..." value={val} onChange={e => setVal(e.target.value)}
+          <Input className="h-7 text-xs rounded-lg" placeholder="Contains..." value={val} onChange={e => setVal(e.target.value)}
             onKeyDown={e => { if (e.key === 'Enter') { onFilter(col.field, val); setOpen(false); } if (e.key === 'Escape') setOpen(false); }} />
           <div className="flex gap-1 mt-1.5">
-            <Button size="sm" variant="outline" className="h-6 text-[10px] flex-1" onClick={() => { onFilter(col.field, val); setOpen(false); }}>Apply</Button>
-            <Button size="sm" variant="ghost" className="h-6 text-[10px] flex-1" onClick={() => { onFilter(col.field, ''); setOpen(false); }}>Clear</Button>
+            <Button size="sm" variant="outline" className="h-6 text-[10px] flex-1 rounded-lg" onClick={() => { onFilter(col.field, val); setOpen(false); }}>Apply</Button>
+            <Button size="sm" variant="ghost" className="h-6 text-[10px] flex-1 rounded-lg" onClick={() => { onFilter(col.field, ''); setOpen(false); }}>Clear</Button>
           </div>
         </div>
       )}
@@ -814,7 +814,7 @@ export function DataTable({
   const gridCols = ['40px','40px','28px',...visibleColumns.map(c=>getW(c.field)+'px')].join(' ');
 
   return (
-    <div className="relative flex flex-col h-full min-h-[200px] w-full max-w-full flex-1 overflow-hidden rounded-lg border border-border/60 bg-card text-foreground shadow-2xl">
+    <div className="relative flex flex-col h-full min-h-[200px] w-full max-w-full flex-1 overflow-hidden rounded-xl border border-border/60 bg-card text-foreground shadow-2xl">
 
       {/* ── Scrollable area ── */}
       <div ref={parentRef} className="flex-1 overflow-auto relative custom-scrollbar" data-scroll-container="true" tabIndex={0} onKeyDown={handleKeyDown}>
@@ -1058,10 +1058,10 @@ export function DataTable({
           </div>
           <div className="w-px h-3.5 bg-border/50 mx-0.5" />
           <div className="relative">
-            <button className={`p-1 rounded transition-colors ${views.length ? 'text-foreground/70 hover:bg-muted' : 'text-muted-foreground/40 hover:text-foreground/60'}`}
+            <button className={`p-1 rounded-md transition-colors ${views.length ? 'text-foreground/70 hover:bg-muted' : 'text-muted-foreground/40 hover:text-foreground/60'}`}
               onClick={() => setShowViews(!showViews)} title="Saved views"><Bookmark className="h-3.5 w-3.5" /></button>
             {showViews && (
-              <div className="absolute right-0 bottom-full mb-1 z-50 w-64 rounded-lg border bg-card/95 backdrop-blur-xl shadow-xl p-3" onClick={e => e.stopPropagation()}>
+              <div className="absolute right-0 bottom-full mb-1.5 z-50 w-64 rounded-xl border bg-card/95 backdrop-blur-xl shadow-xl p-3" onClick={e => e.stopPropagation()}>
                 <div className="text-xs font-semibold mb-2">Saved Views</div>
                 {views.length === 0 && <div className="text-xs text-muted-foreground py-2">No saved views yet.</div>}
                 {views.map(v => (
@@ -1071,8 +1071,8 @@ export function DataTable({
                   </div>
                 ))}
                 <div className="flex gap-1.5 mt-2 pt-2 border-t border-border/50">
-                  <Input className="h-7 text-xs flex-1" placeholder="View name..." value={viewName} onChange={e => setViewName(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') saveView(); }} />
-                  <Button size="sm" variant="outline" className="h-7 text-[10px]" onClick={saveView}>Save</Button>
+                  <Input className="h-7 text-xs flex-1 rounded-lg" placeholder="View name..." value={viewName} onChange={e => setViewName(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') saveView(); }} />
+                  <Button size="sm" variant="outline" className="h-7 text-[10px] rounded-xl" onClick={saveView}>Save</Button>
                 </div>
               </div>
             )}

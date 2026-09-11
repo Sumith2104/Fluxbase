@@ -393,7 +393,7 @@ export default function StoragePage() {
                 <Button
                     size="sm"
                     variant="outline"
-                    className="h-7 px-2 text-xs border-orange-500/30 hover:bg-orange-500/10 hover:text-orange-400 gap-1 font-medium"
+                    className="h-7 px-2 text-xs border-border hover:bg-secondary hover:text-foreground gap-1 font-medium"
                     onClick={() => {
                         setNewBucketName('');
                         setIsCreateBucketOpen(true);
@@ -739,7 +739,7 @@ export default function StoragePage() {
                                             <p className="text-xs text-muted-foreground/80 max-w-sm">
                                                 Supports Images, PDFs, Videos, ZIP, CSV, JSON and documents. Files upload seamlessly in the background.
                                             </p>
-                                            <Button size="sm" variant="outline" className="h-7 text-xs border-orange-500/30 text-orange-400 hover:bg-orange-500/10 mt-1">
+                                            <Button size="sm" variant="outline" className="h-7 text-xs border-border text-foreground hover:bg-secondary mt-1">
                                                 Select Files
                                             </Button>
                                         </div>
@@ -754,7 +754,7 @@ export default function StoragePage() {
                                             {filteredFiles.map(file => (
                                                 <Card
                                                     key={file.id}
-                                                    className="group border-border/70 bg-card/40 hover:bg-card/90 hover:border-orange-500/40 transition-all overflow-hidden flex flex-col text-xs"
+                                                    className="group border-border/70 bg-card/40 hover:bg-card/90 hover:border-border transition-all overflow-hidden flex flex-col text-xs"
                                                 >
                                                     <div
                                                         className="h-28 bg-muted/30 flex items-center justify-center p-2 relative overflow-hidden border-b border-border/40 cursor-pointer"

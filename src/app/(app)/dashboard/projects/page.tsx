@@ -1427,20 +1427,20 @@ export default function SelectProjectPage() {
           }
         }
       }}>
-        <DialogContent className="sm:max-w-4xl lg:max-w-5xl rounded-none bg-card/98 backdrop-blur-2xl border border-border p-0 gap-0 overflow-hidden max-h-[90vh] flex flex-col md:flex-row">
+        <DialogContent className="sm:max-w-4xl lg:max-w-5xl rounded-2xl bg-card/98 backdrop-blur-2xl border border-border p-0 gap-0 overflow-hidden max-h-[90vh] flex flex-col md:flex-row">
           {/* LEFT SIDEBAR PIPELINE STACK */}
           <div className="w-full md:w-72 lg:w-80 shrink-0 border-b md:border-b-0 md:border-r border-border bg-secondary/25 flex flex-col justify-between p-5 select-none">
             <div className="space-y-4">
               {/* Header */}
               <div className="space-y-2">
                 <div className="flex items-center gap-2">
-                  <Badge variant="secondary" className="text-[10px] font-mono uppercase bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 rounded-none flex items-center gap-1 px-1.5 py-0.5">
+                  <Badge variant="secondary" className="text-[10px] font-mono uppercase bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 rounded-lg flex items-center gap-1 px-1.5 py-0.5">
                     <Github className="h-3 w-3" />
                     GitHub Import
                   </Badge>
                   {githubConnected && githubUsername && (
                     <span className="text-[10px] font-mono text-muted-foreground flex items-center gap-1 truncate">
-                      <span className="h-1.5 w-1.5 rounded-none bg-emerald-500" />
+                      <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
                       @{githubUsername}
                     </span>
                   )}
@@ -1464,7 +1464,7 @@ export default function SelectProjectPage() {
                       <div
                         key={s}
                         className={cn(
-                          "h-full transition-all rounded-none",
+                          "h-full transition-all rounded-full",
                           isDone ? "bg-emerald-500" : isCurr ? "bg-emerald-400 animate-pulse" : "bg-border/60"
                         )}
                       />
@@ -1536,7 +1536,7 @@ export default function SelectProjectPage() {
                         }
                       }}
                       className={cn(
-                        "w-full text-left p-2.5 rounded-none border transition-all relative flex flex-col gap-0.5",
+                        "w-full text-left p-2.5 rounded-xl border transition-all relative flex flex-col gap-0.5",
                         isCurrent
                           ? "bg-emerald-500/10 border-emerald-500 border-l-4 border-l-emerald-500 text-emerald-400 font-semibold shadow-sm"
                           : isPassed
@@ -1555,7 +1555,7 @@ export default function SelectProjectPage() {
                           </span>
                         ) : isCurrent ? (
                           <span className="flex items-center gap-1 text-emerald-400 text-[9px] font-bold uppercase">
-                            <span className="h-1.5 w-1.5 rounded-none bg-emerald-400 animate-pulse" />
+                            <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
                             Active
                           </span>
                         ) : (
@@ -1613,9 +1613,9 @@ export default function SelectProjectPage() {
           {/* STEP 1: CONNECT */}
           {githubStep === 'connect' && (
             <div className="py-6 my-auto flex flex-col items-center text-center space-y-5">
-              <div className="p-4 rounded-none bg-secondary/80 border border-border text-foreground relative group">
+              <div className="p-4 rounded-2xl bg-secondary/80 border border-border text-foreground relative group">
                 <Github className="h-12 w-12" />
-                <div className="absolute -bottom-1 -right-1 p-1 rounded-none bg-emerald-500 text-black">
+                <div className="absolute -bottom-1 -right-1 p-1 rounded-full bg-emerald-500 text-black">
                   <Plus className="h-3 w-3" />
                 </div>
               </div>
@@ -1625,11 +1625,11 @@ export default function SelectProjectPage() {
                   Connect GitHub for Schema Discovery
                 </h3>
                 <p className="text-xs text-muted-foreground leading-relaxed">
-                  Authorize Fluxbase to inspect your public and private repositories. We will locate the <code className="px-1.5 py-0.5 rounded-none bg-secondary font-mono text-[11px] border border-border/60">fluxbase/</code> folder, auto-detect the SQL dialect, and execute the migrations in your dedicated tenant database.
+                  Authorize Fluxbase to inspect your public and private repositories. We will locate the <code className="px-1.5 py-0.5 rounded-md bg-secondary font-mono text-[11px] border border-border/60">fluxbase/</code> folder, auto-detect the SQL dialect, and execute the migrations in your dedicated tenant database.
                 </p>
               </div>
 
-              <div className="p-3.5 rounded-none bg-secondary/30 border border-border text-left max-w-md w-full text-xs text-muted-foreground space-y-1.5">
+              <div className="p-3.5 rounded-xl bg-secondary/30 border border-border text-left max-w-md w-full text-xs text-muted-foreground space-y-1.5">
                 <div className="flex items-center gap-2 text-foreground font-medium">
                   <ShieldCheck className="h-4 w-4 text-emerald-400" />
                   <span>Secure & Encrypted</span>
@@ -1644,7 +1644,7 @@ export default function SelectProjectPage() {
                   <>
                     <Button
                       onClick={() => { setGithubStep('repos'); fetchRepos(); }}
-                      className="w-full sm:w-auto min-w-[210px] h-10 px-6 rounded-none bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-xs tracking-wide shadow-md shadow-emerald-950/40 flex items-center justify-center gap-2"
+                      className="w-full sm:w-auto min-w-[210px] h-10 px-6 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-xs tracking-wide shadow-md shadow-emerald-950/40 flex items-center justify-center gap-2"
                     >
                       <span>Continue as {githubUsername.replace(/^@/, '') || 'Sumith'}</span>
                       <ArrowRight className="h-4 w-4" />
@@ -1652,7 +1652,7 @@ export default function SelectProjectPage() {
                     <Button
                       variant="outline"
                       onClick={handleDisconnectGithub}
-                      className="w-full sm:w-auto h-10 px-5 rounded-none text-xs text-destructive hover:bg-destructive/10 border border-destructive/40 font-medium"
+                      className="w-full sm:w-auto h-10 px-5 rounded-xl text-xs text-destructive hover:bg-destructive/10 border border-destructive/40 font-medium"
                     >
                       Disconnect
                     </Button>
@@ -1663,7 +1663,7 @@ export default function SelectProjectPage() {
                       onClick={() => {
                         window.location.href = '/api/auth/github/import?returnTo=/dashboard/projects';
                       }}
-                      className="w-full sm:w-auto min-w-[220px] h-10 px-6 rounded-none bg-white text-black hover:bg-white/90 font-semibold text-xs flex items-center justify-center gap-2.5"
+                      className="w-full sm:w-auto min-w-[220px] h-10 px-6 rounded-xl bg-white text-black hover:bg-white/90 font-semibold text-xs flex items-center justify-center gap-2.5"
                     >
                       <Github className="h-4 w-4" />
                       <span>Connect GitHub Account</span>
@@ -1671,7 +1671,7 @@ export default function SelectProjectPage() {
                     <Button
                       variant="outline"
                       onClick={() => setIsGithubModalOpen(false)}
-                      className="w-full sm:w-auto h-10 px-5 rounded-none text-xs border border-border hover:bg-secondary/60 font-medium"
+                      className="w-full sm:w-auto h-10 px-5 rounded-xl text-xs border border-border hover:bg-secondary/60 font-medium"
                     >
                       Cancel
                     </Button>
@@ -1693,7 +1693,7 @@ export default function SelectProjectPage() {
                       setRepoSearch(e.target.value);
                       fetchRepos(e.target.value);
                     }}
-                    className="h-9 text-xs rounded-none bg-secondary/50 border border-border focus-visible:ring-emerald-500/50"
+                    className="h-9 text-xs rounded-xl bg-secondary/50 border border-border focus-visible:ring-emerald-500/50"
                   />
                 </div>
                 <div className="flex items-center gap-2 w-full sm:w-auto">
@@ -1705,13 +1705,13 @@ export default function SelectProjectPage() {
                     value={modulePath}
                     onChange={(e) => setModulePath(e.target.value)}
                     placeholder="fluxbase"
-                    className="h-9 w-32 font-mono text-xs rounded-none bg-secondary/50 border border-border focus-visible:ring-emerald-500/50"
+                    className="h-9 w-32 font-mono text-xs rounded-xl bg-secondary/50 border border-border focus-visible:ring-emerald-500/50"
                   />
                 </div>
               </div>
 
               {/* Repo list - expands and fills the available vertical space */}
-              <div className="border border-border rounded-none overflow-hidden flex-1 min-h-[320px] max-h-[500px] overflow-y-auto divide-y divide-border/60 bg-secondary/20">
+              <div className="border border-border rounded-xl overflow-hidden flex-1 min-h-[320px] max-h-[500px] overflow-y-auto divide-y divide-border/60 bg-secondary/20">
                 {loadingRepos ? (
                   <div className="p-10 flex flex-col items-center justify-center text-muted-foreground gap-2 min-h-[220px]">
                     <Loader2 className="h-5 w-5 animate-spin text-emerald-500" />
@@ -1739,17 +1739,17 @@ export default function SelectProjectPage() {
                             <span className="font-semibold text-xs text-foreground truncate">
                               {repo.full_name}
                             </span>
-                            <Badge variant="outline" className="text-[10px] font-mono px-1.5 py-0.5 rounded-none border border-border">
+                            <Badge variant="outline" className="text-[10px] font-mono px-1.5 py-0.5 rounded-lg border border-border">
                               {repo.private ? <Lock className="h-2.5 w-2.5 mr-1 inline" /> : <Globe className="h-2.5 w-2.5 mr-1 inline" />}
                               {repo.private ? 'Private' : 'Public'}
                             </Badge>
                             {repo.language && (
-                              <span className="text-[10px] text-muted-foreground/80 font-mono px-1.5 py-0.5 border border-border/50 bg-secondary/40">
+                              <span className="text-[10px] text-muted-foreground/80 font-mono px-1.5 py-0.5 border border-border/50 bg-secondary/40 rounded-md">
                                 {repo.language}
                               </span>
                             )}
                             {linkedProject && (
-                              <Badge variant="secondary" className="text-[10px] font-mono bg-amber-500/10 text-amber-400 border border-amber-500/30 rounded-none">
+                              <Badge variant="secondary" className="text-[10px] font-mono bg-amber-500/10 text-amber-400 border border-amber-500/30 rounded-lg">
                                 Linked: {linkedProject.display_name}
                               </Badge>
                             )}
@@ -1763,7 +1763,7 @@ export default function SelectProjectPage() {
 
                         <div className="shrink-0 flex items-center gap-2">
                           <div className={cn(
-                            "w-4 h-4 rounded-none border flex items-center justify-center transition-colors",
+                            "w-4 h-4 rounded-md border flex items-center justify-center transition-colors",
                             isSelected ? "border-emerald-500 bg-emerald-500 text-black shadow-sm" : "border-muted-foreground/40"
                           )}>
                             {isSelected && <Check className="h-3 w-3 stroke-[3]" />}
@@ -1777,7 +1777,7 @@ export default function SelectProjectPage() {
 
               {/* Notice if selected repo has an existing project */}
               {existingProjectForSelectedRepo && (
-                <div className="p-3 shrink-0 rounded-none bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs flex items-center gap-2.5">
+                <div className="p-3 shrink-0 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs flex items-center gap-2.5">
                   <Info className="h-4 w-4 text-amber-400 shrink-0" />
                   <span className="text-[11px] leading-relaxed">
                     Project <strong className="text-white font-mono">{existingProjectForSelectedRepo.display_name}</strong> is already linked to this repo. Importing again creates an independent project environment.
@@ -1791,7 +1791,7 @@ export default function SelectProjectPage() {
                     type="button"
                     variant="outline"
                     onClick={() => setGithubStep('connect')}
-                    className="h-9.5 px-4 rounded-none text-xs border border-border hover:bg-secondary/60 font-medium"
+                    className="h-9.5 px-4 rounded-xl text-xs border border-border hover:bg-secondary/60 font-medium"
                   >
                     Back
                   </Button>
@@ -1799,7 +1799,7 @@ export default function SelectProjectPage() {
                     type="button"
                     variant="ghost"
                     onClick={handleDisconnectGithub}
-                    className="h-9.5 px-3 rounded-none text-xs text-muted-foreground hover:text-destructive"
+                    className="h-9.5 px-3 rounded-xl text-xs text-muted-foreground hover:text-destructive"
                   >
                     Disconnect @{githubUsername}
                   </Button>
@@ -1809,7 +1809,7 @@ export default function SelectProjectPage() {
                     type="button"
                     variant="outline"
                     onClick={() => setIsGithubModalOpen(false)}
-                    className="h-9.5 px-4 rounded-none text-xs border border-border hover:bg-secondary/60 font-medium"
+                    className="h-9.5 px-4 rounded-xl text-xs border border-border hover:bg-secondary/60 font-medium"
                   >
                     Cancel
                   </Button>
@@ -1817,7 +1817,7 @@ export default function SelectProjectPage() {
                     type="button"
                     disabled={!selectedRepo}
                     onClick={handleScanRepository}
-                    className="h-9.5 px-5 rounded-none bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-xs shadow-md shadow-emerald-950/40 flex items-center gap-2"
+                    className="h-9.5 px-5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-xs shadow-md shadow-emerald-950/40 flex items-center gap-2"
                   >
                     <span>Scan Repository</span>
                     <ArrowRight className="h-4 w-4" />
@@ -1838,13 +1838,13 @@ export default function SelectProjectPage() {
                       Scanning {selectedRepo?.name}...
                     </h4>
                     <p className="text-xs text-muted-foreground mt-0.5">
-                      Checking for <code className="font-mono px-1 py-0.5 rounded-none bg-secondary border border-border/60">{modulePath}/</code> module, analyzing SQL migrations & syntax...
+                      Checking for <code className="font-mono px-1 py-0.5 rounded-md bg-secondary border border-border/60">{modulePath}/</code> module, analyzing SQL migrations & syntax...
                     </p>
                   </div>
                 </div>
               ) : moduleScanError ? (
                 <div className="space-y-4">
-                  <div className="p-4 rounded-none bg-destructive/10 border border-destructive/30 text-destructive-foreground space-y-2">
+                  <div className="p-4 rounded-xl bg-destructive/10 border border-destructive/30 text-destructive-foreground space-y-2">
                     <div className="flex items-center gap-2 font-semibold text-xs">
                       <XCircle className="h-4 w-4" />
                       Fluxbase Module Not Found
@@ -1854,17 +1854,17 @@ export default function SelectProjectPage() {
                     </p>
                   </div>
 
-                  <div className="p-4 rounded-none bg-secondary/30 border border-border space-y-2 text-xs">
+                  <div className="p-4 rounded-xl bg-secondary/30 border border-border space-y-2 text-xs">
                     <span className="font-semibold text-foreground">How to configure your repository:</span>
                     <ol className="list-decimal list-inside space-y-1 text-muted-foreground text-[11px] leading-relaxed">
-                      <li>Create a <code className="px-1 py-0.5 rounded-none bg-secondary font-mono border border-border/50">fluxbase/</code> folder in the root of <strong className="text-foreground">{selectedRepo?.name}</strong>.</li>
-                      <li>Add your schema migration SQL files (e.g., <code className="px-1 py-0.5 rounded-none bg-secondary font-mono border border-border/50">001_create_users.sql</code>, <code className="px-1 py-0.5 rounded-none bg-secondary font-mono border border-border/50">002_create_posts.sql</code>).</li>
-                      <li>(Optional) Add a <code className="px-1 py-0.5 rounded-none bg-secondary font-mono border border-border/50">fluxbase.json</code> manifest to declare custom dialect, execution order, or project name.</li>
+                      <li>Create a <code className="px-1 py-0.5 rounded-md bg-secondary font-mono border border-border/50">fluxbase/</code> folder in the root of <strong className="text-foreground">{selectedRepo?.name}</strong>.</li>
+                      <li>Add your schema migration SQL files (e.g., <code className="px-1 py-0.5 rounded-md bg-secondary font-mono border border-border/50">001_create_users.sql</code>, <code className="px-1 py-0.5 rounded-md bg-secondary font-mono border border-border/50">002_create_posts.sql</code>).</li>
+                      <li>(Optional) Add a <code className="px-1 py-0.5 rounded-md bg-secondary font-mono border border-border/50">fluxbase.json</code> manifest to declare custom dialect, execution order, or project name.</li>
                     </ol>
                   </div>
 
                   <DialogFooter className="pt-3">
-                    <Button variant="outline" onClick={() => setGithubStep('repos')} className="h-9.5 px-4 rounded-none text-xs border border-border hover:bg-secondary/60 font-medium">
+                    <Button variant="outline" onClick={() => setGithubStep('repos')} className="h-9.5 px-4 rounded-xl text-xs border border-border hover:bg-secondary/60 font-medium">
                       Back to Repositories
                     </Button>
                   </DialogFooter>
@@ -1872,16 +1872,16 @@ export default function SelectProjectPage() {
               ) : fluxbaseModule && (
                 <div className="space-y-4">
                   {/* Dialect detection card */}
-                  <div className="p-4 rounded-none bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-between gap-4">
+                  <div className="p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-between gap-4">
                     <div className="space-y-0.5">
                       <div className="flex items-center gap-2">
                         <span className="text-xs font-semibold text-emerald-400">
                           Detected Dialect:
                         </span>
-                        <Badge variant="secondary" className="text-xs font-mono uppercase bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 font-bold rounded-none px-2 py-0.5">
+                        <Badge variant="secondary" className="text-xs font-mono uppercase bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 font-bold rounded-lg px-2 py-0.5">
                           {fluxbaseModule.detectedDialect}
                         </Badge>
-                        <Badge variant="outline" className="text-[10px] font-mono border border-emerald-500/30 text-emerald-400 rounded-none px-2 py-0.5">
+                        <Badge variant="outline" className="text-[10px] font-mono border border-emerald-500/30 text-emerald-400 rounded-lg px-2 py-0.5">
                           {fluxbaseModule.dialectConfidence}% confidence
                         </Badge>
                       </div>
@@ -1897,11 +1897,11 @@ export default function SelectProjectPage() {
                   {/* Discovered files */}
                   <div className="space-y-2">
                     <div className="flex items-center justify-between text-xs text-muted-foreground">
-                      <span>Found {fluxbaseModule.files.length} SQL Migration File(s) in <code className="font-mono text-foreground px-1 py-0.5 rounded-none bg-secondary border border-border/60">{modulePath}/</code></span>
+                      <span>Found {fluxbaseModule.files.length} SQL Migration File(s) in <code className="font-mono text-foreground px-1 py-0.5 rounded-md bg-secondary border border-border/60">{modulePath}/</code></span>
                       <span className="font-mono text-[11px]">{Math.round(fluxbaseModule.totalSizeBytes / 1024 * 10) / 10} KB total</span>
                     </div>
 
-                    <div className="rounded-none border border-border bg-secondary/20 divide-y divide-border/50 max-h-48 overflow-y-auto">
+                    <div className="rounded-xl border border-border bg-secondary/20 divide-y divide-border/50 max-h-48 overflow-y-auto">
                       {fluxbaseModule.files.map((file: any, idx: number) => (
                         <div key={file.sha} className="p-2.5 px-3 flex items-center justify-between text-xs font-mono">
                           <div className="flex items-center gap-2">
@@ -1916,12 +1916,12 @@ export default function SelectProjectPage() {
                   </div>
 
                   <DialogFooter className="pt-3 flex flex-row items-center justify-between w-full">
-                    <Button variant="outline" onClick={() => setGithubStep('repos')} className="h-9.5 px-4 rounded-none text-xs border border-border hover:bg-secondary/60 font-medium">
+                    <Button variant="outline" onClick={() => setGithubStep('repos')} className="h-9.5 px-4 rounded-xl text-xs border border-border hover:bg-secondary/60 font-medium">
                       Back to Repositories
                     </Button>
                     <Button
                       onClick={() => setGithubStep('configure')}
-                      className="h-9.5 px-5 rounded-none bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-xs shadow-md shadow-emerald-950/40 flex items-center gap-2"
+                      className="h-9.5 px-5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-xs shadow-md shadow-emerald-950/40 flex items-center gap-2"
                     >
                       <span>Configure Project</span>
                       <ArrowRight className="h-4 w-4" />
@@ -1937,7 +1937,7 @@ export default function SelectProjectPage() {
             <div className="space-y-4 pt-2">
               {/* Notice if selected repo has an existing project */}
               {existingProjectForSelectedRepo && (
-                <div className="p-3 rounded-none bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs flex items-start gap-2.5">
+                <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs flex items-start gap-2.5">
                   <Info className="h-4 w-4 text-amber-400 shrink-0 mt-0.5" />
                   <div className="space-y-0.5">
                     <span className="font-semibold text-amber-200">Existing Project Detected</span>
@@ -1958,7 +1958,7 @@ export default function SelectProjectPage() {
                   value={importProjectName}
                   onChange={(e) => setImportProjectName(e.target.value)}
                   placeholder="My Database Project"
-                  className="h-9.5 text-xs bg-background/50 border border-border rounded-none focus-visible:ring-emerald-500/50"
+                  className="h-9.5 text-xs bg-background/50 border border-border rounded-xl focus-visible:ring-emerald-500/50"
                   required
                 />
               </div>
@@ -1969,10 +1969,10 @@ export default function SelectProjectPage() {
                     Dialect Engine
                   </Label>
                   <Select value={importDialect} onValueChange={(val: any) => setImportDialect(val)}>
-                    <SelectTrigger id="importDialect" className="h-9.5 text-xs bg-background/50 border border-border rounded-none focus:ring-emerald-500/50">
+                    <SelectTrigger id="importDialect" className="h-9.5 text-xs bg-background/50 border border-border rounded-xl focus:ring-emerald-500/50">
                       <SelectValue placeholder="Select dialect" />
                     </SelectTrigger>
-                    <SelectContent className="rounded-none border border-border">
+                    <SelectContent className="rounded-xl border border-border">
                       <SelectItem value="postgresql" className="text-xs font-mono">
                         <div className="flex items-center gap-2">
                           <div className="relative w-3.5 h-3.5 shrink-0">
@@ -2010,10 +2010,10 @@ export default function SelectProjectPage() {
                     Timezone
                   </Label>
                   <Select value={importTimezone} onValueChange={setImportTimezone}>
-                    <SelectTrigger id="importTimezone" className="h-9.5 text-xs bg-background/50 border border-border rounded-none focus:ring-emerald-500/50">
+                    <SelectTrigger id="importTimezone" className="h-9.5 text-xs bg-background/50 border border-border rounded-xl focus:ring-emerald-500/50">
                       <SelectValue placeholder="Select timezone" />
                     </SelectTrigger>
-                    <SelectContent className="max-h-56 rounded-none border border-border">
+                    <SelectContent className="max-h-56 rounded-xl border border-border">
                       {timezones.map((tz) => (
                         <SelectItem key={tz} value={tz} className="text-xs font-mono">
                           {tz}
@@ -2046,14 +2046,14 @@ export default function SelectProjectPage() {
                         type="button"
                         onClick={() => setImportRole(tier.id as any)}
                         className={cn(
-                          "flex flex-col p-2.5 rounded-none border text-left transition-all relative overflow-hidden",
+                          "flex flex-col p-2.5 rounded-xl border text-left transition-all relative overflow-hidden",
                           isSel
                             ? "border-emerald-500 bg-emerald-500/10 shadow-md shadow-emerald-950/40 ring-1 ring-emerald-500/50 text-emerald-400"
                             : "border-border bg-secondary/30 hover:bg-secondary/60 hover:border-border text-muted-foreground"
                         )}
                       >
                         {isSel && (
-                          <div className="absolute top-2 right-2 h-4 w-4 rounded-none bg-emerald-500 text-black flex items-center justify-center">
+                          <div className="absolute top-2 right-2 h-4 w-4 rounded-full bg-emerald-500 text-black flex items-center justify-center">
                             <Check className="h-2.5 w-2.5 stroke-[3]" />
                           </div>
                         )}
@@ -2094,7 +2094,7 @@ export default function SelectProjectPage() {
                           type="button"
                           onClick={() => setStudentPlan(plan.id as any)}
                           className={cn(
-                            "flex flex-col p-2.5 rounded-none border text-left transition-all relative overflow-hidden",
+                            "flex flex-col p-2.5 rounded-xl border text-left transition-all relative overflow-hidden",
                             isPlanSel
                               ? "border-emerald-500 bg-emerald-500/10 shadow-md shadow-emerald-950/40 ring-1 ring-emerald-500/50 text-emerald-400"
                               : "border-border bg-secondary/30 hover:bg-secondary/60 hover:border-border text-muted-foreground"
@@ -2102,13 +2102,13 @@ export default function SelectProjectPage() {
                         >
                           <div className="flex items-center justify-between w-full mb-1">
                             <span className={cn(
-                              "text-[9px] font-mono px-1.5 py-0.5 rounded-none border font-semibold",
+                              "text-[9px] font-mono px-1.5 py-0.5 rounded-lg border font-semibold",
                               isPlanSel ? "bg-emerald-500/20 text-emerald-300 border-emerald-500/40" : "bg-secondary text-muted-foreground border-border"
                             )}>
                               {plan.badge}
                             </span>
                             {isPlanSel && (
-                              <div className="h-4 w-4 rounded-none bg-emerald-500 text-black flex items-center justify-center">
+                              <div className="h-4 w-4 rounded-full bg-emerald-500 text-black flex items-center justify-center">
                                 <Check className="h-2.5 w-2.5 stroke-[3]" />
                               </div>
                             )}
@@ -2147,14 +2147,14 @@ export default function SelectProjectPage() {
                         type="button"
                         onClick={() => setImportBillingPreference(bp.id as any)}
                         className={cn(
-                          "flex flex-col p-2.5 rounded-none border text-left transition-all relative",
+                          "flex flex-col p-2.5 rounded-xl border text-left transition-all relative",
                           isSel
                             ? "border-emerald-500 bg-emerald-500/10 shadow-sm shadow-emerald-950/40 ring-1 ring-emerald-500/50 text-emerald-400"
                             : "border-border bg-secondary/30 hover:bg-secondary/60 hover:border-border text-muted-foreground"
                         )}
                       >
                         {isSel && (
-                          <div className="absolute top-2 right-2 h-4 w-4 rounded-none bg-emerald-500 text-black flex items-center justify-center">
+                          <div className="absolute top-2 right-2 h-4 w-4 rounded-full bg-emerald-500 text-black flex items-center justify-center">
                             <Check className="h-2.5 w-2.5 stroke-[3]" />
                           </div>
                         )}
@@ -2173,7 +2173,7 @@ export default function SelectProjectPage() {
                   type="button"
                   variant="outline"
                   onClick={() => setGithubStep('discover')}
-                  className="h-9.5 px-4 rounded-none text-xs border border-border hover:bg-secondary/60 font-medium"
+                  className="h-9.5 px-4 rounded-xl text-xs border border-border hover:bg-secondary/60 font-medium"
                 >
                   Back to Discovery
                 </Button>
@@ -2181,7 +2181,7 @@ export default function SelectProjectPage() {
                   type="button"
                   disabled={!importProjectName.trim()}
                   onClick={() => setGithubStep('preview')}
-                  className="h-9.5 px-5 rounded-none bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-xs shadow-md shadow-emerald-950/40 flex items-center gap-2"
+                  className="h-9.5 px-5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-xs shadow-md shadow-emerald-950/40 flex items-center gap-2"
                 >
                   <span>Preview Schema (Dry Run)</span>
                   <ArrowRight className="ml-1.5 h-3.5 w-3.5" />
@@ -2195,25 +2195,25 @@ export default function SelectProjectPage() {
             <div className="space-y-4 pt-2">
               {/* Summary banner */}
               <div className="grid grid-cols-4 gap-2">
-                <div className="p-3 rounded-none bg-secondary/40 border border-border">
+                <div className="p-3 rounded-xl bg-secondary/40 border border-border">
                   <span className="text-[10px] font-mono text-muted-foreground uppercase">Tables</span>
                   <div className="text-lg font-bold text-foreground mt-0.5">
                     {previewData?.tablesToCreate?.length || 0}
                   </div>
                 </div>
-                <div className="p-3 rounded-none bg-secondary/40 border border-border">
+                <div className="p-3 rounded-xl bg-secondary/40 border border-border">
                   <span className="text-[10px] font-mono text-muted-foreground uppercase">Statements</span>
                   <div className="text-lg font-bold text-foreground mt-0.5">
                     {previewData?.estimatedStatements || 0}
                   </div>
                 </div>
-                <div className="p-3 rounded-none bg-secondary/40 border border-border">
+                <div className="p-3 rounded-xl bg-secondary/40 border border-border">
                   <span className="text-[10px] font-mono text-muted-foreground uppercase">Dialect</span>
                   <div className="text-lg font-bold text-foreground mt-0.5 capitalize">
                     {importDialect}
                   </div>
                 </div>
-                <div className="p-3 rounded-none bg-secondary/40 border border-border">
+                <div className="p-3 rounded-xl bg-secondary/40 border border-border">
                   <span className="text-[10px] font-mono text-muted-foreground uppercase">Plan Tier</span>
                   <div className="text-lg font-bold text-emerald-400 mt-0.5 capitalize truncate">
                     {importRole === 'student' ? studentPlan : importRole}
@@ -2223,7 +2223,7 @@ export default function SelectProjectPage() {
 
               {/* Warnings if any */}
               {previewData?.warnings && previewData.warnings.length > 0 && (
-                <div className="p-3 rounded-none bg-amber-500/10 border border-amber-500/30 text-amber-400 space-y-1">
+                <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-400 space-y-1">
                   <div className="flex items-center gap-1.5 text-xs font-semibold">
                     <AlertTriangle className="h-4 w-4" />
                     SQL Notices & Warnings
@@ -2239,7 +2239,7 @@ export default function SelectProjectPage() {
               {/* Tables list preview */}
               <div className="space-y-2">
                 <span className="text-xs font-semibold text-foreground">Tables & Schema Architecture</span>
-                <div className="border border-border rounded-none overflow-hidden max-h-52 overflow-y-auto divide-y divide-border/40 bg-secondary/20">
+                <div className="border border-border rounded-xl overflow-hidden max-h-52 overflow-y-auto divide-y divide-border/40 bg-secondary/20">
                   {previewData?.tablesToCreate?.length === 0 ? (
                     <div className="p-4 text-center text-xs text-muted-foreground font-mono">
                       No explicit CREATE TABLE statements parsed. Raw SQL files will be executed directly.
@@ -2259,7 +2259,7 @@ export default function SelectProjectPage() {
                         {tbl.columns.length > 0 && (
                           <div className="flex flex-wrap gap-1 pt-1">
                             {tbl.columns.map((col: any) => (
-                              <span key={col.name} className="px-1.5 py-0.5 rounded-none bg-secondary font-mono text-[10px] text-muted-foreground border border-border/40">
+                              <span key={col.name} className="px-1.5 py-0.5 rounded-md bg-secondary font-mono text-[10px] text-muted-foreground border border-border/40">
                                 {col.name}: <span className="text-foreground">{col.type}</span>
                                 {!col.nullable && <span className="text-amber-400 ml-0.5">*</span>}
                               </span>
@@ -2272,7 +2272,7 @@ export default function SelectProjectPage() {
                 </div>
               </div>
 
-              <div className="p-3 rounded-none bg-emerald-500/5 border border-emerald-500/20 text-[11px] text-muted-foreground flex items-center gap-2">
+              <div className="p-3 rounded-xl bg-emerald-500/5 border border-emerald-500/20 text-[11px] text-muted-foreground flex items-center gap-2">
                 <ShieldCheck className="h-4 w-4 text-emerald-400 shrink-0" />
                 <span>Fluxbase will automatically inject isolated search path scoping to guarantee complete schema privacy.</span>
               </div>
@@ -2282,14 +2282,14 @@ export default function SelectProjectPage() {
                   type="button"
                   variant="outline"
                   onClick={() => setGithubStep('configure')}
-                  className="h-9.5 px-4 rounded-none text-xs border border-border hover:bg-secondary/60 font-medium"
+                  className="h-9.5 px-4 rounded-xl text-xs border border-border hover:bg-secondary/60 font-medium"
                 >
                   Back to Configure
                 </Button>
                 <Button
                   type="button"
                   onClick={handleRunImport}
-                  className="h-9.5 px-5 rounded-none bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-xs shadow-md shadow-emerald-950/40 flex items-center gap-2"
+                  className="h-9.5 px-5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-xs shadow-md shadow-emerald-950/40 flex items-center gap-2"
                 >
                   <span>Execute Import & Provision</span>
                   <ArrowRight className="ml-1.5 h-3.5 w-3.5" />
@@ -2318,18 +2318,18 @@ export default function SelectProjectPage() {
                   </div>
                 </div>
                 {importError ? (
-                  <Badge variant="destructive" className="font-mono text-[10px] rounded-none">
+                  <Badge variant="destructive" className="font-mono text-[10px] rounded-lg">
                     Failed
                   </Badge>
                 ) : (
-                  <Badge variant="secondary" className="font-mono text-[10px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 rounded-none">
+                  <Badge variant="secondary" className="font-mono text-[10px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 rounded-lg">
                     Running
                   </Badge>
                 )}
               </div>
 
               {/* Terminal log window */}
-              <div className="p-3 rounded-none bg-black/80 border border-border text-emerald-400 font-mono text-[11px] max-h-56 overflow-y-auto space-y-1">
+              <div className="p-3 rounded-xl bg-black/80 border border-border text-emerald-400 font-mono text-[11px] max-h-56 overflow-y-auto space-y-1">
                 {executionLogs.map((log, idx) => (
                   <div key={idx} className={cn("leading-relaxed whitespace-pre-wrap", log.includes("ERROR") || log.includes("CRITICAL") ? "text-red-400" : "")}>{log}</div>
                 ))}
@@ -2337,7 +2337,7 @@ export default function SelectProjectPage() {
 
               {importError && (
                 <div className="space-y-3">
-                  <div className="p-3 rounded-none bg-destructive/10 border border-destructive/30 text-destructive-foreground text-xs flex items-center gap-2">
+                  <div className="p-3 rounded-xl bg-destructive/10 border border-destructive/30 text-destructive-foreground text-xs flex items-center gap-2">
                     <AlertTriangle className="h-4 w-4 shrink-0" />
                     <span>{importError}</span>
                   </div>
@@ -2349,14 +2349,14 @@ export default function SelectProjectPage() {
                         setImportError(null);
                         setGithubStep('configure');
                       }}
-                      className="h-9 px-4 rounded-none text-xs border border-border hover:bg-secondary/60 font-medium"
+                      className="h-9 px-4 rounded-xl text-xs border border-border hover:bg-secondary/60 font-medium"
                     >
                       Back to Configure
                     </Button>
                     <Button
                       size="sm"
                       onClick={handleRunImport}
-                      className="h-9 px-4 rounded-none text-xs bg-emerald-600 hover:bg-emerald-500 text-white font-semibold"
+                      className="h-9 px-4 rounded-xl text-xs bg-emerald-600 hover:bg-emerald-500 text-white font-semibold"
                     >
                       Retry Import
                     </Button>
@@ -2369,7 +2369,7 @@ export default function SelectProjectPage() {
           {/* STEP 7: SUCCESS */}
           {githubStep === 'success' && (
             <div className="py-6 my-auto flex flex-col items-center text-center space-y-4 animate-in fade-in zoom-in-95 duration-300">
-              <div className="p-4 rounded-none bg-emerald-500/10 border border-emerald-500/30 text-emerald-400">
+              <div className="p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400">
                 <CheckCircle2 className="h-12 w-12" />
               </div>
 
@@ -2384,19 +2384,19 @@ export default function SelectProjectPage() {
 
               {/* Summary details card */}
               <div className="grid grid-cols-3 gap-2 w-full max-w-md pt-2">
-                <div className="p-2.5 rounded-none bg-secondary/40 border border-border">
+                <div className="p-2.5 rounded-xl bg-secondary/40 border border-border">
                   <span className="text-[10px] font-mono text-muted-foreground uppercase">Files Executed</span>
                   <div className="text-sm font-bold text-foreground mt-0.5">
                     {importResult?.filesExecuted || fluxbaseModule?.files?.length || 0}
                   </div>
                 </div>
-                <div className="p-2.5 rounded-none bg-secondary/40 border border-border">
+                <div className="p-2.5 rounded-xl bg-secondary/40 border border-border">
                   <span className="text-[10px] font-mono text-muted-foreground uppercase">Statements</span>
                   <div className="text-sm font-bold text-foreground mt-0.5">
                     {importResult?.totalStatements || 0}
                   </div>
                 </div>
-                <div className="p-2.5 rounded-none bg-secondary/40 border border-border">
+                <div className="p-2.5 rounded-xl bg-secondary/40 border border-border">
                   <span className="text-[10px] font-mono text-muted-foreground uppercase">Time</span>
                   <div className="text-sm font-bold text-foreground mt-0.5">
                     {importResult?.executionTimeMs ? `${importResult.executionTimeMs}ms` : '< 1s'}
@@ -2404,13 +2404,13 @@ export default function SelectProjectPage() {
                 </div>
               </div>
 
-              <div className="p-3.5 rounded-none bg-secondary/30 border border-border text-left max-w-md w-full text-xs text-muted-foreground space-y-1">
+              <div className="p-3.5 rounded-xl bg-secondary/30 border border-border text-left max-w-md w-full text-xs text-muted-foreground space-y-1">
                 <div className="flex items-center gap-1.5 font-medium text-foreground">
                   <RefreshCw className="h-3.5 w-3.5 text-emerald-400" />
                   <span>Continuous Re-Sync Supported</span>
                 </div>
                 <p className="text-[11px] leading-relaxed">
-                  As you push updates to <code className="font-mono px-1 py-0.5 rounded-none bg-secondary border border-border/50">{modulePath}/</code> on GitHub, you can pull new SQL migrations directly from your Project Settings.
+                  As you push updates to <code className="font-mono px-1 py-0.5 rounded-md bg-secondary border border-border/50">{modulePath}/</code> on GitHub, you can pull new SQL migrations directly from your Project Settings.
                 </p>
               </div>
 
@@ -2424,7 +2424,7 @@ export default function SelectProjectPage() {
                     }
                     fetchProjects();
                   }}
-                  className="w-full sm:w-auto min-w-[180px] h-10 px-5 rounded-none text-xs font-medium border border-border hover:bg-secondary/60"
+                  className="w-full sm:w-auto min-w-[180px] h-10 px-5 rounded-xl text-xs font-medium border border-border hover:bg-secondary/60"
                 >
                   Close & View Projects
                 </Button>
@@ -2443,7 +2443,7 @@ export default function SelectProjectPage() {
                       router.push('/dashboard');
                     }
                   }}
-                  className="w-full sm:w-auto min-w-[200px] h-10 px-6 rounded-none bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-xs shadow-md shadow-emerald-950/40 flex items-center justify-center gap-2"
+                  className="w-full sm:w-auto min-w-[200px] h-10 px-6 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-xs shadow-md shadow-emerald-950/40 flex items-center justify-center gap-2"
                 >
                   <span>Open in Table Editor</span>
                   <ArrowRight className="ml-1.5 h-3.5 w-3.5" />

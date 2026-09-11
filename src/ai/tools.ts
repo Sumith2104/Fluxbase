@@ -234,8 +234,44 @@ export const learnErrorFixTool = ai.defineTool({
   };
 });
 
+export const executeSqlTool = ai.defineTool({
+  name: "executeSqlTool",
+  description: "Executes a safe read-only SQL query (SELECT, SHOW, EXPLAIN, DESCRIBE, WITH) against the active database and returns rows.",
+  inputSchema: z.object({
+    query: z.string().describe("The read-only SQL query to execute."),
+  }),
+  outputSchema: z.object({
+    action: z.string(),
+  }),
+}, async (input) => {
+  return { action: `[EXECUTE_SQL:${input.query}]` };
+});
+
+export const searchKnowledgeTool = ai.defineTool({
+  name: "searchKnowledgeTool",
+  description: "Searches Fluxbase documentation, API references, SDK guides, and database rules using the RAG subsystem.",
+  inputSchema: z.object({
+    query: z.string().describe("The search term or question to find documentation for."),
+  }),
+  outputSchema: z.object({
+    results: z.array(z.object({
+      title: z.string(),
+      content: z.string(),
+      source: z.string(),
+    })),
+  }),
+}, async (input) => {
+  const { searchDocumentation } = await import('@/lib/rag-service');
+  const docs = searchDocumentation(input.query, 3);
+  return {
+    results: docs.map(d => ({ title: d.title, content: d.content, source: d.source })),
+  };
+});
+
 export const fluxTools = [
   getSchemaTool, 
+  executeSqlTool,
+  searchKnowledgeTool,
   runSqlTool, 
   createTableDirectTool,
   insertRowsTool,

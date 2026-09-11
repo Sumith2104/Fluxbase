@@ -1,15 +1,25 @@
 import { NextResponse } from 'next/server';
 import { ai } from '@/ai/genkit';
-import fs from 'fs';
-import path from 'path';
 import { getAuthContextFromRequest } from '@/lib/auth';
 import logger from '@/lib/logger';
+import { SqlEngine } from '@/lib/sql-engine';
+import { getProjectById } from '@/lib/data';
+import { getProjectDbAndSchema } from '@/lib/tenant-pools';
+import { getRagContext } from '@/lib/rag-service';
+import { fluxTools } from '@/ai/tools';
 
 // ── Schema Cache ──────────────────────────────────────────────────────────────
 // Avoids querying information_schema on every chat message.
-// TTL: 60 seconds per project.
+// TTL: 5 minutes (300s) per project. Invalidate on DDL via DELETE endpoint.
 const schemaCache = new Map<string, { data: string; expires: number }>();
-const SCHEMA_TTL_MS = 60_000;
+const SCHEMA_TTL_MS = 300_000;
+
+function isCasualOrGreeting(msg: string): boolean {
+    if (!msg) return true;
+    const trimmed = msg.trim().toLowerCase().replace(/[!?.,]/g, '');
+    if (trimmed.length <= 2) return true; // e.g. "hi", "yo"
+    return /^(hi|hello|hey|hiya|yo|greetings|howdy|sup|good (morning|afternoon|evening)|who are you|what can you do|help|thanks|thank you|bye|goodbye)$/i.test(trimmed);
+}
 
 async function getSchemaContext(projectId: string | undefined, userId: string, projectInfo: any): Promise<string> {
     if (!projectId) return '';
@@ -18,36 +28,57 @@ async function getSchemaContext(projectId: string | undefined, userId: string, p
     if (cached && Date.now() < cached.expires) return cached.data;
 
     try {
-        const { SqlEngine } = await import('@/lib/sql-engine');
-        const { getProjectById } = await import('@/lib/data');
-        const { getProjectDbAndSchema } = await import('@/lib/tenant-pools');
-
         const project = await getProjectById(projectId, userId);
         if (!project) return '';
 
         const { dbName, schemaName } = getProjectDbAndSchema(project);
         const isMysql = project.dialect?.toLowerCase() === 'mysql';
         const targetSchemaOrDb = isMysql ? dbName : schemaName;
+        const escaped = (targetSchemaOrDb || '').replace(/'/g, "''");
         const engine = new SqlEngine(projectId, userId, undefined, undefined, project);
 
         const colQuery = isMysql
-            ? `SELECT table_name, column_name, data_type, is_nullable, column_key FROM information_schema.columns WHERE table_schema = ? AND table_name NOT LIKE '\_flux\_internal\_%' ORDER BY table_name, ordinal_position;`
-            : `SELECT table_name, column_name, data_type, is_nullable FROM information_schema.columns WHERE table_schema = $1 AND table_name NOT LIKE '\_flux\_internal\_%' ORDER BY table_name, ordinal_position;`;
+            ? `SELECT table_name, column_name, data_type, is_nullable, column_key FROM information_schema.columns WHERE table_schema = '${escaped}' AND table_name NOT LIKE '\\_flux\\_internal\\_%' ORDER BY table_name, ordinal_position;`
+            : `SELECT table_name, column_name, data_type, is_nullable FROM information_schema.columns WHERE table_schema = '${escaped}' AND table_name NOT LIKE '\\_flux\\_internal\\_%' ORDER BY table_name, ordinal_position;`;
 
         const fkQuery = isMysql
             ? `SELECT TABLE_NAME as table_name, COLUMN_NAME as column_name, REFERENCED_TABLE_NAME as referenced_table, REFERENCED_COLUMN_NAME as referenced_column
                FROM INFORMATION_SCHEMA.KEY_COLUMN_USAGE
-               WHERE TABLE_SCHEMA = ? AND REFERENCED_TABLE_NAME IS NOT NULL;`
+               WHERE TABLE_SCHEMA = '${escaped}' AND REFERENCED_TABLE_NAME IS NOT NULL;`
             : `SELECT tc.table_name, kcu.column_name, ccu.table_name AS referenced_table, ccu.column_name AS referenced_column
                FROM information_schema.table_constraints AS tc
                JOIN information_schema.key_column_usage AS kcu ON tc.constraint_name = kcu.constraint_name AND tc.table_schema = kcu.table_schema
                JOIN information_schema.constraint_column_usage AS ccu ON ccu.constraint_name = tc.constraint_name AND ccu.table_schema = tc.table_schema
-               WHERE tc.constraint_type = 'FOREIGN KEY' AND tc.table_schema = $1;`;
+               WHERE tc.constraint_type = 'FOREIGN KEY' AND tc.table_schema = '${escaped}';`;
 
-        const [colRes, fkRes] = await Promise.all([
-            engine.execute(colQuery, [targetSchemaOrDb]).catch(() => null),
-            engine.execute(fkQuery, [targetSchemaOrDb]).catch(() => null)
+        const rowCountQuery = isMysql
+            ? `SELECT TABLE_NAME as table_name, COALESCE(TABLE_ROWS, 0) as row_count FROM information_schema.TABLES WHERE TABLE_SCHEMA = '${escaped}' AND TABLE_NAME NOT LIKE '\\_flux\\_%';`
+            : `SELECT c.relname as table_name, GREATEST(0, c.reltuples::bigint) as row_count FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace WHERE (n.nspname = '${escaped}' OR n.nspname = 'public') AND c.relkind IN ('r', 'p') AND c.relname NOT LIKE '_flux_%';`;
+
+        const [colRes, fkRes, rowCountRes] = await Promise.all([
+            engine.execute(colQuery).catch((err) => { logger.warn('[AI Chat] Schema columns introspection error:', err?.message || err); return null; }),
+            engine.execute(fkQuery).catch((err) => { logger.warn('[AI Chat] Schema FK introspection error:', err?.message || err); return null; }),
+            engine.execute(rowCountQuery).catch((err) => { logger.warn('[AI Chat] Schema row count error:', err?.message || err); return null; })
         ]);
+
+        const rowCountMap: Record<string, { count: number; isApproximate: boolean }> = {};
+        if (rowCountRes?.rows?.length) {
+            await Promise.all(rowCountRes.rows.map(async (r: any) => {
+                const t = r.table_name || r.TABLE_NAME;
+                let cnt = parseInt(r.row_count || r.ROW_COUNT || '0', 10);
+                const isApproximate = cnt >= 100000;
+                // For PostgreSQL tables under 100k rows, fetch exact count to mirror dashboard precision
+                if (!isMysql && !isApproximate && t) {
+                    try {
+                        const exactRes = await engine.execute(`SELECT COUNT(*) as c FROM "${t}"`);
+                        if (exactRes?.rows?.[0]?.c !== undefined) {
+                            cnt = parseInt(exactRes.rows[0].c, 10);
+                        }
+                    } catch {}
+                }
+                if (t) rowCountMap[t] = { count: cnt, isApproximate };
+            }));
+        }
 
         let result = '';
         if (colRes?.rows?.length) {
@@ -70,7 +101,13 @@ async function getSchemaContext(projectId: string | undefined, userId: string, p
 
             result = `\n\n=== LIVE DATABASE SCHEMA ===\n` +
                 Object.entries(schemaMap)
-                    .map(([tbl, cols]) => `- ${tbl}: [${cols.join(', ')}]`)
+                    .map(([tbl, cols]) => {
+                        const info = rowCountMap[tbl];
+                        const countStr = info !== undefined
+                            ? (info.isApproximate ? ` (~${info.count.toLocaleString()} rows)` : ` (${info.count.toLocaleString()} rows)`)
+                            : '';
+                        return `- ${tbl}${countStr}: [${cols.join(', ')}]`;
+                    })
                     .join('\n') +
                 (fkList.length > 0 ? `\n- Foreign Keys:\n${fkList.join('\n')}` : '') +
                 `\n\nCRITICAL: Use EXACT table/column names above. NEVER invent fake tables or columns.\n============================\n`;
@@ -84,7 +121,13 @@ async function getSchemaContext(projectId: string | undefined, userId: string, p
     }
 }
 
-// ── Main Handler ─────────────────────────────────────────────────────────────
+// ── Pre-warm Endpoint (GET) ──────────────────────────────────────────────────
+// Pinged by client on page mount to ensure Turbopack pre-compiles the route in the background.
+export async function GET() {
+    return NextResponse.json({ status: 'ready', timestamp: Date.now() });
+}
+
+// ── Main Handler (POST) ──────────────────────────────────────────────────────
 
 export async function POST(req: Request) {
     try {
@@ -94,29 +137,27 @@ export async function POST(req: Request) {
         }
 
         const { messages, currentPath, model, activeProject, screenContext } = await req.json();
+        const userLastMsg = messages[messages.length - 1]?.content || '';
+        const dialect = activeProject?.dialect || 'postgresql';
 
-        // RAG Error Memory
-        let ragLessonsPrompt = '';
-        try {
-            const { getRelevantErrorLessons, formatLessonsForPrompt } = await import('@/lib/ai-memory');
-            const userLastMsg = messages[messages.length - 1]?.content || '';
-            const dialect = activeProject?.dialect || 'postgresql';
-            const lessons = await getRelevantErrorLessons(activeProject?.project_id, dialect, userLastMsg);
-            ragLessonsPrompt = formatLessonsForPrompt(lessons, dialect);
-        } catch (memErr) {
-            logger.warn('[AI Chat] RAG fetch failed:', memErr);
+        // ── 1. Fast-path intent check for greetings & chitchat ──────────────────
+        // Greetings do not need database schema introspection or RAG error memory DB lookups.
+        const isGreeting = isCasualOrGreeting(userLastMsg);
+
+        let rawSchema = '';
+        let rag = { schemaSnippet: '', docSnippet: '', errorMemorySnippet: '', sources: [] as string[] };
+
+        if (!isGreeting) {
+            // Real query: execute schema context retrieval and RAG context
+            rawSchema = await getSchemaContext(activeProject?.project_id, auth.userId, activeProject);
+            rag = await getRagContext(
+                activeProject?.project_id,
+                auth.userId,
+                dialect,
+                rawSchema,
+                userLastMsg
+            );
         }
-
-        // Integration guide (cached in memory)
-        let docsContext = '';
-        try {
-            const docsPath = path.join(process.cwd(), 'fluxbase-client', 'INTEGRATION_GUIDE.md');
-            if (fs.existsSync(docsPath)) {
-                docsContext = fs.readFileSync(docsPath, 'utf-8').substring(0, 6000);
-            } else {
-                docsContext = 'Fluxbase API: POST /api/execute-sql {query}, POST /api/storage/upload (multipart), SSE /api/realtime/subscribe.';
-            }
-        } catch {}
 
         // Project context
         const projectContext = activeProject
@@ -127,132 +168,181 @@ export async function POST(req: Request) {
             ? `\nSCREEN: Table="${screenContext.activeTable || 'none'}" Cols=${JSON.stringify(screenContext.visibleColumns?.slice(0, 15) || [])} Rows=${screenContext.rowCount || 0}${screenContext.activeError ? ` Error="${screenContext.activeError.slice(0, 100)}"` : ''}\n`
             : '';
 
-        // Schema (cached)
-        const schemaContext = await getSchemaContext(activeProject?.project_id, auth.userId, activeProject);
+        const systemPrompt = isGreeting
+            ? `You are Flux AI, an autonomous database agent inside Fluxbase. Greet the user warmly and concisely explain what you can do (query databases, explore schemas, create tables, run Auto-Pilot workflows, and navigate the app). Keep your response concise.`
+            : `You are Flux AI, an autonomous database agent inside Fluxbase. You are capable of querying databases, navigating the UI, clicking buttons, typing in forms, executing MCP tools, and requesting user review/approval for sensitive operations.
 
-        const systemPrompt = `You are Flux AI, an autonomous agent inside the Fluxbase database platform. You can navigate pages, execute SQL, create tables, insert data, and analyze results.
-
-AVAILABLE ROUTES (use exact paths — never wrap in angle brackets):
-/ (Home — landing page, demo showcases, auth dialogs)
+AVAILABLE ROUTES:
+/ (Home)
 /dashboard (Real-time analytics, API throughput, query metrics)
 /dashboard/projects (Project switcher, database management)
 /editor (Spreadsheet-style interactive data grid for viewing/editing table rows)
 /query (Monaco SQL editor with AI query generation, explain plans, data exports)
 /database (Visual schema explorer, tables, relationships)
-/storage (AWS S3 file browser, drag-and-drop uploader, presigned URLs)
+/storage (AWS S3 file browser, uploader, presigned URLs)
 /scraper (Automated web data scraping into database tables)
 /docs (Interactive REST API & SDK developer documentation)
 /settings (Project configurations, API keys, team members, backups)
 
-RULES:
-1. Use ONLY real table/column names from the LIVE DATABASE SCHEMA below. Never invent names.
-2. When the user asks about data, write a precise SQL query with WHERE/ORDER BY/LIMIT. Never do bare SELECT * unless asked.
-3. When query results are in the conversation, READ them and answer directly.
-4. Be concise. No 4-step plans for simple queries. Execute directly.
-5. For destructive operations (DROP, DELETE, TRUNCATE, ALTER), warn the user in your response text. The query will be loaded into the editor where the user reviews before executing.
-6. Use exact route paths from the AVAILABLE ROUTES list above. Never guess or fabricate paths.
+${projectContext}${screenContextStr}
+${rag.schemaSnippet}
+${rag.docSnippet}
+${rag.errorMemorySnippet}
 
 CURRENT PATH: ${currentPath}
-${projectContext}${screenContextStr}${schemaContext}${ragLessonsPrompt}
 
-ACTION TAGS (output at end of response if needed):
-- Run safe SQL directly and show results: [EXECUTE_SQL:<query>]
-  Use for ALL read-only queries: SELECT, SHOW, EXPLAIN, DESCRIBE, WITH/CTE.
-  This executes immediately and returns results in the chat. No user review needed.
-- Load dangerous SQL into editor for review: [CONFIRM_ACTION:INJECT_SQL:<query>]
-  Use ONLY for data-modifying or destructive operations: DROP, DELETE, TRUNCATE, ALTER, INSERT, UPDATE, CREATE TABLE.
-  The user reviews and executes manually.
-- Create project: [CONFIRM_ACTION:CREATE_PROJECT:<name>:<postgresql|mysql>]
-- Navigate: [NAVIGATE:/path] — NEVER wrap the path in angle brackets. Use [NAVIGATE:/editor] NOT [NAVIGATE:</editor>]
-- Click: [CLICK:<label>]
-- Type: [TYPE:<value>:<field>]
+CRITICAL RULES:
+1. NEVER simulate user responses or output "USER:". NEVER output "ASSISTANT:" or repeat your response. Provide your response once directly.
+2. REASONING & THINKING PROTOCOL:
+   If you need to plan, reason, or formulate SQL queries, you MUST put your internal reasoning inside <think>...</think> tags.
+   NEVER output conversational filler like "To provide the row count for each table, I will execute another query...". Either put your reasoning inside <think>...</think> or emit the action tag immediately.
+3. ACCURATE TABLE ROW COUNTS & DATABASE SIZES:
+   - Live row counts are ALREADY PROVIDED for every table in "=== LIVE DATABASE SCHEMA ===" (e.g. "- predictions (~619,430 rows): [...]", "- candles_1m (52,142 rows): [...]", "- exported_data (13 rows): [...]").
+   - When the user asks for row counts, number of rows, or how many rows are inside tables, ANSWER IMMEDIATELY using these live schema row counts formatted in a clean Markdown table! DO NOT tell the user every table has 1 row!
+   - NEVER, UNDER ANY CIRCUMSTANCES, run "SELECT table_name, COUNT(*) FROM information_schema.tables"! That query is COMPLETELY INACCURATE because it only counts metadata catalog schema entries and always returns 1 for every table!
+   - If you need to execute SQL to query or refresh table row counts:
+     * In PostgreSQL, run:
+       SELECT c.relname AS table_name, GREATEST(0, c.reltuples::bigint) AS row_count
+       FROM pg_class c
+       JOIN pg_namespace n ON n.oid = c.relnamespace
+       WHERE (n.nspname = current_schema() OR n.nspname = 'public') AND c.relkind IN ('r', 'p') AND c.relname NOT LIKE '_flux_%'
+       ORDER BY row_count DESC;
+     * In MySQL, run:
+       SELECT TABLE_NAME AS table_name, COALESCE(TABLE_ROWS, 0) AS row_count
+       FROM information_schema.TABLES
+       WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME NOT LIKE '_flux_%'
+       ORDER BY TABLE_NAME;
+     * For a single table exact count:
+       SELECT COUNT(*) AS row_count FROM "tableName";
+4. When the user asks to query, inspect, count, or analyze data, DO NOT explain that you will query. Run the query IMMEDIATELY by emitting [EXECUTE_SQL:<actual_sql_statement>].
+5. For destructive operations (DROP TABLE, DELETE, TRUNCATE, ALTER, UPDATE without WHERE), you MUST request human approval using [REQUEST_APPROVAL:<id>:EXECUTE_SQL:<summary>:<sql>]. The user will receive an interactive card in the chat to approve and run it.
+6. When you receive observation data (e.g. "System: Observation from SQL execution..."), analyze the rows and determine the next step or conclude the goal. Format tables using clean Markdown tables.
+7. When the user's overall goal or Auto-Pilot task is accomplished, summarize your findings and end with [GOAL_ACCOMPLISHED:<summary>].
+8. ACCURATE COLUMNS & ROW COMPARISONS (LAG WINDOW FUNCTION):
+   - ONLY query columns that actually exist in "=== LIVE DATABASE SCHEMA ==="!
+   - For example, in table "predictions", there is NO column called "previous_balance"! NEVER write "WHERE balance != previous_balance".
+   - To compare values with the preceding row, ALWAYS use the LAG() window function:
+     WITH changes AS (
+       SELECT *, LAG(balance) OVER (ORDER BY id) AS prev_balance
+       FROM predictions
+     )
+     SELECT *
+     FROM changes
+     WHERE prev_balance IS NOT NULL
+       AND ABS(balance - prev_balance) >= 1.0;
+   - When the user asks for balance changes of at least 1 rupee (ignoring decimals/paisa), filter with "ABS(balance - prev_balance) >= 1.0".
 
---- INTEGRATION GUIDE ---
-${docsContext}
---- END GUIDE ---
+AVAILABLE ACTION TAGS (append at the very end of your response):
+- Safe Read SQL (immediate execution): [EXECUTE_SQL:<exact_sql_query>]
+  CRITICAL: You MUST replace <exact_sql_query> with the actual executable SQL statement (e.g. [EXECUTE_SQL:SELECT * FROM predictions LIMIT 10;]). NEVER output the literal placeholder text "[EXECUTE_SQL:<query>]" or literal angle brackets!
+- Destructive SQL (human review required): [REQUEST_APPROVAL:appr_${Date.now()}:EXECUTE_SQL:<summary>:<sql>]
+  For DROP, DELETE, TRUNCATE, ALTER, INSERT, CREATE TABLE.
+- MCP Tool Call: [CALL_MCP:<toolName>:<jsonArgs>]
+  Tools: "create_project", "list_projects", "get_schema", "run_sql".
+- Navigate: [NAVIGATE:/path] (exact route from AVAILABLE ROUTES)
+- Click: [CLICK:<label_or_id>]
+- Type: [TYPE:<value>:<field_or_placeholder>]
+- Goal Finished: [GOAL_ACCOMPLISHED:<summary>]
 
-7. NEVER output only navigation tags without text. Always explain what you're doing and why.
-8. When the user asks to query, analyze, or read data, use EXECUTE_SQL to run the query immediately. Use INJECT_SQL ONLY for writes/destructive ops.
-9. Respond in Markdown. No HTML. No emojis.
+Respond concisely in Markdown. If you need data, output your thought inside <think>...</think> and the ACTION tag with your full SQL query immediately.`;
 
-Respond in Markdown. No HTML. No emojis.`;
-
-        // Build conversation (last 10 messages for token efficiency)
+        // Build conversation
         const recentMessages = messages.slice(-10);
         let fullPrompt = systemPrompt + '\n\n--- CONVERSATION ---\n';
         for (const msg of recentMessages) {
-            // Skip hidden system messages from the history we send to the model
             if (msg.hidden) continue;
             const role = msg.role.toUpperCase();
             fullPrompt += `${role}: ${msg.content}\n\n`;
         }
         fullPrompt += 'ASSISTANT: ';
 
-        const { fluxTools } = await import('@/ai/tools');
-
         const response = await ai.generate({
             model: model || 'glm',
             prompt: fullPrompt,
-            tools: fluxTools,
+            tools: isGreeting ? undefined : fluxTools,
             config: { temperature: 0.2 }
         });
 
-        let responseText = response.text;
+        let responseText = response.text || '';
 
-        // Extract tool calls and append as action tags
-        try {
-            const actionTags: string[] = [];
-            const content = response.message?.content || (response as any).output?.content || [];
-            if (Array.isArray(content)) {
-                for (const part of content) {
-                    if (!part.toolRequest) continue;
-                    const req = part.toolRequest;
-                    if (req.name === 'navigatePageTool' && req.input?.path) {
-                        const p = req.input.path.replace(/^<\/+/, '/').replace(/>+$/, '');
-                        actionTags.push(`[NAVIGATE:${p}]`);
-                    } else if (req.name === 'clickElementTool' && req.input?.elementId) {
-                        actionTags.push(`[CLICK:${req.input.elementId}]`);
-                    } else if (req.name === 'typeInputTool' && req.input?.value && req.input?.locator) {
-                        actionTags.push(`[TYPE:${req.input.value}:${req.input.locator}]`);
-                    } else if (req.name === 'createProjectTool' && req.input?.projectName) {
-                        actionTags.push(`[CONFIRM_ACTION:CREATE_PROJECT:${req.input.projectName}:${req.input.dialect || 'postgresql'}]`);
-                    } else if (req.name === 'runSqlTool' && req.input?.query) {
-                        actionTags.push(`[CONFIRM_ACTION:INJECT_SQL:${req.input.query}]`);
-                    } else if (req.name === 'createTableDirectTool') {
-                        const input = req.input as any;
-                        const isM = (input.dialect || 'postgresql').toLowerCase() === 'mysql';
-                        const q = isM ? '`' : '"';
-                        const cols = (input.columns || []).map((c: any) => {
-                            let d = `${q}${c.name}${q} ${c.type}`;
-                            if (c.isPrimaryKey) d += isM && c.type.toUpperCase().includes('INT') ? ' AUTO_INCREMENT PRIMARY KEY' : ' PRIMARY KEY';
-                            if (c.isNullable === false) d += ' NOT NULL';
-                            if (c.defaultValue) d += ` DEFAULT ${c.defaultValue}`;
-                            return d;
-                        });
-                        const sql = `CREATE TABLE IF NOT EXISTS ${q}${input.tableName}${q} (\n  ${cols.join(',\n  ')}\n);`;
-                        actionTags.push(`[CONFIRM_ACTION:INJECT_SQL:${sql}]`);
-                    } else if (req.name === 'insertRowsTool') {
-                        const input = req.input as any;
-                        const rows = input.rows || [];
-                        if (rows.length) {
-                            const columns = Object.keys(rows[0]);
-                            const fmt = (v: any) => v === null || v === undefined ? 'NULL' : typeof v === 'number' || typeof v === 'boolean' ? String(v) : `'${String(v).replace(/'/g, "''")}'`;
-                            const vals = rows.map((r: any) => `(${columns.map((c: string) => fmt(r[c])).join(', ')})`).join(',\n  ');
-                            const sql = `INSERT INTO "${input.tableName}" (${columns.map((c: string) => `"${c}"`).join(', ')})\nVALUES\n  ${vals};`;
-                            actionTags.push(`[CONFIRM_ACTION:INJECT_SQL:${sql}]`);
+        // 1. Preserve any <think>...</think> or <thought>...</thought> block from the model
+        const thinkMatch = responseText.match(/<think>[\s\S]*?<\/think>/i) || responseText.match(/<thought>[\s\S]*?<\/thought>/i);
+        const thinkBlock = thinkMatch ? thinkMatch[0] : '';
+        if (thinkBlock) {
+            responseText = responseText.replace(thinkBlock, '').trim();
+        }
+
+        // 2. Strip leading "ASSISTANT:" prefix if model mirrored prompt header
+        responseText = responseText.replace(/^(?:ASSISTANT|Assistant):\s*/i, '').trim();
+
+        // 3. Anti-hallucination defense: If model generated multiple turns with "\nASSISTANT: ..."
+        if (/\n+(?:ASSISTANT|Assistant):\s*/i.test(responseText)) {
+            const parts = responseText.split(/\n+(?:ASSISTANT|Assistant):\s*/i).filter(Boolean);
+            if (parts.length > 0) {
+                // Keep the final authoritative answer
+                responseText = parts[parts.length - 1].trim();
+            }
+        }
+
+        // 4. Anti-hallucination defense: Strip any hallucinated "USER: ..." dialogue continuation
+        if (responseText.includes('\nUSER:')) {
+            responseText = responseText.split(/\nUSER:/i)[0].trim();
+        } else if (responseText.includes('\nUser:')) {
+            responseText = responseText.split(/\nUser:/)[0].trim();
+        }
+
+        // 5. Clean orphan "Query results: ```sql..." if followed by conversational answer with code
+        if (/^Query results:\s*```[\s\S]*?```/i.test(responseText)) {
+            const afterQueryResults = responseText.replace(/^Query results:\s*```[\s\S]*?```\s*/i, '').trim();
+            if (afterQueryResults.includes('```')) {
+                responseText = afterQueryResults;
+            }
+        }
+
+        // 6. Restore the preserved thought block at the very top
+        if (thinkBlock) {
+            responseText = `${thinkBlock}\n\n${responseText}`.trim();
+        }
+
+        // Extract tool calls and append as action tags (only if not a greeting)
+        if (!isGreeting) {
+            try {
+                const actionTags: string[] = [];
+                const content = response.message?.content || (response as any).output?.content || [];
+                if (Array.isArray(content)) {
+                    for (const part of content) {
+                        if (!part.toolRequest) continue;
+                        const req = part.toolRequest;
+                        if (req.name === 'navigatePageTool' && req.input?.path) {
+                            const p = req.input.path.replace(/^<\/+/, '/').replace(/>+$/, '');
+                            actionTags.push(`[NAVIGATE:${p}]`);
+                        } else if (req.name === 'clickElementTool' && req.input?.elementId) {
+                            actionTags.push(`[CLICK:${req.input.elementId}]`);
+                        } else if (req.name === 'typeInputTool' && req.input?.value && req.input?.locator) {
+                            actionTags.push(`[TYPE:${req.input.value}:${req.input.locator}]`);
+                        } else if (req.name === 'createProjectTool' && req.input?.projectName) {
+                            actionTags.push(`[REQUEST_APPROVAL:appr_${Date.now()}:CREATE_PROJECT:Create project ${req.input.projectName}:${JSON.stringify(req.input)}]`);
+                        } else if (req.name === 'runSqlTool' && req.input?.query) {
+                            const q = req.input.query;
+                            const isDestr = /drop|delete\s+from|truncate|alter\s+table/i.test(q);
+                            if (isDestr) {
+                                actionTags.push(`[REQUEST_APPROVAL:appr_${Date.now()}:EXECUTE_SQL:${req.input.reason || 'Execute SQL query'}:${q}]`);
+                            } else {
+                                actionTags.push(`[EXECUTE_SQL:${q}]`);
+                            }
                         }
                     }
                 }
+                const uniqueTags = [...new Set(actionTags.filter(Boolean))];
+                if (uniqueTags.length > 0) {
+                    responseText += '\n' + uniqueTags.join('\n');
+                }
+            } catch (toolErr) {
+                logger.error('[AI Chat] Tool extraction failed:', toolErr);
             }
-            const uniqueTags = [...new Set(actionTags.filter(Boolean))];
-            if (uniqueTags.length > 0) {
-                responseText += '\n' + uniqueTags.join('\n');
-            }
-        } catch (toolErr) {
-            logger.error('[AI Chat] Tool extraction failed:', toolErr);
         }
 
-        return NextResponse.json({ success: true, text: responseText });
+        return NextResponse.json({ success: true, text: responseText, sources: rag.sources });
     } catch (error: any) {
         logger.error('AI Chat Error:', error);
         let userFacingError = error.message || 'Failed to process request.';
@@ -265,7 +355,7 @@ Respond in Markdown. No HTML. No emojis.`;
     }
 }
 
-// Allow schema cache invalidation via POST (called after DDL operations)
+// Allow schema cache invalidation via DELETE (called after DDL operations)
 export async function DELETE(req: Request) {
     try {
         const { projectId } = await req.json();
@@ -278,3 +368,4 @@ export async function DELETE(req: Request) {
         return NextResponse.json({ success: false }, { status: 400 });
     }
 }
+

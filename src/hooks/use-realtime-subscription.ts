@@ -322,6 +322,10 @@ function subscribe(projectId: string, listener: Listener): () => void {
 const globalLastTableRefetch = new Map<string, number>();
 const globalTableTimers = new Map<string, ReturnType<typeof setTimeout>>();
 
+// Global per-project schema invalidation debounce timers across all hook instances
+const globalLastSchemaInvalidate = new Map<string, number>();
+const globalSchemaTimer = new Map<string, ReturnType<typeof setTimeout>>();
+
 export function useRealtimeSubscription(projectId: string | undefined) {
     const [lastEvent, setLastEvent] = useState<RealtimeEvent | null>(null);
     const [status, setStatus] = useState<'idle' | 'connecting' | 'open' | 'closed'>('connecting');
@@ -336,20 +340,33 @@ export function useRealtimeSubscription(projectId: string | undefined) {
         // 1. Handle Schema Changes (Tables created/dropped/altered)
         if (event.type === 'schema_update' || event.event_type === 'schema_update') {
             const pid = event.project_id || projectId;
-            logger.info(`[Realtime Sync] Schema changed. Instant Triple-Pass Pass 1...`);
+            const now = Date.now();
+            const lastTime = globalLastSchemaInvalidate.get(pid) || 0;
 
-            // Pass 1: IMMEDIATE (0ms)
-            queryClient.invalidateQueries({ queryKey: ['schema', pid] });
+            // Clear any pending trailing debounce timer
+            const existingTimer = globalSchemaTimer.get(pid);
+            if (existingTimer) {
+                clearTimeout(existingTimer);
+                globalSchemaTimer.delete(pid);
+            }
 
-            // Pass 2: Propagation Safety (3000ms)
-            setTimeout(() => {
+            const COOLDOWN_THRESHOLD = 3000; // 3s cooldown between leading-edge schema refetches
+
+            if (now - lastTime >= COOLDOWN_THRESHOLD) {
+                // Leading edge: Immediate invalidation for instant UI response (0ms)
+                globalLastSchemaInvalidate.set(pid, now);
+                logger.info(`[Realtime Sync] Schema changed for ${pid}. Immediate invalidation (leading edge)...`);
                 queryClient.invalidateQueries({ queryKey: ['schema', pid] });
-            }, 3000);
+            }
 
-            // Pass 3: Consistency Check (8000ms)
-            setTimeout(() => {
+            // Trailing edge: Single safety pass at 2500ms for delayed catalog propagation
+            const trailingTimer = setTimeout(() => {
+                globalSchemaTimer.delete(pid);
+                globalLastSchemaInvalidate.set(pid, Date.now());
+                logger.info(`[Realtime Sync] Schema changed for ${pid}. Consistency invalidation (trailing edge)...`);
                 queryClient.invalidateQueries({ queryKey: ['schema', pid] });
-            }, 8000);
+            }, 2500);
+            globalSchemaTimer.set(pid, trailingTimer);
             return;
         }
 

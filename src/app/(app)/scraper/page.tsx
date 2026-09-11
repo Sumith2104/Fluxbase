@@ -120,7 +120,7 @@ export default function ScraperDashboard() {
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b pb-6">
                 <div>
                     <h1 className="text-4xl font-black tracking-tight flex items-center gap-3">
-                        Native Scraper Engine <Badge variant="secondary" className="bg-orange-500/20 text-orange-500 hover:bg-orange-500/30">Beta</Badge>
+                        Native Scraper Engine <Badge variant="secondary" className="bg-orange-500/20 text-orange-500 hover:bg-orange-500/20">Beta</Badge>
                     </h1>
                     <p className="text-muted-foreground mt-2 text-lg">Serverlessly fetch, parse, and ingest web data directly into your database using distributed Playwright engines.</p>
                 </div>

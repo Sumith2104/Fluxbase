@@ -441,7 +441,7 @@ export default function GeneralSettingsPage() {
                                         <div className="flex-1">
                                             <p className="font-semibold text-orange-500 text-sm">Setup Incomplete</p>
                                             <p className="text-xs text-muted-foreground mb-3">You generated a 2FA secret but never verified it. Your account is NOT protected yet.</p>
-                                            <Button size="sm" variant="outline" className="h-8 border-orange-500/50 text-orange-500 hover:bg-orange-500/10" onClick={handleSetup2FA}>
+                                            <Button size="sm" variant="outline" className="h-8 border-border text-foreground hover:bg-secondary" onClick={handleSetup2FA}>
                                                 Complete Setup
                                             </Button>
                                         </div>
@@ -521,7 +521,7 @@ export default function GeneralSettingsPage() {
 
             {/* 5. Danger Zone */}
             {(!selectedProject?.role || selectedProject?.role === 'admin' || selectedProject?.role === 'owner') && (
-                <Card className="border-destructive/50 bg-destructive/5 rounded-none">
+                <Card className="border-destructive/50 bg-destructive/5 rounded-xl">
                     <CardHeader>
                         <CardTitle className="text-destructive flex items-center gap-2">
                             <AlertTriangle className="h-5 w-5" />
@@ -531,7 +531,7 @@ export default function GeneralSettingsPage() {
                     </CardHeader>
                     <CardContent className="space-y-4">
                         {/* 1. DELETE THIS PROJECT */}
-                        <div className="flex flex-col sm:flex-row sm:items-center justify-between rounded-none border border-border bg-background p-4 gap-4">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between rounded-xl border border-border bg-background p-4 gap-4">
                             <div>
                                 <Label htmlFor="delete-project" className="font-semibold text-foreground">Delete this Project</Label>
                                 <p className="text-sm text-muted-foreground">
@@ -545,11 +545,11 @@ export default function GeneralSettingsPage() {
                                 }
                             }}>
                                 <AlertDialogTrigger asChild>
-                                    <Button variant="destructive" disabled={!selectedProject} className="rounded-none shrink-0 font-medium">
+                                    <Button variant="destructive" disabled={!selectedProject} className="rounded-xl shrink-0 font-medium">
                                         Delete Project
                                     </Button>
                                 </AlertDialogTrigger>
-                                <AlertDialogContent className="bg-card border-border rounded-none max-w-lg">
+                                <AlertDialogContent className="bg-card border-border rounded-2xl max-w-lg">
                                     <AlertDialogHeader>
                                         <AlertDialogTitle className="flex items-center gap-2 text-destructive font-bold">
                                             <AlertTriangle className="h-5 w-5" />
@@ -562,7 +562,7 @@ export default function GeneralSettingsPage() {
                                     </AlertDialogHeader>
 
                                     <div className="space-y-3 py-2">
-                                        <div className="p-2.5 rounded-none bg-destructive/10 border border-destructive/25 text-[11px] text-destructive-foreground font-mono space-y-1">
+                                        <div className="p-2.5 rounded-xl bg-destructive/10 border border-destructive/25 text-[11px] text-destructive-foreground font-mono space-y-1">
                                             <div className="flex justify-between">
                                                 <span className="text-muted-foreground">Project:</span>
                                                 <span className="font-bold text-foreground">{selectedProject?.display_name}</span>
@@ -582,7 +582,7 @@ export default function GeneralSettingsPage() {
                                                 id="ack-delete-project"
                                                 checked={deleteAckChecked}
                                                 onCheckedChange={(c) => setDeleteAckChecked(!!c)}
-                                                className="mt-0.5 rounded-none"
+                                                className="mt-0.5"
                                             />
                                             <label htmlFor="ack-delete-project" className="text-xs text-muted-foreground cursor-pointer select-none leading-tight">
                                                 I understand that all tables, rows, and schema data will be permanently purged and cannot be recovered.
@@ -610,13 +610,13 @@ export default function GeneralSettingsPage() {
                                                 value={deleteConfirmation}
                                                 onChange={(e) => setDeleteConfirmation(e.target.value)}
                                                 placeholder={selectedProject?.display_name}
-                                                className="font-mono bg-secondary/70 border-border rounded-none text-xs h-9 focus-visible:ring-destructive/50"
+                                                className="font-mono bg-secondary/70 border-border rounded-xl text-xs h-9 focus-visible:ring-destructive/50"
                                             />
                                         </div>
                                     </div>
 
                                     <AlertDialogFooter className="pt-2">
-                                        <AlertDialogCancel disabled={isDeletingProject} className="rounded-none text-xs border-border">Cancel</AlertDialogCancel>
+                                        <AlertDialogCancel disabled={isDeletingProject} className="rounded-xl text-xs border-border">Cancel</AlertDialogCancel>
                                         <Button
                                             onClick={handleDeleteProject}
                                             disabled={
@@ -629,7 +629,7 @@ export default function GeneralSettingsPage() {
                                                     deleteConfirmation.trim().toLowerCase() === (selectedProject?.project_id || '').toLowerCase()
                                                 )
                                             }
-                                            className="rounded-none text-xs bg-destructive hover:bg-destructive/90 text-white font-semibold"
+                                            className="rounded-xl text-xs bg-destructive hover:bg-destructive/90 text-white font-semibold"
                                         >
                                             {isDeletingProject ? (
                                                 <>
@@ -646,7 +646,7 @@ export default function GeneralSettingsPage() {
                         </div>
 
                         {/* 2. SUSPEND / RESUME PROJECT */}
-                        <div className="flex flex-col sm:flex-row sm:items-center justify-between rounded-none border border-border bg-background p-4 gap-4">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between rounded-xl border border-border bg-background p-4 gap-4">
                             <div>
                                 <Label htmlFor="suspend-project" className="font-semibold text-foreground">{selectedProject?.status === 'suspended' ? 'Resume Project' : 'Suspend Project'}</Label>
                                 <p className="text-sm text-muted-foreground">
@@ -657,11 +657,11 @@ export default function GeneralSettingsPage() {
                             </div>
                             <AlertDialog onOpenChange={(open) => !open && setSuspendProjectAckChecked(false)}>
                                 <AlertDialogTrigger asChild>
-                                    <Button variant={selectedProject?.status === 'suspended' ? "default" : "destructive"} disabled={!selectedProject || isTogglingProjectSuspension} className="rounded-none shrink-0 font-medium">
+                                    <Button variant={selectedProject?.status === 'suspended' ? "default" : "destructive"} disabled={!selectedProject || isTogglingProjectSuspension} className="rounded-xl shrink-0 font-medium">
                                         {selectedProject?.status === 'suspended' ? 'Resume Project' : 'Suspend Project'}
                                     </Button>
                                 </AlertDialogTrigger>
-                                <AlertDialogContent className="bg-card border-border rounded-none max-w-lg">
+                                <AlertDialogContent className="bg-card border-border rounded-2xl max-w-lg">
                                     <AlertDialogHeader>
                                         <AlertDialogTitle className="flex items-center gap-2">
                                             <AlertTriangle className="h-5 w-5 text-amber-500" />
@@ -680,7 +680,7 @@ export default function GeneralSettingsPage() {
                                                 id="ack-suspend-project"
                                                 checked={suspendProjectAckChecked}
                                                 onCheckedChange={(c) => setSuspendProjectAckChecked(!!c)}
-                                                className="mt-0.5 rounded-none"
+                                                className="mt-0.5"
                                             />
                                             <label htmlFor="ack-suspend-project" className="text-xs text-muted-foreground cursor-pointer select-none leading-tight">
                                                 I confirm I want to {selectedProject?.status === 'suspended' ? 'resume database operations' : 'suspend query traffic for this project'}.
@@ -689,11 +689,11 @@ export default function GeneralSettingsPage() {
                                     </div>
 
                                     <AlertDialogFooter>
-                                        <AlertDialogCancel disabled={isTogglingProjectSuspension} className="rounded-none text-xs border-border">Cancel</AlertDialogCancel>
+                                        <AlertDialogCancel disabled={isTogglingProjectSuspension} className="rounded-xl text-xs border-border">Cancel</AlertDialogCancel>
                                         <Button
                                             onClick={() => handleToggleProjectSuspension(selectedProject!.project_id, selectedProject!.status || 'active')}
                                             disabled={!suspendProjectAckChecked || isTogglingProjectSuspension}
-                                            className={cn("rounded-none text-xs font-semibold", selectedProject?.status === 'suspended' ? "bg-primary" : "bg-destructive hover:bg-destructive/90")}
+                                            className={cn("rounded-xl text-xs font-semibold", selectedProject?.status === 'suspended' ? "bg-primary" : "bg-destructive hover:bg-destructive/90")}
                                         >
                                             {isTogglingProjectSuspension ? <><Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" /> Updating...</> : 'Confirm'}
                                         </Button>
@@ -703,7 +703,7 @@ export default function GeneralSettingsPage() {
                         </div>
 
                         {/* 3. SUSPEND / RESUME ORGANIZATION */}
-                        <div className="flex flex-col sm:flex-row sm:items-center justify-between rounded-none border border-border bg-background p-4 gap-4">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between rounded-xl border border-border bg-background p-4 gap-4">
                             <div>
                                 <Label htmlFor="suspend-org" className="font-semibold text-foreground">{userPlan.status === 'suspended' ? 'Resume Organization' : 'Suspend Organization'}</Label>
                                 <p className="text-sm text-muted-foreground">
@@ -719,11 +719,11 @@ export default function GeneralSettingsPage() {
                                 }
                             }}>
                                 <AlertDialogTrigger asChild>
-                                    <Button variant={userPlan.status === 'suspended' ? "default" : "destructive"} disabled={isSuspending} className="rounded-none shrink-0 font-medium">
+                                    <Button variant={userPlan.status === 'suspended' ? "default" : "destructive"} disabled={isSuspending} className="rounded-xl shrink-0 font-medium">
                                         {userPlan.status === 'suspended' ? 'Resume Organization' : 'Suspend Organization'}
                                     </Button>
                                 </AlertDialogTrigger>
-                                <AlertDialogContent className="bg-card border-border rounded-none max-w-lg">
+                                <AlertDialogContent className="bg-card border-border rounded-2xl max-w-lg">
                                     <AlertDialogHeader>
                                         <AlertDialogTitle className="flex items-center gap-2">
                                             <AlertTriangle className="h-5 w-5 text-amber-500" />
@@ -742,7 +742,7 @@ export default function GeneralSettingsPage() {
                                                 id="ack-suspend-org"
                                                 checked={suspendOrgAckChecked}
                                                 onCheckedChange={(c) => setSuspendOrgAckChecked(!!c)}
-                                                className="mt-0.5 rounded-none"
+                                                className="mt-0.5"
                                             />
                                             <label htmlFor="ack-suspend-org" className="text-xs text-muted-foreground cursor-pointer select-none leading-tight">
                                                 I understand this halts database access across all projects in my account.
@@ -768,21 +768,21 @@ export default function GeneralSettingsPage() {
                                                     value={suspendConfirmation}
                                                     onChange={(e) => setSuspendConfirmation(e.target.value)}
                                                     placeholder="suspend my org"
-                                                    className="font-mono bg-secondary/70 border-border rounded-none text-xs h-9 focus-visible:ring-destructive/50"
+                                                    className="font-mono bg-secondary/70 border-border rounded-xl text-xs h-9 focus-visible:ring-destructive/50"
                                                 />
                                             </div>
                                         )}
                                     </div>
 
                                     <AlertDialogFooter>
-                                        <AlertDialogCancel disabled={isSuspending} className="rounded-none text-xs border-border">Cancel</AlertDialogCancel>
+                                        <AlertDialogCancel disabled={isSuspending} className="rounded-xl text-xs border-border">Cancel</AlertDialogCancel>
                                         <Button
                                             onClick={handleToggleSuspension}
                                             disabled={
                                                 (userPlan.status !== 'suspended' && (!suspendOrgAckChecked || suspendConfirmation.trim().toLowerCase() !== 'suspend my org')) ||
                                                 isSuspending
                                             }
-                                            className={cn("rounded-none text-xs font-semibold", userPlan.status === 'suspended' ? "bg-primary" : "bg-destructive hover:bg-destructive/90")}
+                                            className={cn("rounded-xl text-xs font-semibold", userPlan.status === 'suspended' ? "bg-primary" : "bg-destructive hover:bg-destructive/90")}
                                         >
                                             {isSuspending ? <><Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" /> Updating...</> : 'Confirm'}
                                         </Button>
@@ -792,7 +792,7 @@ export default function GeneralSettingsPage() {
                         </div>
 
                         {/* 4. CLEAR ORGANIZATION */}
-                        <div className="flex flex-col sm:flex-row sm:items-center justify-between rounded-none border border-border bg-background p-4 gap-4">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between rounded-xl border border-border bg-background p-4 gap-4">
                             <div>
                                 <Label htmlFor="clear-org" className="font-semibold text-foreground">Clear Organization</Label>
                                 <p className="text-sm text-muted-foreground">This will permanently delete all projects and data associated with your account.</p>
@@ -804,9 +804,9 @@ export default function GeneralSettingsPage() {
                                 }
                             }}>
                                 <AlertDialogTrigger asChild>
-                                    <Button variant="destructive" disabled={isClearingOrg} className="rounded-none shrink-0 font-medium">Clear Organization Data</Button>
+                                    <Button variant="destructive" disabled={isClearingOrg} className="rounded-xl shrink-0 font-medium">Clear Organization Data</Button>
                                 </AlertDialogTrigger>
-                                <AlertDialogContent className="bg-card border-border rounded-none max-w-lg">
+                                <AlertDialogContent className="bg-card border-border rounded-2xl max-w-lg">
                                     <AlertDialogHeader>
                                         <AlertDialogTitle className="flex items-center gap-2 text-destructive font-bold">
                                             <AlertTriangle className="h-5 w-5" />
@@ -818,7 +818,7 @@ export default function GeneralSettingsPage() {
                                     </AlertDialogHeader>
 
                                     <div className="space-y-3 py-2">
-                                        <div className="p-2.5 rounded-none bg-destructive/10 border border-destructive/25 text-[11px] text-destructive-foreground font-mono">
+                                        <div className="p-2.5 rounded-xl bg-destructive/10 border border-destructive/25 text-[11px] text-destructive-foreground font-mono">
                                             WARNING: All databases across all projects will be purged. You will be immediately logged out.
                                         </div>
 
@@ -827,7 +827,7 @@ export default function GeneralSettingsPage() {
                                                 id="ack-clear-org"
                                                 checked={clearOrgAckChecked}
                                                 onCheckedChange={(c) => setClearOrgAckChecked(!!c)}
-                                                className="mt-0.5 rounded-none"
+                                                className="mt-0.5"
                                             />
                                             <label htmlFor="ack-clear-org" className="text-xs text-muted-foreground cursor-pointer select-none leading-tight">
                                                 I acknowledge that all my projects, databases, and account credentials will be permanently destroyed.
@@ -852,13 +852,13 @@ export default function GeneralSettingsPage() {
                                                 value={clearOrgConfirmation}
                                                 onChange={(e) => setClearOrgConfirmation(e.target.value)}
                                                 placeholder="CLEAR ALL DATA"
-                                                className="font-mono bg-secondary/70 border-border rounded-none text-xs h-9 focus-visible:ring-destructive/50"
+                                                className="font-mono bg-secondary/70 border-border rounded-xl text-xs h-9 focus-visible:ring-destructive/50"
                                             />
                                         </div>
                                     </div>
 
                                     <AlertDialogFooter>
-                                        <AlertDialogCancel disabled={isClearingOrg} className="rounded-none text-xs border-border">Cancel</AlertDialogCancel>
+                                        <AlertDialogCancel disabled={isClearingOrg} className="rounded-xl text-xs border-border">Cancel</AlertDialogCancel>
                                         <Button
                                             onClick={handleClearOrganization}
                                             disabled={
@@ -869,7 +869,7 @@ export default function GeneralSettingsPage() {
                                                     clearOrgConfirmation.trim().toLowerCase() === 'clear organization'
                                                 )
                                             }
-                                            className="rounded-none text-xs bg-destructive hover:bg-destructive/90 text-white font-semibold"
+                                            className="rounded-xl text-xs bg-destructive hover:bg-destructive/90 text-white font-semibold"
                                         >
                                             {isClearingOrg ? (
                                                 <>

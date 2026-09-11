@@ -306,7 +306,7 @@ export default function WebhooksPage() {
                                     <div className="flex items-center gap-2 shrink-0">
                                         <span className="text-[10px] text-muted-foreground/55">{new Date(log.createdAt).toLocaleTimeString()}</span>
                                         {!log.success && (
-                                            <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-orange-400"
+                                            <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-foreground"
                                                 onClick={() => handleRetry(log.id)} disabled={retrying === log.id} id={`retry-${log.id}`}>
                                                 {retrying === log.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RotateCcw className="h-3.5 w-3.5" />}
                                             </Button>

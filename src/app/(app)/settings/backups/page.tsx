@@ -373,7 +373,7 @@ function BackupList({ backups, onRestore, onDelete, onDownload, downloading, res
                                             {downloading === b.id ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" /> : <Download className="h-3.5 w-3.5 mr-1.5" />}
                                             Download
                                         </Button>
-                                        <Button variant="outline" size="sm" className="h-8 text-xs border-border/80 hover:border-orange-500/50 hover:text-orange-400 shrink-0"
+                                        <Button variant="outline" size="sm" className="h-8 text-xs border-border/80 hover:bg-secondary hover:text-foreground shrink-0"
                                             onClick={() => onRestore(b)} disabled={!!restoring || !!deleting} id={`restore-${b.id}`}>
                                             <RotateCcw className="h-3.5 w-3.5 mr-1.5" />Restore
                                         </Button>

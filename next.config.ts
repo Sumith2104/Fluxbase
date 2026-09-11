@@ -3,6 +3,7 @@ import createNextIntlPlugin from 'next-intl/plugin';
 
 const withNextIntl = createNextIntlPlugin();
 
+// Next.js configuration
 const nextConfig: NextConfig = {
   output: 'standalone',
   serverExternalPackages: [

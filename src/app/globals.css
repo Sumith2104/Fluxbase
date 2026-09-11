@@ -20,8 +20,8 @@ body {
     --secondary-foreground: 0 0% 9%;
     --muted: 0 0% 96%;
     --muted-foreground: 0 0% 45%;
-    --accent: 26 100% 57%;
-    --accent-foreground: 0 0% 100%;
+    --accent: 0 0% 96%;
+    --accent-foreground: 0 0% 9%;
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 0 0% 98%;
     --border: 0 0% 89%;
@@ -32,7 +32,7 @@ body {
     --chart-3: 197 37% 24%;
     --chart-4: 43 74% 66%;
     --chart-5: 27 87% 67%;
-    --radius: 0.375rem;
+    --radius: 0.75rem;
     --sidebar-background: 0 0% 99%;
     --sidebar-foreground: 0 0% 9%;
     --sidebar-primary: 26 100% 57%;
@@ -56,8 +56,8 @@ body {
     --secondary-foreground: 0 0% 96%;
     --muted: 0 0% 15%;
     --muted-foreground: 0 0% 55%;
-    --accent: 26 100% 57%;
-    --accent-foreground: 60 3% 10%;
+    --accent: 0 0% 15%;
+    --accent-foreground: 0 0% 98%;
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 0 0% 98%;
     --border: 0 0% 16%;
@@ -76,6 +76,7 @@ body {
     --sidebar-accent-foreground: 0 0% 96%;
     --sidebar-border: 0 0% 16%;
     --sidebar-ring: 26 100% 57%;
+    --radius: 0.75rem;
   }
 }
 
@@ -153,12 +154,14 @@ body {
   .card {
     background: hsl(var(--card));
     border: 1px solid hsl(var(--border));
+    border-radius: var(--radius);
     box-shadow: none;
   }
 
   .dark .card {
     background: hsl(var(--card) / 0.5);
     border: 1px solid hsl(var(--border));
+    border-radius: var(--radius);
     box-shadow: none;
   }
 

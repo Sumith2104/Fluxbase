@@ -23,6 +23,7 @@ import { EditColumnDialog } from '@/components/edit-column-dialog';
 
 import { AddConstraintDialog } from '@/components/add-constraint-dialog';
 import { Separator } from '@/components/ui/separator';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import {
@@ -943,7 +944,7 @@ export function EditorClient({
                 <main className="flex-1 flex flex-col overflow-hidden w-full h-full min-h-0">
                             {currentTable && tableId && tableName ? (
                                 <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full flex-1 flex flex-col min-h-0">
-                                    <header className="h-12 flex items-center justify-between gap-3 border-b bg-background/95 backdrop-blur-md px-3 sm:px-4 flex-shrink-0">
+                                    <header className="relative z-30 h-12 flex items-center justify-between gap-3 border-b bg-background/95 backdrop-blur-md px-3 sm:px-4 flex-shrink-0">
                                         {/* Left Side: Table Context & Tab Switcher & Main Actions */}
                                         <div className="flex items-center gap-3 shrink-0 flex-wrap">
                                             {/* Table Name & Row Count */}
@@ -973,11 +974,11 @@ export function EditorClient({
                                             <Separator orientation="vertical" className="hidden sm:block h-4 bg-border/60" />
 
                                             {/* View Mode Switcher */}
-                                            <TabsList className="h-7 p-0.5 bg-muted/50 rounded-md border border-border/40">
-                                                <TabsTrigger value="data" className="text-xs px-2.5 py-0.5 h-6 font-medium data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-xs">
+                                            <TabsList className="h-7 p-0.5 bg-muted/50 rounded-xl border border-border/40">
+                                                <TabsTrigger value="data" className="text-xs px-2.5 py-0.5 h-6 rounded-lg font-medium data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-xs">
                                                     Data
                                                 </TabsTrigger>
-                                                <TabsTrigger value="structure" className="text-xs px-2.5 py-0.5 h-6 font-medium data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-xs">
+                                                <TabsTrigger value="structure" className="text-xs px-2.5 py-0.5 h-6 rounded-lg font-medium data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-xs">
                                                     Structure
                                                 </TabsTrigger>
                                             </TabsList>
@@ -991,7 +992,7 @@ export function EditorClient({
                                                         <>
                                                             {selectionModel.length > 0 ? (
                                                                 /* Contextual Selection Action Bar */
-                                                                <div className="flex items-center gap-1.5 bg-primary/10 border border-primary/30 rounded-md px-2 py-0.5 animate-in fade-in duration-100">
+                                                                <div className="flex items-center gap-1.5 bg-primary/10 border border-primary/30 rounded-xl px-2 py-0.5 animate-in fade-in duration-100">
                                                                     <span className="text-xs font-mono font-medium text-primary px-1">
                                                                         {selectionModel.length} selected
                                                                     </span>
@@ -999,7 +1000,7 @@ export function EditorClient({
                                                                         <Button
                                                                             variant="secondary"
                                                                             size="sm"
-                                                                            className="h-6 px-2 text-xs font-medium bg-background hover:bg-muted text-foreground"
+                                                                            className="h-6 px-2 text-xs font-medium bg-background hover:bg-muted text-foreground rounded-lg"
                                                                             onClick={() => setIsEditRowOpen(true)}
                                                                         >
                                                                             <Edit className="mr-1 h-3 w-3" /> Edit
@@ -1023,7 +1024,7 @@ export function EditorClient({
 
                                                                     <AlertDialog onOpenChange={(open) => { if (!open) setIsDeleting(false); }}>
                                                                         <AlertDialogTrigger asChild>
-                                                                            <Button variant="destructive" size="sm" className="h-6 px-2 text-xs font-medium">
+                                                                            <Button variant="destructive" size="sm" className="h-6 px-2 text-xs font-medium rounded-lg">
                                                                                 <Trash2 className="mr-1 h-3 w-3" /> Delete
                                                                             </Button>
                                                                         </AlertDialogTrigger>
@@ -1055,7 +1056,7 @@ export function EditorClient({
                                                                     </AlertDialog>
                                                                     <button
                                                                         onClick={() => setSelectionModel([])}
-                                                                        className="text-muted-foreground hover:text-foreground p-0.5 rounded hover:bg-muted/80 ml-0.5"
+                                                                        className="text-muted-foreground hover:text-foreground p-0.5 rounded-lg hover:bg-muted/80 ml-0.5"
                                                                         title="Clear selection"
                                                                     >
                                                                         <X className="h-3 w-3" />
@@ -1079,7 +1080,7 @@ export function EditorClient({
                                                                     <Button
                                                                         variant="outline"
                                                                         size="sm"
-                                                                        className="h-7 text-xs font-medium border-border/70 hover:bg-muted"
+                                                                        className="h-7 text-xs font-medium border-border/70 hover:bg-muted rounded-xl"
                                                                         onClick={() => setIsAddColumnOpen(true)}
                                                                     >
                                                                         <Plus className="mr-1 h-3 w-3" /> Add Column
@@ -1107,7 +1108,7 @@ export function EditorClient({
                                                                     {/* Import dropdown */}
                                                                     <DropdownMenu>
                                                                         <DropdownMenuTrigger asChild>
-                                                                            <Button variant="outline" size="sm" className="h-7 text-xs font-medium border-border/70 hover:bg-muted" disabled={isImportingCsv}>
+                                                                            <Button variant="outline" size="sm" className="h-7 text-xs font-medium border-border/70 hover:bg-muted rounded-xl" disabled={isImportingCsv}>
                                                                                 {isImportingCsv ? (
                                                                                     <><Loader2 className="mr-1 h-3 w-3 animate-spin" />{importProgress || 'Importing…'}</>
                                                                                 ) : (
@@ -1115,7 +1116,7 @@ export function EditorClient({
                                                                                 )}
                                                                             </Button>
                                                                         </DropdownMenuTrigger>
-                                                                        <DropdownMenuContent align="end" className="w-52">
+                                                                        <DropdownMenuContent align="end" className="w-52 rounded-xl">
                                                                             <DropdownMenuItem onClick={() => csvInputRef.current?.click()}>
                                                                                 <FileText className="mr-2 h-4 w-4 text-emerald-500" />
                                                                                 <div>
@@ -1156,7 +1157,7 @@ export function EditorClient({
                                                             <Button
                                                                 variant="default"
                                                                 size="sm"
-                                                                className="h-7 text-xs font-medium"
+                                                                className="h-7 text-xs font-medium rounded-xl"
                                                                 onClick={() => setIsAddColumnOpen(true)}
                                                             >
                                                                 <Plus className="mr-1 h-3 w-3" /> Add Column
@@ -1186,7 +1187,7 @@ export function EditorClient({
                                                             <Button
                                                                 variant="outline"
                                                                 size="sm"
-                                                                className="h-7 text-xs font-medium"
+                                                                className="h-7 text-xs font-medium rounded-xl"
                                                                 onClick={refreshData}
                                                             >
                                                                 <RefreshCw className="mr-1 h-3 w-3 text-muted-foreground" /> Refresh Schema
@@ -1217,104 +1218,102 @@ export function EditorClient({
                                                 )}
 
                                                 {/* Filter button */}
-                                                <div className="relative">
-                                                    <Button
-                                                        variant="outline"
-                                                        size="sm"
-                                                        onClick={() => { setShowFilterPanel(p => !p); setShowColumnPanel(false); }}
-                                                        className={`h-7 text-xs font-medium border-border/70 ${filters.length ? 'bg-primary/10 border-primary/30 text-primary' : ''}`}
-                                                    >
-                                                        <Filter className="mr-1 h-3 w-3" /> Filter {filters.length > 0 && <Badge className="ml-1 h-3.5 px-1 text-[9.5px]">{filters.length}</Badge>}
-                                                    </Button>
-                                                    {showFilterPanel && (
-                                                        <div className="absolute right-0 top-full mt-1 z-50 w-80 rounded-lg border border-border bg-card shadow-xl p-3 space-y-2">
-                                                            <div className="flex items-center justify-between mb-2">
-                                                                <span className="text-sm font-semibold">Filters</span>
-                                                                <button onClick={() => setFilters([])} className="text-xs text-muted-foreground hover:text-foreground">Clear all</button>
-                                                            </div>
-                                                            {filters.map(f => (
-                                                                <div key={f.id} className="flex gap-1.5 items-center">
-                                                                    <select className="flex-1 text-xs rounded border border-border bg-background px-2 py-1.5" value={f.field}
-                                                                        onChange={e => setFilters(prev => prev.map(x => x.id === f.id ? { ...x, field: e.target.value } : x))}>
-                                                                        {columns.map(c => <option key={c.field} value={c.field}>{c.headerName}</option>)}
-                                                                    </select>
-                                                                    <select className="text-xs rounded border border-border bg-background px-2 py-1.5" value={f.op}
-                                                                        onChange={e => setFilters(prev => prev.map(x => x.id === f.id ? { ...x, op: e.target.value } : x))}>
-                                                                        <option value="contains">contains</option>
-                                                                        <option value="equals">equals</option>
-                                                                        <option value="not_equals">≠</option>
-                                                                        <option value="starts_with">starts</option>
-                                                                        <option value="ends_with">ends</option>
-                                                                        <option value="gt">&gt;</option>
-                                                                        <option value="gte">&gt;=</option>
-                                                                        <option value="lt">&lt;</option>
-                                                                        <option value="lte">&lt;=</option>
-                                                                        <option value="is_null">is null</option>
-                                                                        <option value="is_not_null">not null</option>
-                                                                    </select>
-                                                                    {f.op !== 'is_null' && f.op !== 'is_not_null' && (
-                                                                        <Input className="flex-1 h-7 text-xs" value={f.value}
-                                                                            onChange={e => setFilters(prev => prev.map(x => x.id === f.id ? { ...x, value: e.target.value } : x))}
-                                                                            placeholder="value" />
-                                                                    )}
-                                                                    <button onClick={() => setFilters(prev => prev.filter(x => x.id !== f.id))} className="p-1 rounded hover:bg-muted text-muted-foreground">
-                                                                        <X className="h-3.5 w-3.5" />
-                                                                    </button>
-                                                                </div>
-                                                            ))}
-                                                            <Button size="sm" variant="outline" className="w-full mt-1 text-xs" onClick={() => setFilters(prev => [...prev, { id: crypto.randomUUID(), field: columns[0]?.field || '', op: 'contains', value: '' }])}>
-                                                                + Add filter
-                                                            </Button>
+                                                <Popover open={showFilterPanel} onOpenChange={(open) => { setShowFilterPanel(open); if (open) setShowColumnPanel(false); }}>
+                                                    <PopoverTrigger asChild>
+                                                        <Button
+                                                            variant="outline"
+                                                            size="sm"
+                                                            className={`h-7 text-xs font-medium border-border/70 rounded-xl ${filters.length ? 'bg-primary/10 border-primary/30 text-primary' : ''}`}
+                                                        >
+                                                            <Filter className="mr-1 h-3 w-3" /> Filter {filters.length > 0 && <Badge className="ml-1 h-3.5 px-1 text-[9.5px] rounded-full">{filters.length}</Badge>}
+                                                        </Button>
+                                                    </PopoverTrigger>
+                                                    <PopoverContent align="end" sideOffset={6} className="w-80 rounded-xl border border-border bg-card shadow-2xl p-3 space-y-2 z-50">
+                                                        <div className="flex items-center justify-between mb-2">
+                                                            <span className="text-sm font-semibold">Filters</span>
+                                                            <button onClick={() => setFilters([])} className="text-xs text-muted-foreground hover:text-foreground">Clear all</button>
                                                         </div>
-                                                    )}
-                                                </div>
+                                                        {filters.map(f => (
+                                                            <div key={f.id} className="flex gap-1.5 items-center">
+                                                                <select className="flex-1 text-xs rounded-lg border border-border bg-background px-2 py-1.5" value={f.field}
+                                                                    onChange={e => setFilters(prev => prev.map(x => x.id === f.id ? { ...x, field: e.target.value } : x))}>
+                                                                    {columns.map(c => <option key={c.field} value={c.field}>{c.headerName}</option>)}
+                                                                </select>
+                                                                <select className="text-xs rounded-lg border border-border bg-background px-2 py-1.5" value={f.op}
+                                                                    onChange={e => setFilters(prev => prev.map(x => x.id === f.id ? { ...x, op: e.target.value } : x))}>
+                                                                    <option value="contains">contains</option>
+                                                                    <option value="equals">equals</option>
+                                                                    <option value="not_equals">≠</option>
+                                                                    <option value="starts_with">starts</option>
+                                                                    <option value="ends_with">ends</option>
+                                                                    <option value="gt">&gt;</option>
+                                                                    <option value="gte">&gt;=</option>
+                                                                    <option value="lt">&lt;</option>
+                                                                    <option value="lte">&lt;=</option>
+                                                                    <option value="is_null">is null</option>
+                                                                    <option value="is_not_null">not null</option>
+                                                                </select>
+                                                                {f.op !== 'is_null' && f.op !== 'is_not_null' && (
+                                                                    <Input className="flex-1 h-7 text-xs rounded-lg" value={f.value}
+                                                                        onChange={e => setFilters(prev => prev.map(x => x.id === f.id ? { ...x, value: e.target.value } : x))}
+                                                                        placeholder="value" />
+                                                                )}
+                                                                <button onClick={() => setFilters(prev => prev.filter(x => x.id !== f.id))} className="p-1 rounded-lg hover:bg-muted text-muted-foreground">
+                                                                    <X className="h-3.5 w-3.5" />
+                                                                </button>
+                                                            </div>
+                                                        ))}
+                                                        <Button size="sm" variant="outline" className="w-full mt-1 text-xs rounded-xl" onClick={() => setFilters(prev => [...prev, { id: crypto.randomUUID(), field: columns[0]?.field || '', op: 'contains', value: '' }])}>
+                                                            + Add filter
+                                                        </Button>
+                                                    </PopoverContent>
+                                                </Popover>
 
                                                 {/* Column Visibility button */}
-                                                <div className="relative">
-                                                    <Button
-                                                        variant="outline"
-                                                        size="sm"
-                                                        onClick={() => { setShowColumnPanel(p => !p); setShowFilterPanel(false); }}
-                                                        className={`h-7 text-xs font-medium border-border/70 ${hiddenColumns.size ? 'bg-primary/10 border-primary/30 text-primary' : ''}`}
-                                                    >
-                                                        <Columns className="mr-1 h-3 w-3" /> Columns {hiddenColumns.size > 0 && <Badge className="ml-1 h-3.5 px-1 text-[9.5px]">{hiddenColumns.size} hidden</Badge>}
-                                                    </Button>
-                                                    {showColumnPanel && (
-                                                        <div className="absolute right-0 top-full mt-1 z-50 w-56 max-h-[350px] flex flex-col rounded-lg border border-border bg-card shadow-xl p-3">
-                                                            <div className="flex items-center justify-between mb-2 pb-1.5 border-b border-border/50 shrink-0">
-                                                                <span className="text-sm font-semibold">Columns</span>
-                                                                <div className="flex gap-2 text-xs">
-                                                                    <button onClick={() => setHiddenColumns(new Set())} className="text-muted-foreground hover:text-foreground">Show all</button>
-                                                                    <button onClick={() => setHiddenColumns(new Set(columns.map(c => c.field)))} className="text-muted-foreground hover:text-foreground">Hide all</button>
-                                                                </div>
-                                                            </div>
-                                                            <div className="overflow-y-auto pr-1 space-y-1 flex-1 custom-scrollbar">
-                                                                {localColumns.map(col => (
-                                                                    <label key={col.column_name} className="flex items-center gap-2 text-sm cursor-pointer rounded px-1 py-0.5 hover:bg-muted">
-                                                                        <input type="checkbox" checked={!hiddenColumns.has(col.column_name)}
-                                                                            onChange={e => setHiddenColumns(prev => {
-                                                                                const next = new Set(prev);
-                                                                                if (e.target.checked) next.delete(col.column_name); else next.add(col.column_name);
-                                                                                return next;
-                                                                            })}
-                                                                            className="accent-primary"
-                                                                        />
-                                                                        <span className="font-mono truncate">{col.column_name}</span>
-                                                                    </label>
-                                                                ))}
+                                                <Popover open={showColumnPanel} onOpenChange={(open) => { setShowColumnPanel(open); if (open) setShowFilterPanel(false); }}>
+                                                    <PopoverTrigger asChild>
+                                                        <Button
+                                                            variant="outline"
+                                                            size="sm"
+                                                            className={`h-7 text-xs font-medium border-border/70 rounded-xl ${hiddenColumns.size ? 'bg-primary/10 border-primary/30 text-primary' : ''}`}
+                                                        >
+                                                            <Columns className="mr-1 h-3 w-3" /> Columns {hiddenColumns.size > 0 && <Badge className="ml-1 h-3.5 px-1 text-[9.5px] rounded-full">{hiddenColumns.size} hidden</Badge>}
+                                                        </Button>
+                                                    </PopoverTrigger>
+                                                    <PopoverContent align="end" sideOffset={6} className="w-56 max-h-[350px] flex flex-col rounded-xl border border-border bg-card shadow-2xl p-3 z-50">
+                                                        <div className="flex items-center justify-between mb-2 pb-1.5 border-b border-border/50 shrink-0">
+                                                            <span className="text-sm font-semibold">Columns</span>
+                                                            <div className="flex gap-2 text-xs">
+                                                                <button onClick={() => setHiddenColumns(new Set())} className="text-muted-foreground hover:text-foreground">Show all</button>
+                                                                <button onClick={() => setHiddenColumns(new Set(columns.map(c => c.field)))} className="text-muted-foreground hover:text-foreground">Hide all</button>
                                                             </div>
                                                         </div>
-                                                    )}
-                                                </div>
+                                                        <div className="overflow-y-auto pr-1 space-y-1 flex-1 custom-scrollbar">
+                                                            {localColumns.map(col => (
+                                                                <label key={col.column_name} className="flex items-center gap-2 text-sm cursor-pointer rounded-lg px-1.5 py-1 hover:bg-muted">
+                                                                    <input type="checkbox" checked={!hiddenColumns.has(col.column_name)}
+                                                                        onChange={e => setHiddenColumns(prev => {
+                                                                            const next = new Set(prev);
+                                                                            if (e.target.checked) next.delete(col.column_name); else next.add(col.column_name);
+                                                                            return next;
+                                                                        })}
+                                                                        className="accent-primary rounded"
+                                                                    />
+                                                                    <span className="font-mono truncate">{col.column_name}</span>
+                                                                </label>
+                                                            ))}
+                                                        </div>
+                                                    </PopoverContent>
+                                                </Popover>
 
                                                 {/* Export dropdown */}
                                                 <DropdownMenu>
                                                     <DropdownMenuTrigger asChild>
-                                                        <Button variant="outline" size="sm" className="h-7 text-xs font-medium border-border/70">
+                                                        <Button variant="outline" size="sm" className="h-7 text-xs font-medium border-border/70 rounded-xl">
                                                             <Download className="mr-1 h-3 w-3 text-muted-foreground" /> Export <ChevronDown className="ml-0.5 h-3 w-3 opacity-50" />
                                                         </Button>
                                                     </DropdownMenuTrigger>
-                                                    <DropdownMenuContent align="end">
+                                                    <DropdownMenuContent align="end" className="rounded-xl">
                                                         <DropdownMenuItem onClick={() => handleExport('csv')}>
                                                             <FileText className="mr-2 h-4 w-4" /> CSV
                                                         </DropdownMenuItem>
@@ -1334,7 +1333,7 @@ export function EditorClient({
                                                 <Button
                                                     variant="ghost"
                                                     size="icon"
-                                                    className="h-7 w-7 text-muted-foreground hover:text-foreground"
+                                                    className="h-7 w-7 rounded-xl text-muted-foreground hover:text-foreground"
                                                     onClick={refreshData}
                                                     title="Reload table"
                                                 >

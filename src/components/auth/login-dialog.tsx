@@ -349,7 +349,7 @@ export function LoginDialog({ open, onOpenChange, onSwitchToSignup, isGhost }: L
                 ) : authMode === 'otp' && otpStep === 'verify' ? (
                     /* OTP Verification Screen */
                     <div className="space-y-4 pt-2">
-                        <div className="p-3.5 bg-orange-500/10 border border-orange-500/20 rounded-none flex items-center gap-3 text-xs text-orange-200/90">
+                        <div className="p-3.5 bg-orange-500/10 border border-orange-500/20 rounded-xl flex items-center gap-3 text-xs text-orange-200/90">
                             <Mail className="h-4 w-4 text-orange-400 shrink-0" />
                             <span>You can either type the 6-digit code below <b>or</b> click the sign-in button in your email!</span>
                         </div>
@@ -424,12 +424,12 @@ export function LoginDialog({ open, onOpenChange, onSwitchToSignup, isGhost }: L
                         </div>
 
                         {/* Mode Selector Tabs (Password vs Passwordless OTP) */}
-                        <div className="grid grid-cols-2 p-1 bg-background/50 border border-border/60 rounded-none mb-4 text-xs font-medium">
+                        <div className="grid grid-cols-2 p-1 bg-background/50 border border-border/60 rounded-xl mb-4 text-xs font-medium">
                             <button
                                 type="button"
                                 onClick={() => setAuthMode('password')}
                                 className={cn(
-                                    "py-2 rounded-none transition-all flex items-center justify-center gap-1.5",
+                                    "py-2 rounded-lg transition-all flex items-center justify-center gap-1.5",
                                     authMode === 'password'
                                         ? "bg-primary text-primary-foreground shadow-sm font-semibold"
                                         : "text-muted-foreground hover:text-white"
@@ -442,7 +442,7 @@ export function LoginDialog({ open, onOpenChange, onSwitchToSignup, isGhost }: L
                                 type="button"
                                 onClick={() => setAuthMode('otp')}
                                 className={cn(
-                                    "py-2 rounded-none transition-all flex items-center justify-center gap-1.5",
+                                    "py-2 rounded-lg transition-all flex items-center justify-center gap-1.5",
                                     authMode === 'otp'
                                         ? "bg-primary text-primary-foreground shadow-sm font-semibold"
                                         : "text-muted-foreground hover:text-white"

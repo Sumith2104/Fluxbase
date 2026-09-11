@@ -8,6 +8,11 @@ import { useContext } from "react";
 import { ProjectContext } from "@/contexts/project-context";
 import { createProjectAction } from "@/components/layout/actions";
 import { cn } from "@/lib/utils";
+import { FluxAiApprovalCard, ApprovalRequestData } from "@/components/flux-ai-approval-card";
+import { FluxMarkdownRenderer } from "@/components/flux-markdown-renderer";
+import { BorderBeam } from "@/components/ui/border-beam";
+import { Button, LiquidButton } from "@/components/ui/button";
+import { FluxAiIcon } from "@/components/ui/flux-ai-icon";
 
 // --- Types ---
 
@@ -15,20 +20,27 @@ type Message = {
   role: "user" | "assistant";
   content: string;
   pendingWorkflow?: { steps: WorkflowStep[] };
+  approvalRequest?: ApprovalRequestData;
+  sources?: string[];
   hidden?: boolean;
   timestamp?: number;
+  isStreaming?: boolean;
 };
 
 type WorkflowStep = {
-  type: "NAVIGATE" | "CLICK" | "TYPE" | "CONFIRM_ACTION" | "EXECUTE_SQL";
+  type: "NAVIGATE" | "CLICK" | "TYPE" | "CONFIRM_ACTION" | "EXECUTE_SQL" | "REQUEST_APPROVAL" | "CALL_MCP" | "GOAL_ACCOMPLISHED";
   path?: string;
   elementId?: string;
   value?: string;
   locator?: string;
-  actionType?: "CREATE_PROJECT" | "INJECT_SQL";
+  actionType?: "CREATE_PROJECT" | "INJECT_SQL" | "EXECUTE_SQL" | "DROP_TABLE" | "MUTATION";
   projectName?: string;
   dialect?: string;
   query?: string;
+  approvalData?: ApprovalRequestData;
+  mcpTool?: string;
+  mcpArgs?: Record<string, any>;
+  goalSummary?: string;
 };
 
 type ActiveWorkflow = {
@@ -43,8 +55,9 @@ const MAX_STORAGE_BYTES = 512 * 1024;
 
 // --- Workflow Parser ---
 
-const parseWorkflow = (text: string): { steps: WorkflowStep[]; cleanText: string } => {
+const parseWorkflow = (text: string, currentProjectId?: string): { steps: WorkflowStep[]; cleanText: string; approvalRequest?: ApprovalRequestData } => {
   const steps: WorkflowStep[] = [];
+  let approvalRequest: ApprovalRequestData | undefined = undefined;
 
   const codeBlockRanges: [number, number][] = [];
   const codeBlockRegex = /```[\s\S]*?```/g;
@@ -53,7 +66,7 @@ const parseWorkflow = (text: string): { steps: WorkflowStep[]; cleanText: string
     codeBlockRanges.push([cbMatch.index, cbMatch.index + cbMatch[0].length]);
   }
 
-  const tagRegex = /\[(NAVIGATE|CLICK|TYPE|CONFIRM_ACTION):([^\]]*?)]/g;
+  const tagRegex = /\[(NAVIGATE|CLICK|TYPE|CONFIRM_ACTION|EXECUTE_SQL|REQUEST_APPROVAL|CALL_MCP|GOAL_ACCOMPLISHED):([^\]]*?)]/g;
   let match;
   while ((match = tagRegex.exec(text)) !== null) {
     const inCode = codeBlockRanges.some(([start, end]) => match!.index >= start && match!.index < end);
@@ -73,6 +86,40 @@ const parseWorkflow = (text: string): { steps: WorkflowStep[]; cleanText: string
       if (colonIdx !== -1) {
         steps.push({ type: 'TYPE', value: argsStr.substring(0, colonIdx).trim(), locator: argsStr.substring(colonIdx + 1).trim() });
       }
+    } else if (type === 'EXECUTE_SQL') {
+      let query = argsStr.trim();
+      if (!query || query.toLowerCase().includes('rawsqlquery') || query.startsWith('<') || query.endsWith('>') || query === '<query>') {
+        const sqlBlock = text.match(/```(?:sql)?\s*([\s\S]*?)```/i);
+        if (sqlBlock?.[1]?.trim()) query = sqlBlock[1].trim().replace(/;+$/, '');
+      }
+      if (query && !query.startsWith('<') && !query.toLowerCase().includes('rawsqlquery') && query !== '<query>') {
+        steps.push({ type: 'EXECUTE_SQL', query });
+      }
+    } else if (type === 'REQUEST_APPROVAL') {
+      const parts = argsStr.split(':');
+      const id = parts[0]?.trim() || `appr_${Date.now()}`;
+      const actionType = (parts[1]?.trim().toUpperCase() || 'EXECUTE_SQL') as any;
+      const summary = parts[2]?.trim() || 'Review sensitive database operation';
+      const payload = argsStr.split(':').slice(3).join(':').trim();
+      approvalRequest = {
+        id,
+        actionType,
+        summary,
+        payload,
+        projectId: currentProjectId,
+        status: 'pending'
+      };
+      steps.push({ type: 'REQUEST_APPROVAL', approvalData: approvalRequest });
+    } else if (type === 'CALL_MCP') {
+      const firstColon = argsStr.indexOf(':');
+      const mcpTool = firstColon !== -1 ? argsStr.substring(0, firstColon).trim() : argsStr.trim();
+      let mcpArgs = {};
+      if (firstColon !== -1) {
+        try { mcpArgs = JSON.parse(argsStr.substring(firstColon + 1).trim()); } catch {}
+      }
+      steps.push({ type: 'CALL_MCP', mcpTool, mcpArgs });
+    } else if (type === 'GOAL_ACCOMPLISHED') {
+      steps.push({ type: 'GOAL_ACCOMPLISHED', goalSummary: argsStr.trim() });
     } else if (type === 'CONFIRM_ACTION') {
       const parts = argsStr.split(':');
       const actionType = parts[0]?.toUpperCase();
@@ -80,41 +127,24 @@ const parseWorkflow = (text: string): { steps: WorkflowStep[]; cleanText: string
         steps.push({ type: 'CONFIRM_ACTION', actionType: 'CREATE_PROJECT', projectName: parts[1]?.trim(), dialect: parts[2]?.trim() || 'postgresql' });
       } else if (actionType === 'INJECT_SQL') {
         let query = argsStr.substring(argsStr.indexOf(':') + 1).trim();
-        if (!query || query.toLowerCase().includes('rawsqlquery')) {
+        if (!query || query.toLowerCase().includes('rawsqlquery') || query.startsWith('<') || query.endsWith('>') || query === '<query>') {
           const sqlBlock = text.match(/```(?:sql)?\s*([\s\S]*?)```/i);
           if (sqlBlock?.[1]?.trim()) query = sqlBlock[1].trim().replace(/;+$/, '');
         }
-        if (query && !query.toLowerCase().includes('rawsqlquery')) {
+        if (query && !query.startsWith('<') && !query.toLowerCase().includes('rawsqlquery') && query !== '<query>') {
           steps.push({ type: 'CONFIRM_ACTION', actionType: 'INJECT_SQL', query });
         }
-      }
-    } else if (type === 'EXECUTE_SQL') {
-      let query = argsStr.trim();
-      if (!query || query.toLowerCase().includes('rawsqlquery')) {
-        const sqlBlock = text.match(/```(?:sql)?\s*([\s\S]*?)```/i);
-        if (sqlBlock?.[1]?.trim()) query = sqlBlock[1].trim().replace(/;+$/, '');
-      }
-      if (query && !query.toLowerCase().includes('rawsqlquery')) {
-        steps.push({ type: 'EXECUTE_SQL', query });
       }
     }
   }
 
-  const cleanText = text.replace(/\[(?:NAVIGATE|CLICK|TYPE|CONFIRM_ACTION)[^\]]*?]/g, '').trim();
-  return { steps, cleanText };
+  const cleanText = text.replace(/\[(?:NAVIGATE|CLICK|TYPE|CONFIRM_ACTION|EXECUTE_SQL|REQUEST_APPROVAL|CALL_MCP|GOAL_ACCOMPLISHED)[^\]]*?]/g, '').trim();
+  return { steps, cleanText, approvalRequest };
 };
 
 // --- Helpers ---
 
 const isDestructiveSql = (q: string) => /^(\s*\/\*)?(\s*DROP\s|\s*TRUNCATE\s|\s*DELETE\s+FROM\s|\s*ALTER\s+.*\s+(DROP|RENAME))/i.test(q);
-
-const AiIcon = ({ size = 24, className = "" }: { size?: number; className?: string }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className={className}>
-    <path d="M12 2L14.4 9.6L22 12L14.4 14.4L12 22L9.6 14.4L2 12L9.6 9.6L12 2Z" fill="currentColor" />
-    <path d="M19 4L19.8 6.2L22 7L19.8 7.8L19 10L18.2 7.8L16 7L18.2 6.2L19 4Z" fill="currentColor" />
-    <path d="M5 16L5.8 18.2L8 19L5.8 19.8L5 22L4.2 19.8L2 19L4.2 18.2L5 16Z" fill="currentColor" />
-  </svg>
-);
 
 // --- Component ---
 
@@ -123,11 +153,39 @@ export function FluxAiAssistant({ userId, isOpen, onOpenChange }: { userId: stri
   const router = useRouter();
   const { project, setProject } = useContext(ProjectContext);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const messagesContainerRef = useRef<HTMLDivElement>(null);
   const abortRef = useRef<AbortController | null>(null);
+
+  const scrollToBottom = useCallback((behavior: ScrollBehavior = 'auto') => {
+    if (messagesContainerRef.current) {
+      const el = messagesContainerRef.current;
+      el.scrollTo({
+        top: el.scrollHeight,
+        behavior
+      });
+    } else if (messagesEndRef.current) {
+      messagesEndRef.current.scrollIntoView({ behavior, block: 'end' });
+    }
+  }, []);
 
   const [messages, setMessages] = useState<Message[]>([]);
   const isRestored = useRef(false);
   const [input, setInput] = useState("");
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  const handleTextareaChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    setInput(e.target.value);
+    e.target.style.height = "auto";
+    e.target.style.height = `${Math.min(e.target.scrollHeight, 140)}px`;
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      handleSend();
+    }
+  };
+
   const [isTyping, setIsTyping] = useState(false);
   const [voiceEnabled, setVoiceEnabled] = useState(false);
   const [selectedModel, setSelectedModel] = useState("glm");
@@ -137,6 +195,7 @@ export function FluxAiAssistant({ userId, isOpen, onOpenChange }: { userId: stri
   const [triggerCheckin, setTriggerCheckin] = useState(0);
   const [panelWidth, setPanelWidth] = useState(420);
   const [isResizing, setIsResizing] = useState(false);
+  const [isStreamingActive, setIsStreamingActive] = useState(false);
 
   // --- Panel resize ---
 
@@ -190,6 +249,11 @@ export function FluxAiAssistant({ userId, isOpen, onOpenChange }: { userId: stri
     localStorage.removeItem('flux_autopilot_pending_checkin');
   }, []);
 
+  // Pre-warm the /api/ai-chat route in the background so Turbopack compiles it before user sends first message
+  useEffect(() => {
+    fetch('/api/ai-chat', { method: 'GET' }).catch(() => {});
+  }, []);
+
   useEffect(() => {
     if (isRestored.current) return;
     const saved = localStorage.getItem(storageKey);
@@ -201,11 +265,25 @@ export function FluxAiAssistant({ userId, isOpen, onOpenChange }: { userId: stri
 
   useEffect(() => {
     if (!isRestored.current) return;
-    const trimmed = messages.slice(-MAX_MESSAGES);
-    const serialized = JSON.stringify(trimmed);
-    localStorage.setItem(storageKey, serialized.length < MAX_STORAGE_BYTES ? serialized : JSON.stringify(messages.slice(-10)));
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    const sanitized = messages.slice(-MAX_MESSAGES).map(m => m.isStreaming ? { ...m, isStreaming: false } : m);
+    const serialized = JSON.stringify(sanitized);
+    localStorage.setItem(storageKey, serialized.length < MAX_STORAGE_BYTES ? serialized : JSON.stringify(sanitized.slice(-10)));
   }, [messages, storageKey]);
+
+  // Dedicated Auto-Scroll: Keeps viewport pinned to the bottom on new messages, typing indicator, or streaming tokens
+  useEffect(() => {
+    if (!isOpen) return;
+    scrollToBottom(isStreamingActive ? 'auto' : 'smooth');
+  }, [messages, isTyping, isOpen, isStreamingActive, scrollToBottom]);
+
+  // When panel opens or mounts, ensure view is scrolled to latest messages after entrance animation
+  useEffect(() => {
+    if (isOpen) {
+      const t1 = setTimeout(() => scrollToBottom('auto'), 50);
+      const t2 = setTimeout(() => scrollToBottom('auto'), 200);
+      return () => { clearTimeout(t1); clearTimeout(t2); };
+    }
+  }, [isOpen, scrollToBottom]);
 
   // --- Auto-pilot state ---
 
@@ -255,6 +333,119 @@ export function FluxAiAssistant({ userId, isOpen, onOpenChange }: { userId: stri
     if (preferred) utt.voice = preferred;
     window.speechSynthesis.speak(utt);
   }, [voiceEnabled]);
+
+  // --- Word-by-Word Live Streaming Engine ---
+
+  const streamingTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const activeStreamFinalizeRef = useRef<(() => void) | null>(null);
+
+  const finalizeActiveStream = useCallback(() => {
+    if (streamingTimerRef.current) {
+      clearInterval(streamingTimerRef.current);
+      streamingTimerRef.current = null;
+    }
+    if (activeStreamFinalizeRef.current) {
+      activeStreamFinalizeRef.current();
+      activeStreamFinalizeRef.current = null;
+    }
+    setIsStreamingActive(false);
+    setTimeout(() => scrollToBottom('smooth'), 40);
+  }, [scrollToBottom]);
+
+  const streamAssistantResponse = useCallback((
+    fullText: string,
+    options?: {
+      pendingWorkflow?: { steps: WorkflowStep[] };
+      approvalRequest?: ApprovalRequestData;
+      sources?: string[];
+      onComplete?: () => void;
+    }
+  ) => {
+    finalizeActiveStream();
+
+    const clean = (fullText || '').trim();
+    if (!clean) {
+      setMessages(prev => [...prev, {
+        role: "assistant",
+        content: "",
+        pendingWorkflow: options?.pendingWorkflow,
+        approvalRequest: options?.approvalRequest,
+        sources: options?.sources,
+        timestamp: Date.now()
+      }]);
+      options?.onComplete?.();
+      return;
+    }
+
+    // Split text into tokens preserving words and whitespace/line breaks
+    const tokens = clean.match(/\S+|\s+/g) || [clean];
+
+    setIsStreamingActive(true);
+
+    // Initial empty assistant message with isStreaming: true
+    setMessages(prev => [...prev, {
+      role: "assistant",
+      content: "",
+      isStreaming: true,
+      timestamp: Date.now()
+    }]);
+
+    let currentIndex = 0;
+    // Word-by-word live writing cadence:
+    // Short: 1 token every 20ms (~50 tokens/sec)
+    // Medium: 2 tokens every 16ms
+    // Long: 4 tokens every 12ms
+    const chunkSize = tokens.length > 200 ? 4 : tokens.length > 60 ? 2 : 1;
+    const intervalMs = tokens.length > 200 ? 12 : tokens.length > 60 ? 16 : 20;
+
+    const finalize = () => {
+      setMessages(prev => {
+        const lastIdx = prev.length - 1;
+        if (lastIdx < 0) return prev;
+        const updated = [...prev];
+        updated[lastIdx] = {
+          ...updated[lastIdx],
+          content: clean,
+          isStreaming: false,
+          pendingWorkflow: options?.pendingWorkflow,
+          approvalRequest: options?.approvalRequest,
+          sources: options?.sources
+        };
+        return updated;
+      });
+      setIsStreamingActive(false);
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+      options?.onComplete?.();
+    };
+
+    activeStreamFinalizeRef.current = finalize;
+
+    const timer = setInterval(() => {
+      currentIndex += chunkSize;
+      if (currentIndex >= tokens.length) {
+        clearInterval(timer);
+        streamingTimerRef.current = null;
+        activeStreamFinalizeRef.current = null;
+        finalize();
+      } else {
+        const partial = tokens.slice(0, currentIndex).join('');
+        setMessages(prev => {
+          const lastIdx = prev.length - 1;
+          if (lastIdx < 0) return prev;
+          const updated = [...prev];
+          updated[lastIdx] = {
+            ...updated[lastIdx],
+            content: partial,
+            isStreaming: true
+          };
+          return updated;
+        });
+        scrollToBottom('auto');
+      }
+    }, intervalMs);
+
+    streamingTimerRef.current = timer;
+  }, [finalizeActiveStream]);
 
   // --- Schema cache invalidation ---
 
@@ -386,7 +577,7 @@ export function FluxAiAssistant({ userId, isOpen, onOpenChange }: { userId: stri
     }
 
     else if (step.type === 'EXECUTE_SQL' && step.query) {
-      // Run safe (read-only) SQL directly and display results in chat
+      // Run safe SQL directly, display results, and feed observation back into Auto-Pilot
       fetch('/api/ai-chat/execute-sql', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -400,15 +591,32 @@ export function FluxAiAssistant({ userId, isOpen, onOpenChange }: { userId: stri
           if (columns && columns.length > 0 && rows && rows.length > 0) {
             const header = '| ' + columns.join(' | ') + ' |';
             const sep = '| ' + columns.map(() => '---').join(' | ') + ' |';
-            const bodyRows = rows.map((r: any) => '| ' + columns.map((c: string) => String(r[c] ?? 'NULL')).join(' | ') + ' |');
+            const bodyRows = rows.slice(0, 15).map((r: any) => '| ' + columns.map((c: string) => String(r[c] ?? 'NULL')).join(' | ') + ' |');
             tableMd = header + '\n' + sep + '\n' + bodyRows.join('\n');
           }
           const resultMsg = `**Query results** (${rowCount} row${rowCount === 1 ? '' : 's'}${truncated ? ', showing first 50' : ''}):\n\n${tableMd || 'No rows returned.'}`;
-          setMessages(prev => [...prev, { role: 'assistant', content: resultMsg, timestamp: Date.now() }]);
+          streamAssistantResponse(resultMsg, {
+            onComplete: () => {
+              // Feed observation back to Auto-Pilot so agent can take next action towards goal
+              if (autoPilotActive) {
+                const goal = localStorage.getItem("flux_autopilot_goal") || autoPilotGoal;
+                const previewSnippet = rows && rows.length > 0 ? JSON.stringify(rows.slice(0, 10)) : '0 rows';
+                const obsMsg = `System: Observation from SQL execution (${rowCount} rows):\n${previewSnippet}\nWhat is the next step towards goal: "${goal}"? If the goal is fully accomplished, conclude with [GOAL_ACCOMPLISHED:<summary>].`;
+                requestAutopilotCheckin(obsMsg);
+              }
+              advanceWorkflow();
+            }
+          });
         } else {
-          setMessages(prev => [...prev, { role: 'assistant', content: `Query error: ${data.error}`, timestamp: Date.now() }]);
+          streamAssistantResponse(`Query error: ${data.error}`, {
+            onComplete: () => {
+              if (autoPilotActive) {
+                requestAutopilotCheckin(`System: Observation - SQL Query failed: "${data.error}". Please self-correct the query and retry.`);
+              }
+              advanceWorkflow();
+            }
+          });
         }
-        advanceWorkflow();
       })
       .catch(err => {
         setMessages(prev => [...prev, { role: 'assistant', content: `Failed to execute: ${err.message || err}`, timestamp: Date.now() }]);
@@ -416,31 +624,103 @@ export function FluxAiAssistant({ userId, isOpen, onOpenChange }: { userId: stri
       });
     }
 
+    else if (step.type === 'CALL_MCP' && step.mcpTool) {
+      // Call Fluxbase MCP Tool Gateway
+      fetch('/api/mcp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          jsonrpc: '2.0',
+          id: Date.now(),
+          method: 'tools/call',
+          params: { name: step.mcpTool, arguments: { ...(step.mcpArgs || {}), projectId: project?.project_id } }
+        })
+      })
+      .then(res => res.json())
+      .then(data => {
+        const content = data.result?.content?.[0]?.text || JSON.stringify(data.result || data.error || 'Done');
+        setMessages(prev => [...prev, { role: 'assistant', content: `**MCP [${step.mcpTool}] Response:**\n\`\`\`json\n${content}\n\`\`\``, timestamp: Date.now() }]);
+        if (autoPilotActive) {
+          const goal = localStorage.getItem("flux_autopilot_goal") || autoPilotGoal;
+          requestAutopilotCheckin(`System: Observation from MCP tool "${step.mcpTool}":\n${content.slice(0, 800)}\nNext step towards goal: "${goal}"?`);
+        }
+        advanceWorkflow();
+      })
+      .catch(err => {
+        handleWorkflowError(`MCP execution error: ${err.message || err}`);
+      });
+    }
+
+    else if (step.type === 'REQUEST_APPROVAL') {
+      // Approval step halts workflow and waits for explicit user decision on the ApprovalCard
+      // Workflow advances only when user approves or rejects
+    }
+
+    else if (step.type === 'GOAL_ACCOMPLISHED') {
+      // Autonomous goal accomplished
+      const summary = step.goalSummary || "Goal accomplished successfully.";
+      setMessages(prev => [...prev, { role: 'assistant', content: `**Task Complete:** ${summary}`, timestamp: Date.now() }]);
+      setAutoPilotActive(false);
+      setAutoPilotGoal("");
+      localStorage.removeItem("flux_autopilot_active");
+      localStorage.removeItem("flux_autopilot_goal");
+      localStorage.removeItem("flux_active_workflow");
+      advanceWorkflow();
+    }
+
     return cleanup;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeWorkflow, pathname, project, autoPilotActive, advanceWorkflow, handleWorkflowError]);
+
+  const handleInjectSql = useCallback((sql: string) => {
+    const queryPath = `/query${project?.project_id ? `?projectId=${project.project_id}` : ''}`;
+    if (!window.location.pathname.includes('/query')) {
+      try {
+        localStorage.setItem('flux_pending_sql_inject', JSON.stringify({ query: sql, projectId: project?.project_id, timestamp: Date.now() }));
+      } catch {}
+      router.push(queryPath);
+    } else {
+      window.dispatchEvent(new CustomEvent('flux:inject-sql', { detail: { query: sql, projectId: project?.project_id } }));
+    }
+  }, [project?.project_id, router]);
 
   // --- DOM Simulation Helpers ---
 
   const simulateClick = (el: HTMLElement, onDone?: () => void) => {
     el.scrollIntoView({ behavior: 'smooth', block: 'center' });
     setTimeout(() => {
-      const orig = el.style.boxShadow; el.style.boxShadow = '0 0 15px 5px rgba(249,115,22,0.5)'; el.style.transition = 'box-shadow 0.3s';
-      setTimeout(() => { el.click(); el.style.boxShadow = orig; if (onDone) onDone(); }, 300);
-    }, 400);
+      const origShadow = el.style.boxShadow;
+      const origOutline = el.style.outline;
+      el.style.outline = '2px solid rgba(249, 115, 22, 0.9)';
+      el.style.boxShadow = '0 0 25px 8px rgba(249, 115, 22, 0.6)';
+      el.style.transition = 'all 0.25s ease';
+      setTimeout(() => {
+        el.click();
+        setTimeout(() => {
+          el.style.boxShadow = origShadow;
+          el.style.outline = origOutline;
+          if (onDone) onDone();
+        }, 250);
+      }, 300);
+    }, 350);
   };
 
   const simulateTypeMonaco = (editor: any, value: string, onDone?: () => void) => {
     editor.updateOptions({ quickSuggestions: false, suggestOnTriggerCharacters: false });
     let i = 0;
-    const tick = () => { if (i <= value.length) { editor.setValue(value.substring(0, i++)); setTimeout(tick, 30); } else { editor.updateOptions({ quickSuggestions: { other: true, comments: false, strings: true }, suggestOnTriggerCharacters: true }); onDone?.(); } };
+    const tick = () => { if (i <= value.length) { editor.setValue(value.substring(0, i++)); setTimeout(tick, 25); } else { editor.updateOptions({ quickSuggestions: { other: true, comments: false, strings: true }, suggestOnTriggerCharacters: true }); onDone?.(); } };
     tick();
   };
 
   const simulateTypeNative = (el: HTMLInputElement | HTMLTextAreaElement, value: string, onDone?: () => void) => {
     el.scrollIntoView({ behavior: 'smooth', block: 'center' });
     setTimeout(() => {
-      const orig = el.style.boxShadow; el.style.boxShadow = '0 0 15px 5px rgba(249,115,22,0.5)'; el.style.transition = 'box-shadow 0.3s'; el.focus();
+      const origShadow = el.style.boxShadow;
+      const origOutline = el.style.outline;
+      el.style.outline = '2px solid rgba(249, 115, 22, 0.9)';
+      el.style.boxShadow = '0 0 25px 8px rgba(249, 115, 22, 0.6)';
+      el.style.transition = 'all 0.25s ease';
+      el.focus();
       const proto = el.tagName === 'TEXTAREA' ? window.HTMLTextAreaElement.prototype : window.HTMLInputElement.prototype;
       const desc = (proto as any)['value'];
       const setter = typeof desc === 'object' && desc !== null && 'set' in desc ? (desc as any).set : undefined;
@@ -449,29 +729,45 @@ export function FluxAiAssistant({ userId, isOpen, onOpenChange }: { userId: stri
         if (el && i <= value.length) {
           if (setter) setter.call(el, value.substring(0, i)); else el.value = value.substring(0, i);
           el.dispatchEvent(new Event('input', { bubbles: true })); el.dispatchEvent(new Event('change', { bubbles: true }));
-          i++; if (i <= value.length) setTimeout(tick, 30); else setTimeout(() => { el.style.boxShadow = orig; onDone?.(); }, 500);
+          i++; if (i <= value.length) setTimeout(tick, 25); else setTimeout(() => {
+            el.style.boxShadow = origShadow;
+            el.style.outline = origOutline;
+            onDone?.();
+          }, 400);
         } else { onDone?.(); }
       };
       tick();
-    }, 400);
+    }, 350);
   };
 
   // --- Send Message ---
 
   const handleSend = useCallback(async (e?: React.FormEvent, overrideMsg?: string) => {
     if (e) e.preventDefault();
+    finalizeActiveStream();
     const msg = overrideMsg || input.trim();
     if (!msg.trim() || isTyping) return;
 
-    if (!overrideMsg) { setInput(""); if (autoPilotActive && !localStorage.getItem("flux_autopilot_goal")) { localStorage.setItem("flux_autopilot_goal", msg); setAutoPilotGoal(msg); } }
+    if (!overrideMsg) {
+      setInput("");
+      if (textareaRef.current) {
+        textareaRef.current.style.height = "auto";
+      }
+      if (autoPilotActive && !localStorage.getItem("flux_autopilot_goal")) {
+        localStorage.setItem("flux_autopilot_goal", msg);
+        setAutoPilotGoal(msg);
+      }
+    }
 
     const isHidden = !!overrideMsg && msg.startsWith("System:");
     setMessages(prev => [...prev, { role: "user", content: msg, hidden: isHidden, timestamp: Date.now() }]);
     setIsTyping(true);
+    setTimeout(() => scrollToBottom('smooth'), 20);
 
     const currentMsgs = [...messages, { role: "user" as const, content: msg, hidden: isHidden }];
     abortRef.current?.abort();
-    const controller = new AbortController(); abortRef.current = controller;
+    const controller = new AbortController();
+    abortRef.current = controller;
 
     const getScreenContext = () => {
       if (typeof window === 'undefined') return undefined;
@@ -494,22 +790,40 @@ export function FluxAiAssistant({ userId, isOpen, onOpenChange }: { userId: stri
       const data = await res.json();
 
       if (data.success) {
-        const { steps, cleanText } = parseWorkflow(data.text);
+        const { steps, cleanText, approvalRequest } = parseWorkflow(data.text, project?.project_id);
         const hasOnlyNavSteps = steps.length > 0 && steps.every(s => s.type === 'NAVIGATE') && !cleanText.trim();
-        if (autoPilotActive && hasOnlyNavSteps) { setMessages(prev => [...prev, { role: "assistant", content: "Auto-Pilot stopped - AI is looping without making progress.", timestamp: Date.now() }]); toggleAutoPilot(); return; }
+        if (autoPilotActive && hasOnlyNavSteps) {
+          setIsTyping(false);
+          setMessages(prev => [...prev, { role: "assistant", content: "Auto-Pilot stopped - AI is looping without making progress.", timestamp: Date.now() }]);
+          toggleAutoPilot();
+          return;
+        }
 
-        setMessages(prev => [...prev, { role: "assistant", content: cleanText, pendingWorkflow: steps.length > 0 ? { steps } : undefined, timestamp: Date.now() }]);
-        if (steps.length > 0) { const wf: ActiveWorkflow = { steps, currentStepIndex: 0 }; localStorage.setItem('flux_active_workflow', JSON.stringify(wf)); setActiveWorkflow(wf); }
-        else { localStorage.removeItem('flux_autopilot_goal'); setAutoPilotGoal(""); }
-        speak(cleanText);
+        setIsTyping(false);
+
+        streamAssistantResponse(cleanText, {
+          pendingWorkflow: steps.length > 0 ? { steps } : undefined,
+          approvalRequest,
+          sources: data.sources,
+          onComplete: () => {
+            if (steps.length > 0) {
+              const wf: ActiveWorkflow = { steps, currentStepIndex: 0 };
+              localStorage.setItem('flux_active_workflow', JSON.stringify(wf));
+              setActiveWorkflow(wf);
+            }
+            speak(cleanText);
+          }
+        });
       } else {
+        setIsTyping(false);
         setMessages(prev => [...prev, { role: "assistant", content: data.error || 'Something went wrong. Try again.', timestamp: Date.now() }]);
       }
     } catch (err: any) {
       if (err.name === 'AbortError') return;
+      setIsTyping(false);
       setMessages(prev => [...prev, { role: "assistant", content: 'Connection issue. Try again.', timestamp: Date.now() }]);
-    } finally { setIsTyping(false); }
-  }, [input, isTyping, messages, pathname, selectedModel, project, autoPilotActive, speak]);
+    }
+  }, [input, isTyping, messages, pathname, selectedModel, project, autoPilotActive, speak, finalizeActiveStream, streamAssistantResponse]);
 
   // --- Auto-pilot checkin loop ---
 
@@ -518,60 +832,29 @@ export function FluxAiAssistant({ userId, isOpen, onOpenChange }: { userId: stri
     const pending = localStorage.getItem("flux_autopilot_pending_checkin") === "true";
     const active = localStorage.getItem("flux_autopilot_active") === "true";
     const goal = localStorage.getItem("flux_autopilot_goal") || "";
-    if (!pending || !active || !goal || isTyping) return;
+    if (!pending || !active || !goal || isTyping || isStreamingActive) return;
     localStorage.removeItem('flux_autopilot_pending_checkin');
-    const timer = setTimeout(() => { handleSend(undefined, `System: Previous actions completed. Current page: "${window.location.pathname}". Next step for goal: "${goal}"? If achieved, say "Goal accomplished."`); }, 2500);
+
+    const customMsg = localStorage.getItem('flux_autopilot_checkin_message');
+    localStorage.removeItem('flux_autopilot_checkin_message');
+    const msgToSend = customMsg || `System: Previous actions completed. Current page: "${window.location.pathname}". Next step for goal: "${goal}"? If achieved, say [GOAL_ACCOMPLISHED:<summary>].`;
+
+    const timer = setTimeout(() => {
+      handleSend(undefined, msgToSend);
+    }, 1200);
     return () => clearTimeout(timer);
-  }, [pathname, isTyping, triggerCheckin, handleSend]);
+  }, [pathname, isTyping, isStreamingActive, triggerCheckin, handleSend]);
 
   // --- Cleanup on unmount ---
 
-  useEffect(() => { return () => { abortRef.current?.abort(); if (typeof window !== 'undefined' && window.speechSynthesis) window.speechSynthesis.cancel(); }; }, []);
-
-  // --- Markdown Renderer ---
-
-  const stripActionTags = (text: string) => text
-    .replace(/\[(?:NAVIGATE|CLICK|TYPE|CONFIRM_ACTION|EXECUTE_SQL)[^\]]*\]/g, '')
-    .replace(/^ACTIONS:\s*$/mi, '')
-    .replace(/^\s*[-•]\s*(?:Go to|Click|Type|Create|Head to|Load|Run)\s+.*/gim, '')
-    .replace(/\n{3,}/g, '\n\n')
-    .trim();
-
-  const formatText = (text: string) => {
-    if (typeof text !== 'string') return <span />;
-    text = stripActionTags(text);
-    const inline = (s: string) => {
-      if (!s) return null;
-      const parts = s.split(/(`[^`]+`|\*\*[^*]+\*\*|\*[^*]+\*|\[[^\]]+\]\([^)]+\))/g).filter(Boolean);
-      return parts.map((part: string, i: number) => {
-        if (!part) return null;
-        if (part.startsWith('`') && part.endsWith('`') && part.length > 2) return <code key={i} className="px-1.5 py-0.5 rounded bg-muted font-mono text-[11.5px] text-foreground border border-border/60">{part.slice(1, -1)}</code>;
-        if (part.startsWith('**') && part.endsWith('**') && part.length >= 4) return <strong key={i} className="font-semibold">{part.slice(2, -2)}</strong>;
-        if (part.startsWith('*') && part.endsWith('*') && part.length > 2) return <em key={i} className="italic text-foreground/80">{part.slice(1, -1)}</em>;
-        const linkMatch = part.match(/^\[([^\]]+)\]\(([^)]+)\)$/);
-        if (linkMatch) return <a key={i} href={linkMatch[2]} target="_blank" rel="noopener noreferrer" className="text-primary underline hover:text-primary/80">{linkMatch[1]}</a>;
-        return <span key={i}>{part}</span>;
-      });
+  useEffect(() => {
+    return () => {
+      abortRef.current?.abort();
+      if (streamingTimerRef.current) clearInterval(streamingTimerRef.current);
+      if (typeof window !== 'undefined' && window.speechSynthesis) window.speechSynthesis.cancel();
     };
-    const lines = text.split('\n');
-    const els: React.ReactNode[] = [];
-    let inCode = false, codeLines: string[] = [], codeLang = '';
-    lines.forEach((line, i) => {
-      if (line.startsWith('```')) {
-        if (!inCode) { inCode = true; codeLang = line.slice(3).trim(); codeLines = []; }
-        else { els.push(<div key={`c${i}`} className="my-2 rounded-md border border-border/60 overflow-hidden text-[11.5px]">{codeLang && <div className="px-3 py-1.5 bg-muted/80 border-b border-border/60 font-mono text-[10px] text-muted-foreground uppercase tracking-widest">{codeLang}</div>}<pre className="bg-muted/40 px-3 py-2.5 overflow-x-auto font-mono leading-relaxed text-foreground/85 whitespace-pre-wrap break-words">{codeLines.join('\n')}</pre></div>); inCode = false; codeLines = []; codeLang = ''; }
-        return;
-      }
-      if (inCode) { codeLines.push(line); return; }
-      const hMatch = line.match(/^(#{1,3})\s+(.+)/);
-      if (hMatch) { const lvl = hMatch[1].length; const cls = lvl === 1 ? 'text-base font-bold' : lvl === 2 ? 'text-sm font-semibold' : 'text-xs font-semibold'; els.push(<p key={i} className={`mb-1.5 ${cls}`}>{inline(hMatch[2])}</p>); return; }
-      if (line.match(/^[-•]\s/)) { els.push(<div key={i} className="flex gap-2 mb-1"><span className="mt-1.5 w-1 h-1 rounded-full bg-current shrink-0 opacity-50" /><span>{inline(line.slice(2))}</span></div>); return; }
-      if (line.match(/^\d+\.\s/)) { const num = line.match(/^(\d+)\./)?.[1]; els.push(<div key={i} className="flex gap-2 mb-1"><span className="shrink-0 text-muted-foreground font-mono text-[11px] mt-0.5">{num}.</span><span>{inline(line.replace(/^\d+\.\s/, ''))}</span></div>); return; }
-      if (!line.trim()) { els.push(<div key={i} className="h-1.5" />); return; }
-      els.push(<p key={i} className="mb-1 last:mb-0 break-words leading-relaxed">{inline(line)}</p>);
-    });
-    return els;
-  };
+  }, []);
+
 
   // --- Render ---
 
@@ -586,17 +869,22 @@ export function FluxAiAssistant({ userId, isOpen, onOpenChange }: { userId: stri
             style={{ width: `${panelWidth}px`, maxWidth: 'calc(100vw - 20px)' }}
             className={cn("fixed right-0 top-0 bottom-0 z-50 flex flex-col bg-card border-l border-border shadow-2xl transition-none", isResizing && "select-none")}
           >
-            <div onMouseDown={handleResizeStart} className="absolute left-0 top-0 bottom-0 w-3 -translate-x-1/2 cursor-ew-resize hover:bg-primary/30 active:bg-primary/50 z-50 transition-colors flex items-center justify-center group" title="Drag to resize">
-              <div className="w-1 h-10 rounded-full bg-border/80 group-hover:bg-primary transition-colors flex items-center justify-center"><GripVertical className="h-3 w-3 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" /></div>
+            <div onMouseDown={handleResizeStart} className="absolute left-0 top-0 bottom-0 w-3 -translate-x-1/2 cursor-ew-resize hover:bg-white/10 active:bg-white/20 z-50 transition-colors flex items-center justify-center group" title="Drag to resize">
+              <div className="w-1 h-10 rounded-full bg-border/80 group-hover:bg-white/40 transition-colors flex items-center justify-center"><GripVertical className="h-3 w-3 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" /></div>
             </div>
 
             <div className="flex items-center justify-between px-4 h-14 shrink-0 border-b border-border bg-card/95">
               <div className="flex items-center gap-2.5">
-                <div className="relative flex items-center justify-center w-7 h-7 rounded-lg bg-primary/10 border border-primary/20"><AiIcon size={13} className="text-primary" /><span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-emerald-400 border-2 border-card" /></div>
+                <BorderBeam size="sm" colorVariant="ocean" borderRadius={8} className="rounded-lg">
+                  <div className="relative flex items-center justify-center w-7 h-7 rounded-lg bg-gradient-to-br from-white/[0.12] to-white/[0.04] border border-white/[0.16] shadow-xs">
+                    <FluxAiIcon size={15} />
+                    <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-emerald-400 border-2 border-card" />
+                  </div>
+                </BorderBeam>
                 <div><p className="text-sm font-semibold text-foreground leading-none">Flux AI</p><p className="text-[10.5px] text-muted-foreground mt-0.5">Autonomous agent</p></div>
               </div>
               <div className="flex items-center gap-0.5">
-                <select value={selectedModel} onChange={(e) => handleModelChange(e.target.value)} className="h-7 px-1.5 mr-1.5 rounded border border-border bg-background text-[10.5px] font-medium text-foreground/80 focus:outline-none focus:ring-1 focus:ring-primary cursor-pointer max-w-[130px] truncate shadow-sm opacity-90" title="AI Model"><option value="glm">GLM 5.2</option></select>
+                <select value={selectedModel} onChange={(e) => handleModelChange(e.target.value)} className="h-7 px-1.5 mr-1.5 rounded border border-border bg-background text-[10.5px] font-medium text-foreground/80 focus:outline-none focus:ring-1 focus:ring-border cursor-pointer max-w-[130px] truncate shadow-sm opacity-90" title="AI Model"><option value="glm">GLM 5.2</option></select>
                 <button onClick={() => setVoiceEnabled(v => !v)} className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors" title={voiceEnabled ? 'Mute' : 'Unmute'}>{voiceEnabled ? <Volume2 size={15} /> : <VolumeX size={15} />}</button>
                 <button onClick={() => onOpenChange(false)} className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"><X size={15} /></button>
               </div>
@@ -605,55 +893,224 @@ export function FluxAiAssistant({ userId, isOpen, onOpenChange }: { userId: stri
             {autoPilotActive && autoPilotGoal && (
               <div className="mx-4 mt-3 p-2.5 rounded-lg bg-amber-500/10 border border-amber-500/20 flex items-center justify-between text-[11px] text-amber-600 dark:text-amber-400 font-medium">
                 <div className="flex items-center gap-2 truncate"><Zap size={13} className="animate-bounce shrink-0 fill-current text-amber-500" /><span className="truncate">Auto-Pilot: &quot;{autoPilotGoal}&quot;</span></div>
-                <button onClick={toggleAutoPilot} className="text-[10px] uppercase font-bold text-amber-500 hover:underline shrink-0 ml-2">Stop</button>
+                <LiquidButton variant="destructive" size="sm" onClick={toggleAutoPilot} className="h-6 px-2.5 text-[10px] uppercase font-bold shrink-0 ml-2 cursor-pointer">Stop</LiquidButton>
               </div>
             )}
 
-            <div className="flex-1 overflow-y-auto px-4 py-4 space-y-3 custom-scrollbar">
+            <div ref={messagesContainerRef} className="flex-1 overflow-y-auto px-4 py-4 space-y-3 custom-scrollbar">
               {messages.filter(m => !m.hidden).map((msg, idx) => (
-                <motion.div key={idx} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.18 }} className={`flex items-end gap-2 ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                  {msg.role === 'assistant' && (<div className="flex-shrink-0 w-6 h-6 rounded-md bg-primary/10 border border-primary/20 flex items-center justify-center mb-0.5"><AiIcon size={10} className="text-primary" /></div>)}
-                  <div className={`text-[13px] leading-relaxed ${msg.role === 'user' ? 'max-w-[88%] bg-primary text-primary-foreground rounded-2xl rounded-br-sm px-3.5 py-2.5 shadow-sm' : 'w-full max-w-[96%] bg-secondary/60 border border-border/50 text-foreground rounded-2xl rounded-bl-sm px-3.5 py-2.5'}`}>
-                    {formatText(msg.content)}
-                    {msg.pendingWorkflow && (
-                      <div className="mt-3 pt-3 border-t border-border/40 space-y-2">
-                        <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider font-mono">Actions:</p>
-                        <div className="space-y-1 pl-1">
-                          {msg.pendingWorkflow.steps.map((s, si) => (
-                            <div key={si} className="text-xs flex items-center gap-1.5 text-foreground/85">
-                              <span className="w-1.5 h-1.5 rounded-full bg-primary shrink-0" />
-                              <span className="leading-tight">
-                                {s.type === 'NAVIGATE' && `Go to ${s.path}`}
-                                {s.type === 'CLICK' && `Click "${s.elementId}"`}
-                                {s.type === 'TYPE' && `Type into "${s.locator}"`}
-                                {s.type === 'CONFIRM_ACTION' && s.actionType === 'CREATE_PROJECT' && `Create project "${s.projectName}"`}
-                                {s.type === 'CONFIRM_ACTION' && s.actionType === 'INJECT_SQL' && (
-                                  <span className={isDestructiveSql(s.query || '') ? 'text-red-400' : ''}>
-                                    {isDestructiveSql(s.query || '') ? '⚠ ' : ''}Load into editor: {(s.query || '').slice(0, 50)}{(s.query || '').length > 50 ? '...' : ''}
-                                  </span>
-                                )}
-                                {s.type === 'EXECUTE_SQL' && (
-                                  <span className="text-emerald-400">▸ {(s.query || '').slice(0, 55)}{(s.query || '').length > 55 ? '...' : ''}</span>
-                                )}
-                              </span>
-                            </div>
-                          ))}
+                <motion.div key={idx} initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.16 }} className="w-full">
+                  {msg.role === 'user' ? (
+                    <div className="flex justify-end w-full pl-6">
+                      <div className="max-w-[90%] rounded-xl bg-secondary/80 border border-border/80 text-foreground px-3.5 py-2.5 shadow-2xs">
+                        <div className="flex items-center gap-1.5 mb-1 opacity-60 text-[10px] font-mono uppercase tracking-wider font-semibold">
+                          <span>You</span>
                         </div>
+                        <p className="whitespace-pre-wrap leading-relaxed text-[12.5px] font-normal">{msg.content}</p>
                       </div>
-                    )}
-                  </div>
+                    </div>
+                  ) : (
+                    <div className="flex flex-col gap-1.5 w-full pr-1">
+                      <div className="flex items-center gap-2 px-1">
+                        <div className="flex items-center justify-center w-5.5 h-5.5 rounded-md bg-white/[0.08] border border-white/[0.14] shadow-xs shrink-0">
+                          <FluxAiIcon size={13} />
+                        </div>
+                        <span className="text-[11px] font-semibold text-foreground/80 tracking-tight">Flux AI</span>
+                        {msg.isStreaming && (
+                          <span className="inline-flex items-center gap-1 px-1.5 py-0.2 rounded text-[9.5px] font-mono text-cyan-400 bg-cyan-500/10 border border-cyan-500/20 animate-pulse">
+                            Generating
+                          </span>
+                        )}
+                      </div>
+                      <BorderBeam
+                        size="md"
+                        colorVariant="ocean"
+                        borderRadius={12}
+                        active={Boolean(msg.isStreaming)}
+                        className="w-full rounded-xl"
+                      >
+                        <div
+                          onClick={() => { if (msg.isStreaming) finalizeActiveStream(); }}
+                          className={cn(
+                            "w-full rounded-xl bg-card/75 border border-border/70 text-foreground p-3.5 shadow-2xs transition-all",
+                            msg.isStreaming && "cursor-pointer hover:border-primary/40"
+                          )}
+                          title={msg.isStreaming ? 'Click to show full response' : undefined}
+                        >
+                          <FluxMarkdownRenderer
+                            content={msg.content}
+                            onInjectSql={handleInjectSql}
+                            projectId={project?.project_id}
+                            isStreaming={msg.isStreaming}
+                          />
+
+                        {msg.sources && msg.sources.length > 0 && (
+                          <div className="mt-3 pt-2.5 border-t border-border/40 flex flex-wrap gap-1 items-center">
+                            <span className="text-[10px] text-muted-foreground/80 font-mono tracking-wider uppercase font-semibold">RAG:</span>
+                            {msg.sources.map((src, si) => (
+                              <span key={si} className="text-[9.5px] px-1.5 py-0.5 rounded bg-muted/70 text-muted-foreground border border-border/50 font-mono">
+                                {src}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+
+                        {msg.approvalRequest && (
+                          <FluxAiApprovalCard
+                            data={msg.approvalRequest}
+                            onDecision={(decision, res) => {
+                              if (decision === 'approved') {
+                                advanceWorkflow();
+                                if (autoPilotActive) {
+                                  const goal = localStorage.getItem("flux_autopilot_goal") || autoPilotGoal;
+                                  requestAutopilotCheckin(`System: Observation - User approved and executed ${msg.approvalRequest?.actionType}. Result: ${res?.message || 'Done'}. Proceeding with goal: "${goal}".`);
+                                }
+                              } else {
+                                advanceWorkflow();
+                                if (autoPilotActive) {
+                                  requestAutopilotCheckin(`System: Observation - User rejected this action. Do not run it. Propose an alternative or ask what to do next.`);
+                                }
+                              }
+                            }}
+                          />
+                        )}
+
+                        {msg.pendingWorkflow && (
+                          <div className="mt-3 pt-3 border-t border-border/40 space-y-2">
+                            <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider font-mono">Actions:</p>
+                            <div className="space-y-1 pl-1">
+                              {msg.pendingWorkflow.steps.map((s, si) => (
+                                <div key={si} className="text-xs flex items-center gap-1.5 text-foreground/85">
+                                  <span className="w-1.5 h-1.5 rounded-full bg-primary shrink-0" />
+                                  <span className="leading-tight">
+                                    {s.type === 'NAVIGATE' && `Go to ${s.path}`}
+                                    {s.type === 'CLICK' && `Click "${s.elementId}"`}
+                                    {s.type === 'TYPE' && `Type into "${s.locator}"`}
+                                    {s.type === 'CONFIRM_ACTION' && s.actionType === 'CREATE_PROJECT' && `Create project "${s.projectName}"`}
+                                    {s.type === 'CONFIRM_ACTION' && s.actionType === 'INJECT_SQL' && (
+                                      <span className={isDestructiveSql(s.query || '') ? 'text-red-400' : ''}>
+                                        {isDestructiveSql(s.query || '') ? '⚠ ' : ''}Load into editor: {(s.query || '').slice(0, 50)}{(s.query || '').length > 50 ? '...' : ''}
+                                      </span>
+                                    )}
+                                    {s.type === 'EXECUTE_SQL' && (
+                                      <span className="text-emerald-400 font-mono text-[11.5px]">▸ {(s.query || '').slice(0, 55)}{(s.query || '').length > 55 ? '...' : ''}</span>
+                                    )}
+                                    {s.type === 'REQUEST_APPROVAL' && (
+                                      <span className="text-amber-400">⚠ Review: {s.approvalData?.summary?.slice(0, 45)}</span>
+                                    )}
+                                    {s.type === 'CALL_MCP' && (
+                                      <span className="text-cyan-400 font-mono text-[11.5px]">⚡ MCP: {s.mcpTool}</span>
+                                    )}
+                                    {s.type === 'GOAL_ACCOMPLISHED' && (
+                                      <span className="text-emerald-400 font-semibold">✓ Goal Accomplished</span>
+                                    )}
+                                  </span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                        </div>
+                      </BorderBeam>
+                    </div>
+                  )}
                 </motion.div>
               ))}
-              {isTyping && (<motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} className="flex items-end gap-2 justify-start"><div className="flex-shrink-0 w-6 h-6 rounded-md bg-primary/10 border border-primary/20 flex items-center justify-center"><AiIcon size={10} className="text-primary" /></div><div className="bg-secondary/60 border border-border/50 rounded-2xl rounded-bl-sm px-3.5 py-3 flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-full bg-muted-foreground/60 animate-bounce" style={{ animationDelay: '0ms' }} /><span className="w-1.5 h-1.5 rounded-full bg-muted-foreground/60 animate-bounce" style={{ animationDelay: '150ms' }} /><span className="w-1.5 h-1.5 rounded-full bg-muted-foreground/60 animate-bounce" style={{ animationDelay: '300ms' }} /></div></motion.div>)}
+              {isTyping && (
+                <motion.div initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} className="flex items-center gap-2 px-1 text-xs text-muted-foreground">
+                  <div className="flex items-center justify-center w-5.5 h-5.5 rounded-md bg-white/[0.08] border border-white/[0.14] shadow-xs shrink-0">
+                    <FluxAiIcon size={13} />
+                  </div>
+                  <BorderBeam size="sm" colorVariant="ocean" borderRadius={8} className="rounded-lg">
+                    <div className="flex items-center gap-1.5 py-1 px-2.5 rounded-lg bg-secondary/60 border border-border/50">
+                      <span className="w-1.5 h-1.5 rounded-full bg-cyan-400/90 animate-pulse" style={{ animationDelay: '0ms' }} />
+                      <span className="w-1.5 h-1.5 rounded-full bg-indigo-400/90 animate-pulse" style={{ animationDelay: '150ms' }} />
+                      <span className="w-1.5 h-1.5 rounded-full bg-violet-400/90 animate-pulse" style={{ animationDelay: '300ms' }} />
+                      <span className="text-[10.5px] font-mono text-muted-foreground ml-1">Thinking...</span>
+                    </div>
+                  </BorderBeam>
+                </motion.div>
+              )}
               <div ref={messagesEndRef} />
             </div>
 
-            <div className="shrink-0 px-4 py-3 border-t border-border bg-card/95">
-              <form onSubmit={handleSend} className="flex items-center gap-2">
-                <input type="text" value={input} onChange={(e) => setInput(e.target.value)} placeholder="Ask anything..." className="flex-1 h-9 bg-secondary/50 border border-border rounded-lg px-3.5 text-sm text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent transition-all" disabled={isTyping} autoFocus />
-                <button type="button" onClick={toggleAutoPilot} className={`h-9 px-3 shrink-0 flex items-center justify-center rounded-lg border text-xs font-semibold gap-1.5 transition-all ${autoPilotActive ? 'bg-amber-500/10 border-amber-500/30 text-amber-500 hover:bg-amber-500/20' : 'bg-secondary/40 border-border text-muted-foreground hover:text-foreground hover:bg-secondary'}`} title="Toggle Auto-Pilot"><Zap size={14} className={autoPilotActive ? 'animate-pulse fill-current text-amber-500' : ''} /><span className="hidden sm:inline">Auto-Pilot</span></button>
-                <button type="submit" disabled={!input.trim() || isTyping} className="h-9 w-9 shrink-0 flex items-center justify-center rounded-lg bg-primary text-primary-foreground hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed transition-opacity"><ArrowUp size={15} strokeWidth={2.5} /></button>
-              </form>
+            <div className="shrink-0 px-3 pt-2.5 pb-3 border-t border-border/80 bg-card/95">
+              {/* Quick suggestion prompt chips when conversation is fresh */}
+              {messages.filter(m => !m.hidden).length <= 2 && (
+                <div className="mb-2 flex flex-wrap gap-1.5 px-0.5">
+                  {[
+                    { label: "✨ Explain Schema", prompt: "Explain the database schema and table relationships in this project." },
+                    { label: "⚡ Analyze Performance", prompt: "What queries or indexes could improve performance in this database?" },
+                    { label: "🔍 Show Tables", prompt: "List all user tables in this database with their row counts." }
+                  ].map((chip) => (
+                    <LiquidButton
+                      key={chip.label}
+                      type="button"
+                      size="sm"
+                      onClick={() => handleSend(undefined, chip.prompt)}
+                      className="h-7 text-[10.5px] font-medium px-3 text-muted-foreground hover:text-foreground cursor-pointer"
+                    >
+                      {chip.label}
+                    </LiquidButton>
+                  ))}
+                </div>
+              )}
+
+              {/* Modern expanding prompt card */}
+              <div className="relative rounded-2xl border border-border/90 bg-background/95 shadow-sm transition-all focus-within:border-white/30 focus-within:ring-2 focus-within:ring-white/10 overflow-hidden">
+                <textarea
+                  ref={textareaRef}
+                  value={input}
+                  onChange={handleTextareaChange}
+                  onKeyDown={handleKeyDown}
+                  placeholder="Ask Flux AI, request SQL execution, or enter a prompt..."
+                  rows={1}
+                  className="w-full resize-none bg-transparent px-3.5 pt-3 pb-1 text-xs sm:text-[13px] text-foreground placeholder:text-muted-foreground/45 focus:outline-none leading-relaxed max-h-[140px] custom-scrollbar block"
+                  disabled={isTyping}
+                  autoFocus
+                />
+
+                {/* Bottom Toolbar */}
+                <div className="flex items-center justify-between px-3 pb-2.5 pt-1 gap-2">
+                  <div className="flex items-center gap-2">
+                    <LiquidButton
+                      type="button"
+                      onClick={toggleAutoPilot}
+                      size="sm"
+                      className={cn(
+                        "h-7 px-3 text-[11px] font-medium transition-all select-none cursor-pointer",
+                        autoPilotActive
+                          ? "text-amber-400 font-semibold"
+                          : "text-muted-foreground hover:text-foreground"
+                      )}
+                      title="Toggle Autonomous Goal Execution"
+                    >
+                      <Zap className={cn("size-3.5 shrink-0", autoPilotActive && "animate-pulse fill-current text-amber-500")} />
+                      <span className="whitespace-nowrap">Auto-Pilot</span>
+                    </LiquidButton>
+
+                    <span className="text-[10px] text-muted-foreground/40 font-mono hidden sm:inline select-none">
+                      Shift+↵ newline
+                    </span>
+                  </div>
+
+                  <LiquidButton
+                    type="button"
+                    onClick={() => handleSend()}
+                    disabled={!input.trim() || isTyping}
+                    size="icon"
+                    className={cn(
+                      "h-8 w-8 rounded-xl transition-all shadow-xs cursor-pointer",
+                      input.trim()
+                        ? "text-white opacity-100 hover:scale-105 active:scale-95"
+                        : "opacity-40 cursor-not-allowed text-muted-foreground"
+                    )}
+                    title="Send message (Enter)"
+                  >
+                    <ArrowUp size={14} strokeWidth={2.5} />
+                  </LiquidButton>
+                </div>
+              </div>
             </div>
           </motion.div>
         </>

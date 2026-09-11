@@ -10,7 +10,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { ProjectContext } from '@/contexts/project-context';
 import {
-    LayoutDashboard, Table, Database, BrainCircuit, BarChart3,
+    LayoutDashboard, Table, Database, SquareTerminal, BarChart3,
     Code, Globe, Folder, Settings, Search, ArrowRight,
     Users, Key, Webhook, Shield, GitBranch,
     Bell, Archive, CreditCard
@@ -36,7 +36,7 @@ const getStaticItems = (projectId?: string): CommandItem[] => {
         { id: 'dashboard', label: 'Dashboard', description: 'View analytics & overview', icon: <LayoutDashboard className="h-4 w-4" />, href: '/dashboard', category: 'Navigation', keywords: ['home', 'overview'] },
         { id: 'editor', label: 'Table Editor', description: 'Browse & edit table data', icon: <Table className="h-4 w-4" />, href: projectHref('/editor'), category: 'Navigation', keywords: ['tables', 'data', 'rows'] },
         { id: 'database', label: 'Database', description: 'Manage schema & structure', icon: <Database className="h-4 w-4" />, href: projectHref('/database'), category: 'Navigation', keywords: ['schema', 'columns'] },
-        { id: 'query', label: 'SQL Editor', description: 'Run SQL queries', icon: <BrainCircuit className="h-4 w-4" />, href: projectHref('/query'), category: 'Navigation', keywords: ['sql', 'query', 'select'] },
+        { id: 'query', label: 'SQL Editor', description: 'Run SQL queries', icon: <SquareTerminal className="h-4 w-4" />, href: projectHref('/query'), category: 'Navigation', keywords: ['sql', 'query', 'select'] },
         { id: 'analytics', label: 'Analytics', description: 'View usage analytics', icon: <BarChart3 className="h-4 w-4" />, href: projectHref('/analytics'), category: 'Navigation', keywords: ['charts', 'metrics', 'stats'] },
         { id: 'api', label: 'API', description: 'REST API explorer', icon: <Code className="h-4 w-4" />, href: projectHref('/api'), category: 'Navigation', keywords: ['rest', 'endpoint'] },
         { id: 'scraper', label: 'Scraper', description: 'Web scraping tools', icon: <Globe className="h-4 w-4" />, href: projectHref('/scraper'), category: 'Navigation', keywords: ['crawl', 'web'] },

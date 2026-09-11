@@ -27,12 +27,6 @@ export function SchemaExplorer({ projectId, onInsertQuery }: { projectId?: strin
     // Register with the global sync layer to catch CREATE/DROP/ALTER events
     useRealtimeSubscription(projectId);
 
-    // Invalidate schema cache when DDL changes happen
-    useEffect(() => {
-        const handler = () => { if (projectId) queryClient.invalidateQueries({ queryKey: ['schema', projectId] }); };
-        window.addEventListener('flux:schema-change', handler);
-        return () => window.removeEventListener('flux:schema-change', handler);
-    }, [projectId, queryClient]);
 
     const { data: schema, isLoading: loading } = useQuery({
         queryKey: ['schema', projectId],

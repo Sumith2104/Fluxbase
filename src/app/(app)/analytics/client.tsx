@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Sparkles, Trash2, Loader2, Zap, Layers, RefreshCw } from 'lucide-react';
+import { FluxAiIcon } from '@/components/ui/flux-ai-icon';
 import { UniversalChartRenderer } from '@/components/analytics/chart-renderer';
 import { ManualBuilder } from '@/components/analytics/manual-builder';
 import {
@@ -291,7 +292,7 @@ export default function AnalyticsDashboardClient({ projectId, initialWidgets }: 
                     <Dialog open={aiOpen} onOpenChange={setAiOpen}>
                         <DialogTrigger asChild>
                             <Button className="gap-2">
-                                <Sparkles className="w-4 h-4" />
+                                <FluxAiIcon size={16} />
                                 Ask AI
                             </Button>
                         </DialogTrigger>
@@ -304,7 +305,7 @@ export default function AnalyticsDashboardClient({ projectId, initialWidgets }: 
 
                                 <div className="space-y-4">
                                     <div className="flex items-center gap-2">
-                                        <Sparkles className="w-4 h-4 text-orange-500" />
+                                        <FluxAiIcon size={16} />
                                         <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Data-Driven Suggestions</span>
                                     </div>
                                     <div className="flex flex-col gap-2">

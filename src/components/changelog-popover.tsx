@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import { useState } from 'react';
 import {
@@ -8,7 +8,8 @@ import {
 } from '@/components/ui/popover';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Megaphone, Zap, Shield, GitBranch, BarChart3, Bell, Plug, Sparkles } from 'lucide-react';
+import { Megaphone, Zap, Shield, GitBranch, BarChart3, Bell, Plug } from 'lucide-react';
+import { FluxAiIcon } from '@/components/ui/flux-ai-icon';
 import { cn } from '@/lib/utils';
 
 interface ChangelogEntry {
@@ -125,7 +126,7 @@ export function ChangelogPopover() {
             </PopoverTrigger>
             <PopoverContent className="w-96 p-0 bg-card border-border max-h-[480px] flex flex-col" align="end">
                 <div className="px-4 py-3 border-b border-border flex items-center gap-2 shrink-0">
-                    <Sparkles className="h-4 w-4 text-orange-400" />
+                    <FluxAiIcon size={16} />
                     <div>
                         <h4 className="font-semibold text-sm text-foreground">What&apos;s New</h4>
                         <p className="text-[10px] text-muted-foreground">Latest updates to Fluxbase</p>

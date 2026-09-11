@@ -5,6 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
 import { Button } from "@/components/ui/button";
+import { BorderBeam } from "@/components/ui/border-beam";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { User } from "@/lib/auth";
@@ -13,11 +14,20 @@ import { ProjectSwitcher } from "@/components/project-switcher";
 import { useEffect, useState, useContext } from "react";
 import dynamic from "next/dynamic";
 import { cn } from "@/lib/utils";
-import { getAppLayoutBootstrapData } from "./actions";
-import { LogoutButton } from "@/components/logout-button";
+import { getAppLayoutBootstrapData, logoutAction } from "./actions";
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuGroup,
+    DropdownMenuItem,
+    DropdownMenuLabel,
+    DropdownMenuSeparator,
+    DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { ProjectProvider, ProjectContext } from "@/contexts/project-context";
 import { TimezoneSelector } from "@/components/timezone-selector";
 import { useRealtimeSubscription } from "@/hooks/use-realtime-subscription";
+import { FluxAiIcon } from "@/components/ui/flux-ai-icon";
 import Dock from "@/components/dock";
 // Phase 5+6: Lazy-load heavy components â€” they are NOT needed on initial page render.
 // FluxAiAssistant: 555 lines, speech synthesis, complex state.
@@ -51,7 +61,14 @@ import {
     ServerCrash,
     BarChart3,
     AlertTriangle,
-    Sparkles
+    Sparkles,
+    SquareTerminal,
+    LogOut,
+    CreditCard,
+    Users,
+    KeyRound,
+    BookOpen,
+    Search
 } from "lucide-react";
 
 
@@ -59,7 +76,7 @@ const navItems = [
     { href: "/dashboard", label: "Dashboard", icon: <LayoutDashboard /> },
     { href: "/editor", label: "Table Editor", icon: <Table /> },
     { href: "/database", label: "Database", icon: <Database /> },
-    { href: "/query", label: "SQL Editor", icon: <BrainCircuit /> },
+    { href: "/query", label: "SQL Editor", icon: <SquareTerminal /> },
     { href: "/analytics", label: "Analytics", icon: <BarChart3 /> },
     { href: "/scraper", label: "Scraper", icon: <Globe /> },
     { href: "/storage", label: "Storage", icon: <Folder /> },
@@ -265,8 +282,7 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
     const isEditorOrDbPage = pathname.startsWith('/editor') || pathname.startsWith('/database') || pathname.startsWith('/query');
     const isLoading = userLoading || projectContextLoading;
 
-    const dockItems = navItems.map(item => {
-        // Reduced list of project-specific pages
+    const toolItems = navItems.slice(0, -1).map(item => {
         const isProjectSpecific = ["/editor", "/storage", "/query", "/database", "/analytics", "/scraper"].includes(item.href);
         const isDisabled = isProjectSpecific && !selectedProject?.project_id;
         let finalHref = item.href;
@@ -275,8 +291,14 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
             finalHref = `${item.href}?projectId=${selectedProject.project_id}`;
         }
 
+        const isActive = item.href === '/dashboard'
+            ? pathname.startsWith('/dashboard')
+            : (pathname === item.href || pathname.startsWith(`${item.href}/`));
+
         return {
             ...item,
+            isActive,
+            isDisabled,
             onMouseEnter: () => {
                 if (!isDisabled) {
                     router.prefetch(finalHref);
@@ -289,6 +311,31 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
             },
         };
     });
+
+    const searchItem = {
+        icon: <Search />,
+        label: "Search (⌘K)",
+        isSeparatorBefore: true,
+        onClick: () => {
+            const el = document.getElementById('command-palette-trigger');
+            if (el) el.click();
+            else window.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', ctrlKey: true, bubbles: true }));
+        },
+    };
+
+    const settingsNavItem = navItems[navItems.length - 1];
+    const settingsHref = selectedProject?.project_id ? `/settings?projectId=${selectedProject.project_id}` : '/settings';
+    const isSettingsActive = pathname.startsWith('/settings');
+
+    const settingsItem = {
+        ...settingsNavItem,
+        isActive: isSettingsActive,
+        badgeCount: invitations?.length > 0 ? invitations.length : undefined,
+        onMouseEnter: () => router.prefetch(settingsHref),
+        onClick: () => router.push(settingsHref),
+    };
+
+    const dockItems = [...toolItems, searchItem, settingsItem];
 
     // Global Keyboard Shortcuts
     useKeyboardShortcuts([
@@ -380,10 +427,78 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
             ) : null}
             <header className="sticky top-0 z-40 flex h-12 max-w-full items-center gap-2 border-b border-border bg-background/95 px-2 backdrop-blur-md sm:gap-4 sm:px-4 md:px-6">
                 <div className="flex min-w-0 flex-1 items-center gap-1.5 sm:gap-2">
-                    <Avatar className="hidden h-8 w-8 shrink-0 sm:block">
-                        {(user as any)?.photo_url && <AvatarImage src={(user as any).photo_url} referrerPolicy="no-referrer" />}
-                        <AvatarFallback>{avatarFallback}</AvatarFallback>
-                    </Avatar>
+                    <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                            <button
+                                className="group relative hidden rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 sm:block cursor-pointer transition-transform duration-150 hover:scale-105"
+                                title="Open account menu"
+                            >
+                                <BorderBeam size="sm" colorVariant="ocean" borderRadius={9999} className="rounded-full">
+                                    <Avatar className="h-8 w-8 shrink-0">
+                                        {(user as any)?.photo_url && <AvatarImage src={(user as any).photo_url} referrerPolicy="no-referrer" />}
+                                        <AvatarFallback>{avatarFallback}</AvatarFallback>
+                                    </Avatar>
+                                </BorderBeam>
+                            </button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="start" className="w-56 p-1.5 shadow-xl">
+                            <DropdownMenuLabel className="font-normal px-2 py-1.5">
+                                <div className="flex flex-col space-y-1">
+                                    <p className="text-xs font-semibold leading-none text-foreground truncate">
+                                        {(user as any)?.name || (user as any)?.email?.split('@')[0] || 'User'}
+                                    </p>
+                                    <p className="text-[11px] leading-none text-muted-foreground truncate font-mono">
+                                        {(user as any)?.email || ''}
+                                    </p>
+                                </div>
+                            </DropdownMenuLabel>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuGroup>
+                                <DropdownMenuItem asChild>
+                                    <Link href="/settings" className="flex items-center gap-2 cursor-pointer text-xs">
+                                        <SettingsIcon className="h-3.5 w-3.5 text-muted-foreground" />
+                                        <span>Account Settings</span>
+                                    </Link>
+                                </DropdownMenuItem>
+                                <DropdownMenuItem asChild>
+                                    <Link href="/settings/billing" className="flex items-center gap-2 cursor-pointer text-xs">
+                                        <CreditCard className="h-3.5 w-3.5 text-muted-foreground" />
+                                        <span>Billing & Usage</span>
+                                    </Link>
+                                </DropdownMenuItem>
+                                <DropdownMenuItem asChild>
+                                    <Link href="/settings/team" className="flex items-center gap-2 cursor-pointer text-xs">
+                                        <Users className="h-3.5 w-3.5 text-muted-foreground" />
+                                        <span>Team Management</span>
+                                    </Link>
+                                </DropdownMenuItem>
+                                <DropdownMenuItem asChild>
+                                    <Link href="/settings/api-keys" className="flex items-center gap-2 cursor-pointer text-xs">
+                                        <KeyRound className="h-3.5 w-3.5 text-muted-foreground" />
+                                        <span>API Keys</span>
+                                    </Link>
+                                </DropdownMenuItem>
+                                <DropdownMenuItem asChild>
+                                    <Link href="/docs" className="flex items-center gap-2 cursor-pointer text-xs">
+                                        <BookOpen className="h-3.5 w-3.5 text-muted-foreground" />
+                                        <span>Documentation</span>
+                                    </Link>
+                                </DropdownMenuItem>
+                            </DropdownMenuGroup>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem
+                                onClick={async () => {
+                                    await logoutAction();
+                                    router.push('/');
+                                    router.refresh();
+                                }}
+                                className="flex items-center gap-2 text-destructive focus:text-destructive cursor-pointer text-xs"
+                            >
+                                <LogOut className="h-3.5 w-3.5" />
+                                <span>Log out</span>
+                            </DropdownMenuItem>
+                        </DropdownMenuContent>
+                    </DropdownMenu>
                     <ProjectSwitcher
                         headerTitle={headerTitle}
                         orgName={orgName}
@@ -495,20 +610,20 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
                         </div>
                         <div className="mx-1 hidden h-5 w-px bg-border sm:block" />
                         {userId && (
-                            <button
-                                onClick={() => setIsAiOpen(true)}
-                                className="relative flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary/60 transition-all text-xs font-medium group"
-                                title="Open Flux AI Assistant"
-                            >
-                                <span className="relative">
-                                    <Sparkles className="h-4 w-4 text-orange-400 group-hover:text-orange-300 transition-colors" />
-                                    <span className="absolute -top-0.5 -right-0.5 h-1.5 w-1.5 bg-orange-500 rounded-full animate-pulse" />
-                                </span>
-                                <span className="hidden md:block">Flux AI</span>
-                            </button>
+                            <BorderBeam size="sm" colorVariant="ocean" borderRadius={8} className="rounded-lg">
+                                <button
+                                    onClick={() => setIsAiOpen(true)}
+                                    className="relative flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary/60 transition-all text-xs font-medium group cursor-pointer"
+                                    title="Open Flux AI Assistant"
+                                >
+                                    <span className="relative flex items-center justify-center">
+                                        <FluxAiIcon size={14} />
+                                        <span className="absolute -top-1 -right-1 h-1.5 w-1.5 bg-emerald-400 rounded-full animate-pulse" />
+                                    </span>
+                                    <span className="hidden md:block">Flux AI</span>
+                                </button>
+                            </BorderBeam>
                         )}
-                        <div className="mx-1 hidden h-5 w-px bg-border sm:block" />
-                        <LogoutButton />
                     </div>
                 ) : (
                     <Button asChild variant="outline" size="sm">
@@ -524,7 +639,7 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
                     {userId && <InvitationAlerts initialInvites={invitations} />}
                     <div data-scroll-container="true" className={cn("flex-1 min-h-0 h-full flex flex-col", isEditorOrDbPage ? "overflow-hidden" : "overflow-auto")}>{children}</div>
                     {shouldShowDock && (
-                        <div className="pointer-events-none fixed bottom-3 left-0 right-0 z-50 flex justify-center px-2 sm:bottom-4">
+                        <div className="pointer-events-none fixed bottom-1.5 sm:bottom-2 left-0 right-0 z-50 flex justify-center px-2">
                             <Dock items={dockItems} className="pointer-events-auto" />
                         </div>
                     )}

@@ -5,6 +5,7 @@ import { useGlobalAlert } from '@/components/global-alert-provider';
 import { useState, useContext, useEffect, useCallback } from 'react';
 
 import { Play, Trash2, History as HistoryIcon, Sparkles,  ChevronRight,  Table2, ListRestart, Info, Database, AlertCircle, CheckCircle2, TerminalSquare,  MoreHorizontal, FileJson, FileType, Copy as CopyIcon, AlignLeft, Upload } from 'lucide-react';
+import { FluxAiIcon } from '@/components/ui/flux-ai-icon';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
@@ -626,7 +627,7 @@ export default function QueryPage() {
                     onClick={handleGenerateSQL}
                     disabled={isGeneratingSQL || isExecutingAI || !aiInput.trim()}
                   >
-                    {isGeneratingSQL ? <MoreHorizontal className="mr-2 h-4 w-4 animate-pulse" /> : <Sparkles className="mr-2 h-3.5 w-3.5" />}
+                    {isGeneratingSQL ? <MoreHorizontal className="mr-2 h-4 w-4 animate-pulse" /> : <FluxAiIcon size={14} className="mr-2" />}
                     Generate
                   </Button>
                   <Button
@@ -820,7 +821,7 @@ export default function QueryPage() {
                     </TabsTrigger>
 
                     <TabsTrigger value="ai" className="h-8 text-xs px-3">
-                      <Sparkles className="h-3.5 w-3.5 mr-1.5" />
+                      <FluxAiIcon size={14} className="mr-1.5" />
                       AI Assistant
                     </TabsTrigger>
                   </TabsList>
@@ -873,7 +874,7 @@ export default function QueryPage() {
                         onClick={handleGenerateSQL}
                         disabled={isGeneratingSQL || isExecutingAI || !aiInput.trim()}
                       >
-                        {isGeneratingSQL ? <MoreHorizontal className="h-4 w-4 mr-2 animate-pulse" /> : <Sparkles className="h-3.5 w-3.5 mr-2" />}
+                        {isGeneratingSQL ? <MoreHorizontal className="h-4 w-4 mr-2 animate-pulse" /> : <FluxAiIcon size={14} className="mr-2" />}
                         {isGeneratingSQL ? "Generating..." : "Generate"}
                       </Button>
                       <Button

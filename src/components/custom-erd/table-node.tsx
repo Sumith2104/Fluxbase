@@ -53,7 +53,7 @@ export const TableNode = React.memo(function TableNode({ table, columns, pks, fk
   return (
     <div
       ref={nodeRef}
-      className="erd-node absolute rounded-lg border border-border bg-secondary/85 shadow-2xl font-sans backdrop-blur-xl overflow-hidden ring-1 ring-border/50 hover:ring-orange-500/50 select-none z-10"
+      className="erd-node absolute rounded-lg border border-border bg-secondary/85 shadow-2xl font-sans backdrop-blur-xl overflow-hidden ring-1 ring-border/50 hover:ring-white/20 select-none z-10"
       style={{
         transform: `translate3d(${x}px, ${y}px, 0)`,
         width: `${width}px`,
