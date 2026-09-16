@@ -732,13 +732,27 @@ export async function createProject(
     );
 
     // Persist user role in Fluxbase database (Student / Employee / Org Owner)
-    if (userRole) {
-        try {
-            await pool.query('UPDATE fluxbase_global.users SET user_role = $1 WHERE id = $2', [userRole, userId]);
-            await pool.query('UPDATE fluxbase_global.projects SET creator_role = $1 WHERE project_id = $2', [userRole, projectId]);
-        } catch (roleErr) {
-            console.warn('[Role Save] Non-critical role update error:', roleErr);
-        }
+    // Server-side validation: prevent unauthorized role escalation
+    let effectiveRole = 'student';
+    if (userRole === 'org_owner' && (planType === 'org_owner' || planType === 'org')) {
+        effectiveRole = 'org_owner';
+    } else if (userRole === 'employee' && (planType === 'employee' || planType === 'org_owner' || planType === 'org')) {
+        effectiveRole = 'employee';
+    } else if (userRole === 'student') {
+        effectiveRole = 'student';
+    } else if (planType === 'org_owner' || planType === 'org') {
+        effectiveRole = 'org_owner';
+    } else if (planType === 'employee') {
+        effectiveRole = 'employee';
+    } else {
+        effectiveRole = 'student';
+    }
+
+    try {
+        await pool.query('UPDATE fluxbase_global.users SET user_role = $1 WHERE id = $2', [effectiveRole, userId]);
+        await pool.query('UPDATE fluxbase_global.projects SET creator_role = $1 WHERE project_id = $2', [effectiveRole, projectId]);
+    } catch (roleErr) {
+        console.warn('[Role Save] Non-critical role update error:', roleErr);
     }
 
     const project: Project = {

@@ -472,8 +472,8 @@ export default function SelectProjectPage() {
     setModalDialect(dialect);
     setProjectName('');
     const defaultRole: UserRoleOption = 
-      (currentPlan === 'org_owner' || currentPlan === 'org' || currentPlan === 'max') ? 'org_owner' :
-      (currentPlan === 'employee' || currentPlan === 'pro') ? 'employee' :
+      (currentPlan === 'org_owner' || currentPlan === 'org') ? 'org_owner' :
+      (currentPlan === 'employee') ? 'employee' :
       'student';
     setSelectedRole(hasAvailableQuota ? defaultRole : null);
     setBillingPreference('monthly');
@@ -507,11 +507,10 @@ export default function SelectProjectPage() {
     setIsSubmitting(true);
     try {
       const isAlreadyCovered = 
-        hasAvailableQuota ||
-        (selectedRole === 'student') ||
-        (selectedRole === 'employee' && (currentPlan === 'employee' || currentPlan === 'org_owner' || currentPlan === 'org' || currentPlan === 'max' || currentPlan === 'pro')) ||
-        (selectedRole === 'org_owner' && (currentPlan === 'org_owner' || currentPlan === 'org' || currentPlan === 'max')) ||
-        (billingPreference === 'pay_as_you_go' && (currentPlan === 'pay_as_you_go' || currentPlan === 'employee' || currentPlan === 'org_owner' || currentPlan === 'max'));
+        (selectedRole === 'student' && (hasAvailableQuota || currentPlan === 'free' || currentPlan === 'pro' || currentPlan === 'max')) ||
+        (selectedRole === 'employee' && (currentPlan === 'employee' || currentPlan === 'org_owner' || currentPlan === 'org')) ||
+        (selectedRole === 'org_owner' && (currentPlan === 'org_owner' || currentPlan === 'org')) ||
+        (billingPreference === 'pay_as_you_go' && (currentPlan === 'pay_as_you_go' || currentPlan === 'employee' || currentPlan === 'org_owner'));
 
       if (!isAlreadyCovered) {
         // For Paid Tiers not yet purchased:
@@ -1036,9 +1035,15 @@ export default function SelectProjectPage() {
                     <div>
                       <div className="flex items-center gap-2">
                         <span className="text-sm font-bold text-foreground">
-                          {currentPlan === 'org_owner' || currentPlan === 'org' || currentPlan === 'max'
+                          {currentPlan === 'org_owner' || currentPlan === 'org'
                             ? 'Organization Owner Tier'
-                            : 'Employee Tier'}
+                            : currentPlan === 'employee'
+                            ? 'Employee Tier'
+                            : currentPlan === 'max'
+                            ? 'Student Max Tier'
+                            : currentPlan === 'pro'
+                            ? 'Student Pro Tier'
+                            : 'Student Free Tier'}
                         </span>
                         <Badge variant="secondary" className="text-[10px] font-mono uppercase bg-emerald-500/10 text-emerald-500 border-emerald-500/20">
                           Active Plan
@@ -1055,11 +1060,27 @@ export default function SelectProjectPage() {
                 <div className="grid grid-cols-3 gap-2 pt-2 border-t border-border/50 text-[11px] text-muted-foreground">
                   <div>
                     <span className="text-foreground font-medium">Compute: </span>
-                    {currentPlan === 'org_owner' || currentPlan === 'org' || currentPlan === 'max' ? '8 vCPU Xeon (32GB)' : '2 vCPU Dedicated (4GB)'}
+                    {currentPlan === 'org_owner' || currentPlan === 'org'
+                      ? '8 vCPU Xeon (32GB)'
+                      : currentPlan === 'employee'
+                      ? '2 vCPU Dedicated (4GB)'
+                      : currentPlan === 'max'
+                      ? 'Shared High-Memory (8GB)'
+                      : currentPlan === 'pro'
+                      ? 'Shared Cloud (4GB)'
+                      : 'Shared Micro Sandbox'}
                   </div>
                   <div>
                     <span className="text-foreground font-medium">Storage: </span>
-                    {currentPlan === 'org_owner' || currentPlan === 'org' || currentPlan === 'max' ? '100GB NVMe' : '10GB SSD'}
+                    {currentPlan === 'org_owner' || currentPlan === 'org'
+                      ? '100GB NVMe'
+                      : currentPlan === 'employee'
+                      ? '10GB SSD'
+                      : currentPlan === 'max'
+                      ? '50GB Storage'
+                      : currentPlan === 'pro'
+                      ? '8GB Storage'
+                      : '500MB Storage'}
                   </div>
                   <div>
                     <span className="text-foreground font-medium">Cost: </span>
