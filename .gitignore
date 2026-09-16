@@ -76,5 +76,11 @@ scratch/
 strix_runs/
 *.log
 dummy-fluxbase-repo/
+
+# Database Backups & Dumps
+backups/
+*.sql
+*.dump
+scripts/backup_*.mjs
 # End
 

@@ -53,6 +53,66 @@ export function generateOpenAPISpec(): Record<string, any> {
             responses: { unauthorized, forbidden, notFound, serverError },
         },
         paths: {
+            '/api/v1/models': {
+                get: {
+                    summary: 'List available Flux AI models',
+                    tags: ['Flux AI'],
+                    security: [{ bearerAuth: [] }, { apiKeyAuth: [] }],
+                    responses: {
+                        '200': {
+                            description: 'OpenAI-compatible list of available Flux AI models (flux, flux-flash, flux-pro, flux-ultra, flux-5.2)',
+                        },
+                        '401': unauthorized,
+                    },
+                },
+            },
+            '/api/v1/chat/completions': {
+                post: {
+                    summary: 'Generate chat completions with Flux AI models',
+                    tags: ['Flux AI'],
+                    security: [{ bearerAuth: [] }, { apiKeyAuth: [] }],
+                    requestBody: {
+                        required: true,
+                        content: {
+                            'application/json': {
+                                schema: {
+                                    type: 'object',
+                                    required: ['messages'],
+                                    properties: {
+                                        model: {
+                                            type: 'string',
+                                            default: 'flux',
+                                            enum: ['flux', 'flux-flash', 'flux-pro', 'flux-ultra', 'flux-5.2', 'gpt-4o', 'gpt-3.5-turbo'],
+                                            description: 'Model identifier to use for completion'
+                                        },
+                                        messages: {
+                                            type: 'array',
+                                            items: {
+                                                type: 'object',
+                                                required: ['role', 'content'],
+                                                properties: {
+                                                    role: { type: 'string', enum: ['system', 'user', 'assistant', 'tool'] },
+                                                    content: { type: 'string' }
+                                                }
+                                            }
+                                        },
+                                        stream: { type: 'boolean', default: false, description: 'Whether to stream Server-Sent Events (SSE)' },
+                                        temperature: { type: 'number', minimum: 0, maximum: 2 },
+                                        max_tokens: { type: 'integer' }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    responses: {
+                        '200': { description: 'Chat completion response (or event-stream if stream=true)' },
+                        '401': unauthorized,
+                        '403': forbidden,
+                        '429': { description: 'Rate limit exceeded (60 req/min)' },
+                        '500': serverError,
+                    },
+                },
+            },
             '/api/execute-sql': {
                 post: {
                     summary: 'Execute SQL',

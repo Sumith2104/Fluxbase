@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import { useState, useEffect } from 'react';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
@@ -14,13 +14,14 @@ import {
 import { useToast } from '@/hooks/use-toast';
 import { createApiKeyAction, getApiKeysAction, revokeApiKeyAction, getProjectsAction } from '../api-key-actions';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Key, Shield, ShieldAlert, ShieldCheck, Copy, Loader2, Globe, Lock, Clock, Calendar } from 'lucide-react';
+import { Key, Shield, ShieldAlert, ShieldCheck, Bot, Copy, Loader2, Globe, Lock, Clock, Calendar } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { formatDistanceToNow } from 'date-fns';
 
 const SCOPES = [
     { id: 'read', label: 'Read Access', description: 'Can only execute SELECT queries', icon: ShieldCheck },
     { id: 'write', label: 'Write Access', description: 'Can execute INSERT, UPDATE, DELETE', icon: Shield },
+    { id: 'ai', label: 'AI Gateway Access', description: 'Access to Flux AI chat & completions', icon: Bot },
     { id: 'admin', label: 'Admin Access', description: 'Full access to schema and settings', icon: ShieldAlert },
 ];
 
@@ -99,7 +100,7 @@ export default function ApiKeysPage() {
 
                         <div className="space-y-3">
                             <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Permissions (Scopes)</Label>
-                            <div className="grid gap-3 sm:grid-cols-3">
+                            <div className="grid gap-3 grid-cols-2 sm:grid-cols-4">
                                 {SCOPES.map(scope => (
                                     <div key={scope.id} 
                                         className={cn(

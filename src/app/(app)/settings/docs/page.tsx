@@ -6,7 +6,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
     Download, ExternalLink, Copy, Check, Info, AlertCircle,
     Database, Code2, Globe, HardDrive, Webhook, Shield, Users, KeyRound, Zap,
-    Book, ArrowLeft, Cpu
+    Book, ArrowLeft, Cpu, Bot, Sparkles
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import Link from 'next/link';
@@ -94,6 +94,7 @@ function Section({ id, title, icon: Icon, children }: { id: string; title: strin
 const NAV_SECTIONS = [
     { id: 'getting-started', label: 'Getting Started', icon: Zap },
     { id: 'authentication', label: 'Authentication', icon: KeyRound },
+    { id: 'flux-ai-gateway', label: 'Flux AI Gateway', icon: Bot },
     { id: 'mcp-gateway', label: 'MCP AI Gateway', icon: Cpu },
     { id: 'core-api', label: 'Core SQL API', icon: Database },
     { id: 'sdks', label: 'Language SDKs', icon: Code2 },
@@ -251,7 +252,8 @@ Content-Type: application/json`} />
                                     <tbody className="divide-y divide-border/60">
                                         {[
                                             { scope: 'read', access: 'SELECT only', rec: 'Dashboards, public APIs' },
-                                            { scope: 'readwrite', access: 'SELECT, INSERT, UPDATE', rec: 'Backend services' },
+                                            { scope: 'write', access: 'INSERT, UPDATE, DELETE', rec: 'Backend services & mutations' },
+                                            { scope: 'ai', access: 'Flux AI Gateway models', rec: 'LLM completions, agent workflows' },
                                             { scope: 'admin', access: 'Full DDL + DML access', rec: 'Migration & init scripts' },
                                         ].map(r => (
                                             <tr key={r.scope} className="hover:bg-secondary/70">
@@ -265,7 +267,151 @@ Content-Type: application/json`} />
                             </div>
                         </Section>
 
-                        {/* ── 3. Model Context Protocol (MCP) AI Gateway ── */}
+                        {/* ── 3. Flux AI Gateway (Chat & Completions) ── */}
+                        <Section id="flux-ai-gateway" title="Flux AI Gateway (Chat & Completions)" icon={Bot}>
+                            <p>
+                                Fluxbase includes an enterprise-grade, <strong className="text-white">OpenAI-compatible AI Gateway</strong>. It enables your applications, developers, and agents to interact with our proprietary <strong className="text-white">Flux AI reasoning model family</strong> using standard OpenAI SDKs, LangChain, Cursor, Windsurf, or direct HTTP requests.
+                            </p>
+
+                            <div className="flex flex-wrap gap-2 pt-1">
+                                <Endpoint method="POST" path="/api/v1/chat/completions" />
+                                <Endpoint method="GET" path="/api/v1/models" />
+                            </div>
+
+                            <h3 className="text-base font-bold text-white mt-6 flex items-center gap-2">
+                                <Sparkles className="h-4 w-4 text-orange-400" />
+                                Available Flux AI Models
+                            </h3>
+                            <p className="text-sm">
+                                All requests to <code className="text-xs font-mono text-foreground/80 bg-muted px-1.5 py-0.5 rounded">/api/v1/chat/completions</code> use these model identifiers. If omitted, the default model is <code className="text-xs font-mono text-orange-400 bg-orange-500/10 px-1.5 py-0.5 rounded">flux</code>.
+                            </p>
+
+                            <div className="rounded-lg border border-border overflow-hidden text-sm mt-3">
+                                <table className="w-full text-left bg-card">
+                                    <thead>
+                                        <tr className="bg-secondary border-b border-border text-xs uppercase tracking-wide text-muted-foreground/75">
+                                            <th className="px-4 py-3">Model ID</th>
+                                            <th className="px-4 py-3">Tier / Speed</th>
+                                            <th className="px-4 py-3">Capabilities & Best For</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-border/60">
+                                        {[
+                                            { id: 'flux', tier: 'Flagship (Default)', speed: 'Ultra-Fast', desc: 'High-accuracy general reasoning, SQL synthesis, and conversational code intelligence.' },
+                                            { id: 'flux-flash', tier: 'Low Latency', speed: 'Realtime', desc: 'Ultra-fast token throughput. Ideal for autocompletion, real-time UX, and lightweight tasks.' },
+                                            { id: 'flux-pro', tier: 'Balanced Pro', speed: 'Fast', desc: 'Enhanced instruction following, multi-table analysis, and strict JSON formatting.' },
+                                            { id: 'flux-ultra', tier: 'Enterprise Intelligence', speed: 'Deep Reasoning', desc: 'Maximum cognitive depth for complex system architecture, long reasoning chains, and auditing.' },
+                                            { id: 'flux-5.2', tier: 'Frontier', speed: 'Advanced', desc: 'Next-generation reasoning architecture specialized in multi-step agentic execution.' },
+                                            { id: 'gpt-4o', tier: 'Alias', speed: 'Deep Reasoning', desc: 'OpenAI drop-in compatibility alias automatically mapped to flux-ultra.' },
+                                            { id: 'gpt-3.5-turbo', tier: 'Alias', speed: 'Realtime', desc: 'OpenAI drop-in compatibility alias automatically mapped to flux-flash.' },
+                                        ].map(m => (
+                                            <tr key={m.id} className="hover:bg-secondary/70">
+                                                <td className="px-4 py-3 font-mono text-orange-400 text-xs font-bold whitespace-nowrap">{m.id}</td>
+                                                <td className="px-4 py-3 text-xs">
+                                                    <span className="px-2 py-0.5 rounded bg-muted text-muted-foreground text-[11px] font-medium">{m.tier}</span>
+                                                </td>
+                                                <td className="px-4 py-3 text-foreground/85 text-xs">{m.desc}</td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+
+                            <h3 className="text-base font-bold text-white mt-6">Integration Examples</h3>
+                            
+                            <Tabs defaultValue="python" className="w-full">
+                                <TabsList className="bg-secondary border border-border">
+                                    <TabsTrigger value="python">Python (OpenAI SDK)</TabsTrigger>
+                                    <TabsTrigger value="node">Node.js / TypeScript</TabsTrigger>
+                                    <TabsTrigger value="curl">cURL</TabsTrigger>
+                                </TabsList>
+
+                                <TabsContent value="python" className="space-y-3 mt-3">
+                                    <p className="text-xs text-muted-foreground">Works out-of-the-box with the standard <code className="font-mono text-foreground/80">openai</code> Python library by pointing <code className="font-mono text-foreground/80">base_url</code> to your Fluxbase API:</p>
+                                    <CodeBlock title="main.py" code={`from openai import OpenAI
+
+client = OpenAI(
+    base_url="https://www.fluxbasedb.me/api/v1",  # or http://localhost:3000/api/v1
+    api_key="flx_live_your_fluxbase_key"        # Scoped with 'ai' or 'admin'
+)
+
+# Standard Completion
+response = client.chat.completions.create(
+    model="flux",  # or "flux-flash", "flux-pro", "flux-ultra"
+    messages=[
+        {"role": "system", "content": "You are a database architect."},
+        {"role": "user", "content": "Design an indexing strategy for a high-traffic analytics table."}
+    ],
+    temperature=0.3
+)
+print(response.choices[0].message.content)
+
+# Real-Time Streaming (SSE)
+stream = client.chat.completions.create(
+    model="flux",
+    messages=[{"role": "user", "content": "Write a Python script to test API latency."}],
+    stream=True
+)
+for chunk in stream:
+    print(chunk.choices[0].delta.content or "", end="", flush=True)`} />
+                                </TabsContent>
+
+                                <TabsContent value="node" className="space-y-3 mt-3">
+                                    <p className="text-xs text-muted-foreground">Compatible with the official <code className="font-mono text-foreground/80">openai</code> Node package:</p>
+                                    <CodeBlock title="ai-gateway.ts" code={`import OpenAI from 'openai';
+
+const client = new OpenAI({
+  baseURL: 'https://www.fluxbasedb.me/api/v1',
+  apiKey: process.env.FLUXBASE_API_KEY, // flx_live_...
+});
+
+async function main() {
+  const stream = await client.chat.completions.create({
+    model: 'flux', // or 'flux-ultra', 'flux-flash'
+    messages: [{ role: 'user', content: 'Generate a PostgreSQL partitioned table schema.' }],
+    stream: true,
+  });
+
+  for await (const chunk of stream) {
+    process.stdout.write(chunk.choices[0]?.delta?.content || '');
+  }
+}
+
+main();`} />
+                                </TabsContent>
+
+                                <TabsContent value="curl" className="space-y-3 mt-3">
+                                    <p className="text-xs text-muted-foreground">Standard HTTP POST with JSON body and Bearer authentication:</p>
+                                    <CodeBlock title="Terminal" code={`# Non-streaming Request
+curl -X POST https://www.fluxbasedb.me/api/v1/chat/completions \\
+  -H "Authorization: Bearer flx_live_your_fluxbase_key" \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "model": "flux",
+    "messages": [
+      {"role": "system", "content": "You are a helpful assistant."},
+      {"role": "user", "content": "Hello Flux AI!"}
+    ]
+  }'
+
+# Real-time Streaming (Server-Sent Events)
+curl -N -X POST https://www.fluxbasedb.me/api/v1/chat/completions \\
+  -H "Authorization: Bearer flx_live_your_fluxbase_key" \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "model": "flux-flash",
+    "messages": [{"role": "user", "content": "Count from 1 to 10."}],
+    "stream": true
+  }'`} />
+                                </TabsContent>
+                            </Tabs>
+
+                            <Callout type="info">
+                                <strong>Rate Limits & Quota:</strong> Standard Fluxbase keys include 60 requests per minute. All token metrics are aggregated live into project rollups for usage tracking.
+                            </Callout>
+                        </Section>
+
+                        {/* ── 4. Model Context Protocol (MCP) AI Gateway ── */}
                         <Section id="mcp-gateway" title="Model Context Protocol (MCP) AI Gateway" icon={Cpu}>
                             <p>
                                 Fluxbase provides a native <strong className="text-white">Model Context Protocol (MCP) Gateway</strong> over JSON-RPC 2.0. This allows AI coding assistants like <strong className="text-white">Google Antigravity</strong>, <strong className="text-white">Cursor</strong>, <strong className="text-white">Windsurf</strong>, and <strong className="text-white">Claude Desktop</strong> to inspect database schemas, run migrations, execute SQL queries, and manage projects autonomously.
