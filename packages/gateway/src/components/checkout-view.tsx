@@ -210,7 +210,7 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({ order }) => {
   const projectData = metadata.projectData;
 
   const finalAmountStr = finalAmount.toFixed(2);
-  const upiIntentUrl = `upi://pay?pa=${encodeURIComponent(order.vpa)}&pn=${encodeURIComponent(order.merchant || 'Fluxbase')}&am=${finalAmountStr}&cu=INR&tn=${encodeURIComponent(order.id)}`;
+  const upiIntentUrl = `upi://pay?pa=${encodeURIComponent(order.vpa)}&pn=${encodeURIComponent(order.merchant || 'Fluxbase')}&am=${finalAmountStr}&cu=INR&tn=${encodeURIComponent(order.id)}&tr=${encodeURIComponent(order.id)}&mode=04`;
   const [showMobileQr, setShowMobileQr] = useState(false);
 
   // Helper to generate the exact intent URL for any app or generic OS chooser
@@ -224,7 +224,7 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({ order }) => {
     const tn = encodeURIComponent(order.id);
     const tr = encodeURIComponent(order.id);
     const cu = 'INR';
-    const query = `pa=${pa}&pn=${pn}&am=${am}&cu=${cu}&tn=${tn}&tr=${tr}`;
+    const query = `pa=${pa}&pn=${pn}&am=${am}&cu=${cu}&tn=${tn}&tr=${tr}&mode=04`;
 
     if (isAndroid) {
       switch (appKey) {
