@@ -211,6 +211,75 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({ order }) => {
 
   const finalAmountStr = finalAmount.toFixed(2);
   const upiIntentUrl = `upi://pay?pa=${encodeURIComponent(order.vpa)}&pn=${encodeURIComponent(order.merchant || 'Fluxbase')}&am=${finalAmountStr}&cu=INR&tn=${encodeURIComponent(order.id)}`;
+  const [showMobileQr, setShowMobileQr] = useState(false);
+
+  // Helper to generate the exact intent URL for any app or generic OS chooser
+  const getAppIntentUrl = (appKey?: string) => {
+    const isAndroid = typeof navigator !== 'undefined' && /Android/i.test(navigator.userAgent);
+    const isIOS = typeof navigator !== 'undefined' && /iPhone|iPad|iPod/i.test(navigator.userAgent);
+
+    const pa = encodeURIComponent(order.vpa);
+    const pn = encodeURIComponent(order.merchant || 'Fluxbase');
+    const am = finalAmountStr;
+    const tn = encodeURIComponent(order.id);
+    const tr = encodeURIComponent(order.id);
+    const cu = 'INR';
+    const query = `pa=${pa}&pn=${pn}&am=${am}&cu=${cu}&tn=${tn}&tr=${tr}`;
+
+    if (isAndroid) {
+      switch (appKey) {
+        case 'phonepe':
+          return `intent://pay?${query}#Intent;scheme=upi;package=com.phonepe.app;end`;
+        case 'gpay':
+          return `intent://pay?${query}#Intent;scheme=upi;package=com.google.android.apps.nbu.paisa.user;end`;
+        case 'paytm':
+          return `intent://pay?${query}#Intent;scheme=upi;package=net.one97.paytm;end`;
+        case 'cred':
+          return `intent://pay?${query}#Intent;scheme=upi;package=com.dreamplug.androidapp;end`;
+        case 'bhim':
+          return `intent://pay?${query}#Intent;scheme=upi;package=in.org.npci.upiapp;end`;
+        case 'amazonpay':
+          return `intent://pay?${query}#Intent;scheme=upi;package=in.amazon.mShop.android.shopping;end`;
+        case 'whatsapp':
+          return `intent://pay?${query}#Intent;scheme=upi;package=com.whatsapp;end`;
+        case 'navi':
+          return `intent://pay?${query}#Intent;scheme=upi;package=com.naviapp;end`;
+        case 'generic':
+        default:
+          // Official Android intent syntax to invoke the OS chooser for all installed UPI apps
+          return `intent://pay?${query}#Intent;scheme=upi;end`;
+      }
+    } else if (isIOS) {
+      switch (appKey) {
+        case 'phonepe':
+          return `phonepe://pay?${query}`;
+        case 'gpay':
+          return `tez://upi/pay?${query}`;
+        case 'paytm':
+          return `paytmmp://pay?${query}`;
+        case 'cred':
+          return `credpay://upi/pay?${query}`;
+        case 'bhim':
+          return `bhim://pay?${query}`;
+        case 'whatsapp':
+          return `whatsapp://pay?${query}`;
+        case 'generic':
+        default:
+          return `upi://pay?${query}`;
+      }
+    }
+
+    return `upi://pay?${query}`;
+  };
+
+  const triggerUpiIntent = (appKey?: string) => {
+    const targetUrl = getAppIntentUrl(appKey);
+    try {
+      window.location.href = targetUrl;
+    } catch {
+      window.location.href = `upi://pay?pa=${encodeURIComponent(order.vpa)}&pn=${encodeURIComponent(order.merchant || 'Fluxbase')}&am=${finalAmountStr}&cu=INR&tn=${encodeURIComponent(order.id)}`;
+    }
+  };
 
   const formatTime = (secs: number) => {
     const m = Math.floor(Math.max(0, secs) / 60);
@@ -697,41 +766,179 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({ order }) => {
                   </button>
                 </div>
 
-                {/* Mobile Quick Pay (1-Tap Intent) - Only visible when app is used from mobile */}
-                {isMobile && (
-                  <div className="space-y-1.5 md:hidden">
-                    <div className="text-[10px] font-mono text-[#a1a1aa] uppercase">
-                      PAY VIA MOBILE APP (1-TAP INTENT)
+                {/* Mobile Quick Pay (1-Tap Intent) - Prominently featured for all mobile devices */}
+                <div className="space-y-3 block md:hidden">
+                  {/* Primary Action: Extract & Launch Any Installed UPI App via OS Intent Chooser */}
+                  <div className="space-y-1.5">
+                    <div className="text-[10px] font-mono text-[#ff6600] uppercase tracking-wider font-bold flex items-center gap-1.5">
+                      <span className="inline-block w-1.5 h-1.5 rounded-full bg-[#ff6600] animate-pulse" />
+                      <span>1-TAP DIRECT MOBILE PAYMENT (NO LIMITS)</span>
+                    </div>
+
+                    <a
+                      href={getAppIntentUrl('generic')}
+                      onClick={(e) => {
+                        e.preventDefault();
+                        triggerUpiIntent('generic');
+                      }}
+                      className="w-full flex items-center justify-between py-3.5 px-4 bg-gradient-to-r from-[#ff6600] to-[#ff8533] hover:from-[#ff7a1a] hover:to-[#ffa366] text-black font-bold text-xs font-mono rounded-lg shadow-lg shadow-[#ff6600]/25 transition active:scale-[0.98]"
+                    >
+                      <div className="flex items-center gap-2.5">
+                        <svg className="w-5 h-5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                          <rect width="14" height="20" x="5" y="2" rx="2" ry="2"/>
+                          <path d="M12 18h.01"/>
+                        </svg>
+                        <div className="text-left">
+                          <div className="font-extrabold uppercase tracking-wide text-[12px]">PAY VIA ANY INSTALLED UPI APP</div>
+                          <div className="text-[10px] font-normal opacity-95">Auto-detects PhonePe, GPay, Paytm, CRED & more</div>
+                        </div>
+                      </div>
+                      <span className="text-sm font-black shrink-0">₹{finalAmountStr} →</span>
+                    </a>
+                  </div>
+
+                  {/* Or Select Specific App */}
+                  <div className="space-y-1.5 pt-1">
+                    <div className="text-[10px] font-mono text-zinc-400 uppercase tracking-wider">
+                      OR CHOOSE SPECIFIC APP DIRECTLY:
                     </div>
                     <div className="grid grid-cols-2 gap-2">
+                      {/* PhonePe */}
                       <a
-                        href={upiIntentUrl}
-                        className="text-center py-2 px-2 bg-[#18181b] hover:bg-[#202023] border border-[#27272a] rounded text-[11px] font-mono text-[#f4f4f5] transition hover:border-zinc-500"
+                        href={getAppIntentUrl('phonepe')}
+                        onClick={(e) => {
+                          e.preventDefault();
+                          triggerUpiIntent('phonepe');
+                        }}
+                        className="flex items-center gap-2.5 py-2.5 px-3 bg-[#5f259f]/20 hover:bg-[#5f259f]/35 border border-[#5f259f]/50 hover:border-[#5f259f] rounded-lg transition active:scale-[0.97]"
                       >
-                        OPEN GPAY
+                        <div className="w-6 h-6 rounded-full bg-[#5f259f] flex items-center justify-center text-[11px] font-black text-white shrink-0">
+                          Pe
+                        </div>
+                        <div className="text-left leading-tight min-w-0">
+                          <div className="text-xs font-bold text-white font-mono truncate">PhonePe</div>
+                          <div className="text-[9px] text-zinc-400 font-mono">Direct Intent</div>
+                        </div>
                       </a>
+
+                      {/* Google Pay */}
                       <a
-                        href={upiIntentUrl}
-                        className="text-center py-2 px-2 bg-[#18181b] hover:bg-[#202023] border border-[#27272a] rounded text-[11px] font-mono text-[#f4f4f5] transition hover:border-zinc-500"
+                        href={getAppIntentUrl('gpay')}
+                        onClick={(e) => {
+                          e.preventDefault();
+                          triggerUpiIntent('gpay');
+                        }}
+                        className="flex items-center gap-2.5 py-2.5 px-3 bg-[#4285f4]/15 hover:bg-[#4285f4]/30 border border-[#4285f4]/50 hover:border-[#4285f4] rounded-lg transition active:scale-[0.97]"
                       >
-                        OPEN PHONEPE
+                        <div className="w-6 h-6 rounded-full bg-white flex items-center justify-center text-[10px] font-bold text-[#4285f4] shrink-0 font-sans shadow">
+                          G
+                        </div>
+                        <div className="text-left leading-tight min-w-0">
+                          <div className="text-xs font-bold text-white font-mono truncate">Google Pay</div>
+                          <div className="text-[9px] text-zinc-400 font-mono">GPay 1-Tap</div>
+                        </div>
                       </a>
+
+                      {/* Paytm */}
                       <a
-                        href={upiIntentUrl}
-                        className="text-center py-2 px-2 bg-[#18181b] hover:bg-[#202023] border border-[#27272a] rounded text-[11px] font-mono text-[#f4f4f5] transition hover:border-zinc-500"
+                        href={getAppIntentUrl('paytm')}
+                        onClick={(e) => {
+                          e.preventDefault();
+                          triggerUpiIntent('paytm');
+                        }}
+                        className="flex items-center gap-2.5 py-2.5 px-3 bg-[#00b9f5]/15 hover:bg-[#00b9f5]/30 border border-[#00b9f5]/50 hover:border-[#00b9f5] rounded-lg transition active:scale-[0.97]"
                       >
-                        OPEN PAYTM
+                        <div className="w-6 h-6 rounded bg-[#002e6e] flex items-center justify-center text-[8px] font-black text-[#00b9f5] shrink-0 font-mono">
+                          PAY
+                        </div>
+                        <div className="text-left leading-tight min-w-0">
+                          <div className="text-xs font-bold text-white font-mono truncate">Paytm UPI</div>
+                          <div className="text-[9px] text-zinc-400 font-mono">Instant Pay</div>
+                        </div>
                       </a>
+
+                      {/* CRED */}
                       <a
-                        href={upiIntentUrl}
-                        style={{ backgroundColor: '#ff6600', color: '#000000' }}
-                        className="text-center py-2 px-2 bg-[#ff6600] hover:bg-[#ff7a1a] text-black font-bold rounded text-[11px] font-mono transition"
+                        href={getAppIntentUrl('cred')}
+                        onClick={(e) => {
+                          e.preventDefault();
+                          triggerUpiIntent('cred');
+                        }}
+                        className="flex items-center gap-2.5 py-2.5 px-3 bg-zinc-900 hover:bg-zinc-800 border border-zinc-700 hover:border-zinc-500 rounded-lg transition active:scale-[0.97]"
                       >
-                        DEFAULT UPI
+                        <div className="w-6 h-6 rounded bg-black border border-zinc-600 flex items-center justify-center text-[9px] font-black text-white shrink-0 font-mono">
+                          C
+                        </div>
+                        <div className="text-left leading-tight min-w-0">
+                          <div className="text-xs font-bold text-white font-mono truncate">CRED Pay</div>
+                          <div className="text-[9px] text-zinc-400 font-mono">Rewards UPI</div>
+                        </div>
+                      </a>
+
+                      {/* BHIM UPI */}
+                      <a
+                        href={getAppIntentUrl('bhim')}
+                        onClick={(e) => {
+                          e.preventDefault();
+                          triggerUpiIntent('bhim');
+                        }}
+                        className="flex items-center gap-2.5 py-2.5 px-3 bg-[#0066b2]/15 hover:bg-[#0066b2]/30 border border-[#0066b2]/50 hover:border-[#0066b2] rounded-lg transition active:scale-[0.97]"
+                      >
+                        <div className="w-6 h-6 rounded bg-[#0066b2] flex items-center justify-center text-[8px] font-black text-white shrink-0 font-mono">
+                          BHIM
+                        </div>
+                        <div className="text-left leading-tight min-w-0">
+                          <div className="text-xs font-bold text-white font-mono truncate">BHIM UPI</div>
+                          <div className="text-[9px] text-zinc-400 font-mono">NPCI Official</div>
+                        </div>
+                      </a>
+
+                      {/* Amazon Pay */}
+                      <a
+                        href={getAppIntentUrl('amazonpay')}
+                        onClick={(e) => {
+                          e.preventDefault();
+                          triggerUpiIntent('amazonpay');
+                        }}
+                        className="flex items-center gap-2.5 py-2.5 px-3 bg-[#ff9900]/15 hover:bg-[#ff9900]/30 border border-[#ff9900]/50 hover:border-[#ff9900] rounded-lg transition active:scale-[0.97]"
+                      >
+                        <div className="w-6 h-6 rounded bg-[#232f3e] flex items-center justify-center text-[9px] font-black text-[#ff9900] shrink-0 font-mono">
+                          a
+                        </div>
+                        <div className="text-left leading-tight min-w-0">
+                          <div className="text-xs font-bold text-white font-mono truncate">Amazon Pay</div>
+                          <div className="text-[9px] text-zinc-400 font-mono">Amazon UPI</div>
+                        </div>
                       </a>
                     </div>
                   </div>
-                )}
+
+                  {/* Explainer: Direct 1-Tap vs NPCI Gallery QR Limit */}
+                  <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg p-3 text-xs font-mono space-y-1">
+                    <div className="flex items-center gap-1.5 font-bold text-amber-400 text-[11px]">
+                      <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                      <span>Direct 1-Tap Mobile Pay (No ₹2,000 Limit)</span>
+                    </div>
+                    <p className="text-[11px] text-zinc-300 leading-relaxed">
+                      Tapping any button above opens your UPI app directly with amount pre-filled and <strong>no amount limit</strong>.
+                      <br />
+                      <span className="text-amber-300 font-semibold">⚠️ Do not screenshot QR to scan via gallery:</span> Bank apps (PhonePe, GPay) limit gallery QR scans to ₹2,000. 1-Tap buttons above bypass this limit completely.
+                    </p>
+                  </div>
+
+                  {/* Mobile QR Accordion Toggle */}
+                  <div className="pt-1">
+                    <button
+                      type="button"
+                      onClick={() => setShowMobileQr((prev) => !prev)}
+                      className="w-full py-2 bg-[#18181b] hover:bg-[#202023] border border-[#27272a] rounded text-[11px] font-mono text-zinc-400 hover:text-zinc-200 transition flex items-center justify-center gap-2"
+                    >
+                      <span>{showMobileQr ? '▲ Hide QR Code' : '▼ Need to scan with a 2nd device? Show QR Code'}</span>
+                    </button>
+                  </div>
+                </div>
 
                 {/* Return Links */}
                 <div className="pt-2 flex items-center justify-between text-[11px] font-mono text-zinc-500">
@@ -775,8 +982,8 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({ order }) => {
                   </div>
                 </div>
 
-                {/* Canvas QR */}
-                <div className="flex flex-col items-center justify-center space-y-2">
+                {/* Canvas QR - Always visible on desktop, toggleable on mobile */}
+                <div className={showMobileQr ? "flex flex-col items-center justify-center space-y-2" : "hidden md:flex flex-col items-center justify-center space-y-2"}>
                   <div className="p-3 bg-[#0b0b0b] border border-[#27272a] rounded-lg shadow-inner">
                     <canvas ref={canvasRef} className="block rounded" />
                   </div>
