@@ -178,7 +178,18 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({ order }) => {
   const [utr, setUtr] = useState(order.utr || '');
   
   // Two-step checkout flow: 'review' (Order & Coupon Review) -> 'pay' (Timer & UPI Payment)
-  const [viewStep, setViewStep] = useState<'review' | 'pay'>('review');
+  // Persisted in sessionStorage and URL query so backgrounding Chrome on mobile never resets to review
+  const [viewStep, setViewStep] = useState<'review' | 'pay'>(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get('step') === 'pay') return 'pay';
+      try {
+        const saved = sessionStorage.getItem(`fluxpay_step_${order.id}`);
+        if (saved === 'pay') return 'pay';
+      } catch {}
+    }
+    return 'review';
+  });
   const [remainingSeconds, setRemainingSeconds] = useState(180);
   const [redirectCount, setRedirectCount] = useState<number | null>(order.status === 'paid' ? 3 : null);
   const [isMobile, setIsMobile] = useState(false);
@@ -229,25 +240,25 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({ order }) => {
     if (isAndroid) {
       switch (appKey) {
         case 'phonepe':
-          return `intent://pay?${query}#Intent;scheme=upi;package=com.phonepe.app;end`;
+          return `intent://pay?${query}#Intent;scheme=upi;package=com.phonepe.app;action=android.intent.action.VIEW;end`;
         case 'gpay':
-          return `intent://pay?${query}#Intent;scheme=upi;package=com.google.android.apps.nbu.paisa.user;end`;
+          return `intent://pay?${query}#Intent;scheme=upi;package=com.google.android.apps.nbu.paisa.user;action=android.intent.action.VIEW;end`;
         case 'paytm':
-          return `intent://pay?${query}#Intent;scheme=upi;package=net.one97.paytm;end`;
+          return `intent://pay?${query}#Intent;scheme=upi;package=net.one97.paytm;action=android.intent.action.VIEW;end`;
         case 'cred':
-          return `intent://pay?${query}#Intent;scheme=upi;package=com.dreamplug.androidapp;end`;
+          return `intent://pay?${query}#Intent;scheme=upi;package=com.dreamplug.androidapp;action=android.intent.action.VIEW;end`;
         case 'bhim':
-          return `intent://pay?${query}#Intent;scheme=upi;package=in.org.npci.upiapp;end`;
+          return `intent://pay?${query}#Intent;scheme=upi;package=in.org.npci.upiapp;action=android.intent.action.VIEW;end`;
         case 'amazonpay':
-          return `intent://pay?${query}#Intent;scheme=upi;package=in.amazon.mShop.android.shopping;end`;
+          return `intent://pay?${query}#Intent;scheme=upi;package=in.amazon.mShop.android.shopping;action=android.intent.action.VIEW;end`;
         case 'whatsapp':
-          return `intent://pay?${query}#Intent;scheme=upi;package=com.whatsapp;end`;
+          return `intent://pay?${query}#Intent;scheme=upi;package=com.whatsapp;action=android.intent.action.VIEW;end`;
         case 'navi':
-          return `intent://pay?${query}#Intent;scheme=upi;package=com.naviapp;end`;
+          return `intent://pay?${query}#Intent;scheme=upi;package=com.naviapp;action=android.intent.action.VIEW;end`;
         case 'generic':
         default:
           // Official Android intent syntax to invoke the OS chooser for all installed UPI apps
-          return `intent://pay?${query}#Intent;scheme=upi;end`;
+          return `intent://pay?${query}#Intent;scheme=upi;action=android.intent.action.VIEW;end`;
       }
     } else if (isIOS) {
       switch (appKey) {
@@ -529,10 +540,30 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({ order }) => {
   const proceedToPayment = () => {
     setRemainingSeconds(180);
     setViewStep('pay');
+    if (typeof window !== 'undefined') {
+      try {
+        sessionStorage.setItem(`fluxpay_step_${order.id}`, 'pay');
+        const url = new URL(window.location.href);
+        url.searchParams.set('step', 'pay');
+        window.history.replaceState({}, '', url.toString());
+      } catch {}
+    }
     // Sync fresh 3-minute payment slot in database and Redis
     fetch(`/api/v1/orders/${order.id}/start-payment`, { method: 'POST' }).catch((err) => {
       console.warn('[Checkout] Failed to sync payment slot:', err);
     });
+  };
+
+  const goToReview = () => {
+    setViewStep('review');
+    if (typeof window !== 'undefined') {
+      try {
+        sessionStorage.removeItem(`fluxpay_step_${order.id}`);
+        const url = new URL(window.location.href);
+        url.searchParams.delete('step');
+        window.history.replaceState({}, '', url.toString());
+      } catch {}
+    }
   };
 
 
@@ -652,7 +683,7 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({ order }) => {
               onClick={() => {
                 setStatus('pending');
                 setRemainingSeconds(180);
-                setViewStep('review');
+                goToReview();
               }}
               className="w-full py-2.5 bg-[#ff6600] hover:bg-[#ff7a1a] text-black font-semibold text-xs font-mono rounded transition uppercase"
             >
@@ -683,7 +714,7 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({ order }) => {
             <div className="flex items-center gap-3">
               <button
                 type="button"
-                onClick={() => setViewStep('review')}
+                onClick={goToReview}
                 className="p-1.5 px-2.5 rounded bg-[#1c1c20] border border-[#27272a] hover:border-[#ff6600] text-zinc-400 hover:text-[#f4f4f5] transition text-xs font-mono"
                 title="Back to Order Review"
               >
@@ -944,7 +975,7 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({ order }) => {
                 <div className="pt-2 flex items-center justify-between text-[11px] font-mono text-zinc-500">
                   <button
                     type="button"
-                    onClick={() => setViewStep('review')}
+                    onClick={goToReview}
                     className="hover:text-[#f4f4f5] transition"
                   >
                     ← Back to Order Review
