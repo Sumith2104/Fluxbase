@@ -55,8 +55,8 @@ export async function middleware(request: NextRequest) {
             isMfaVerified = !!payload.mfa;
         } catch {
             // Invalid or expired session
-            // To prevent redirect loop on '/', we just clear the cookie and continue
-            if (pathname === '/') {
+            // To prevent redirect loop on '/' or breaking checkout payment returns on '/checkout', we just clear the cookie and continue
+            if (pathname === '/' || pathname === '/checkout') {
                 const response = NextResponse.next();
                 response.cookies.delete('session');
                 return response;
@@ -123,8 +123,8 @@ export async function middleware(request: NextRequest) {
             return NextResponse.redirect(new URL('/', request.url));
         }
 
-        // allow public access to marketing pages: '/', '/pricing', etc.
-        const isPublicStaticPage = ['/', '/pricing', '/privacy', '/terms', '/docs', '/contact', '/reset-password'].includes(pathname);
+        // allow public access to marketing pages: '/', '/pricing', etc., and '/checkout' for payment handoffs & returns
+        const isPublicStaticPage = ['/', '/pricing', '/privacy', '/terms', '/docs', '/contact', '/reset-password', '/checkout'].includes(pathname);
 
         // and tries to access a protected page (non-public, non-api), redirect to root
         if (!isPublicStaticPage && !pathname.startsWith('/api/')) {

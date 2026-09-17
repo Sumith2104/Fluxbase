@@ -156,7 +156,7 @@ const PLAN_SPECS: Record<string, PlanMeta> = {
 };
 
 function getCleanReturnUrl(rawCallback?: string | null, statusParam: string = 'paid', orderId?: string, utr?: string | null): string {
-  let urlStr = rawCallback || 'https://www.fluxbasedb.me/dashboard/projects';
+  let urlStr = rawCallback || 'https://www.fluxbasedb.me/checkout';
   urlStr = urlStr.replace(/https?:\/\/[^\/]*vercel\.app/i, 'https://www.fluxbasedb.me');
   try {
     const u = new URL(urlStr);

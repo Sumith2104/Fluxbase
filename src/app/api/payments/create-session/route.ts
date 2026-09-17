@@ -5,13 +5,20 @@ import logger from '@/lib/logger';
 
 function resolveAppUrl(req: NextRequest): string {
     const origin = req.headers.get('origin') || req.headers.get('referer') || '';
-    if (origin.includes('localhost') || origin.includes('127.0.0.1')) {
+    if (origin) {
         try {
             const u = new URL(origin);
-            return `${u.protocol}//${u.host}`;
+            if (u.protocol && u.host) {
+                return `${u.protocol}//${u.host}`;
+            }
         } catch {}
     }
-    return 'https://www.fluxbasedb.me';
+    const host = req.headers.get('x-forwarded-host') || req.headers.get('host');
+    if (host) {
+        const proto = req.headers.get('x-forwarded-proto') || 'https';
+        return `${proto}://${host}`;
+    }
+    return process.env.NEXT_PUBLIC_APP_URL || 'https://www.fluxbasedb.me';
 }
 
 export async function POST(req: NextRequest) {
@@ -217,18 +224,21 @@ export async function POST(req: NextRequest) {
             const { createFluxPayOrder } = await import('@/lib/fluxpay-client');
             const appUrl = resolveAppUrl(req);
             const orderLabel = orderTitle || `${cleanPlan.toUpperCase()} TIER`;
+            const returnTo = body.returnTo || undefined;
+            const callbackUrl = `${appUrl}/checkout?sessionId=${session.id}${returnTo ? `&returnTo=${encodeURIComponent(returnTo)}` : ''}`;
             const fluxpayRes = await createFluxPayOrder({
                 amount: basePrice,
                 couponCode: discountAlreadyDeducted ? undefined : (isDiscountApplied ? couponCode : undefined),
                 customerName: user.display_name || 'Fluxbase Customer',
                 customerEmail: user.email || undefined,
-                callbackUrl: `${appUrl}/checkout?sessionId=${session.id}`,
+                callbackUrl,
                 metadata: {
                     sessionId: session.id,
                     userId,
                     plan: cleanPlan,
                     plan_name: orderLabel,
                     projectData,
+                    returnTo,
                     ...(metadata || {})
                 }
             });

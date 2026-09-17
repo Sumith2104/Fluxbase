@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getPgPool } from '@/lib/pg';
-import { createSessionCookie, createSessionToken, createRefreshToken, getCurrentUserId } from '@/lib/auth';
+import { createSessionCookie, createSessionToken, createRefreshToken, getCurrentUserId, getSessionCookieDomain } from '@/lib/auth';
 import { sendWelcomeEmail } from '@/lib/email';
 import { getOAuthConfig, getBaseOrigin, decodeOAuthState, isAllowedOrigin } from '@/lib/oauth-config';
 import { storeGitHubToken } from '@/lib/github-token';
@@ -216,6 +216,7 @@ export async function GET(request: NextRequest) {
         const sessionToken = await createSessionToken(userId, true);
         const refreshToken = await createRefreshToken(userId);
         const isProd = process.env.NODE_ENV === 'production';
+        const domain = getSessionCookieDomain(currentOrigin);
 
         const response = NextResponse.redirect(new URL(redirectPath, currentOrigin));
         response.cookies.set('session', sessionToken, {
@@ -224,12 +225,14 @@ export async function GET(request: NextRequest) {
             httpOnly: true,
             secure: isProd,
             path: '/',
+            domain,
             sameSite: 'lax',
         });
         response.cookies.set('refresh_token', refreshToken, {
             httpOnly: true,
             secure: isProd,
             path: '/',
+            domain,
             sameSite: 'lax',
             maxAge: 7 * 24 * 60 * 60,
         });

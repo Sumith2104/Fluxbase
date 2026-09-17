@@ -75,12 +75,20 @@ function CheckoutHandler() {
       } catch {}
 
       const cleanPlan = planKey.toLowerCase();
+      let returnTo = searchParams.get('returnTo');
+      if (!returnTo) {
+        try {
+          returnTo = sessionStorage.getItem('checkout_return_to');
+        } catch {}
+      }
+
       const res = await fetch('/api/payments/create-session', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           plan: cleanPlan,
           projectData,
+          returnTo,
         }),
       });
 
@@ -144,46 +152,54 @@ function CheckoutHandler() {
     }
   };
 
-  // Helper: Finalize payment success, provision pending project, and redirect
+  // Helper: Finalize payment success, provision pending project, and redirect directly into workspace
   const handleCompletion = async () => {
     setViewMode('completed');
-    setStatusMessage('Payment verified! Your plan has been upgraded.');
+    setStatusMessage('Payment verified! Loading your project workspace...');
 
     const pendingProjectJson = localStorage.getItem('pending_paid_project');
-    if (pendingProjectJson) {
+    let returnTo = searchParams.get('returnTo');
+    if (!returnTo) {
       try {
-        const projData = JSON.parse(pendingProjectJson);
-        const formData = new FormData();
-        formData.append('projectName', projData.projectName);
-        formData.append('dialect', projData.dialect);
-        formData.append('timezone', projData.timezone || 'UTC');
-        formData.append('userRole', projData.userRole);
-        formData.append('billingPreference', projData.billingPreference || 'monthly');
-        formData.append('companyName', projData.companyName || '');
-        formData.append('workDescription', projData.workDescription || '');
-        formData.append('connectionType', 'internal');
-
-        const { createProjectAction } = await import('@/components/layout/actions');
-        await createProjectAction(formData);
-
-        toast({
-          title: 'Payment Verified & Project Provisioned!',
-          description: `Your ${projData.projectName} project is active and ready.`,
-        });
-      } catch (e) {
-        console.error('Error provisioning paid project:', e);
-      } finally {
-        localStorage.removeItem('pending_paid_project');
-      }
-    } else {
-      toast({
-        title: 'Plan Upgraded Successfully!',
-        description: 'Payment confirmed via FluxPay. Welcome to your upgraded tier.',
-      });
+        returnTo = sessionStorage.getItem('checkout_return_to');
+      } catch {}
     }
 
-    // Seamless instant transition to projects dashboard (no redundant 2nd confirmation dialog)
-    router.replace('/dashboard/projects');
+    try {
+      const res = await fetch('/api/payments/finalize-checkout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          sessionId: paramSessionId,
+          orderId: paramOrderId,
+          utr: paramUtr,
+          pendingProject: pendingProjectJson,
+          returnTo,
+        }),
+      });
+
+      const data = await res.json();
+      localStorage.removeItem('pending_paid_project');
+      try { sessionStorage.removeItem('checkout_return_to'); } catch {}
+
+      if (data.success && data.targetUrl) {
+        toast({
+          title: 'Plan Upgraded Successfully!',
+          description: data.projectName 
+            ? `Project "${data.projectName}" is active in your workspace.` 
+            : 'Welcome to your upgraded subscription tier.',
+        });
+
+        // Hard browser navigation ensures fresh cookies, token persistence & server component re-render
+        window.location.href = data.targetUrl;
+        return;
+      }
+    } catch (e) {
+      console.error('[Checkout Finalize Error]:', e);
+    }
+
+    // Fallback: direct hard navigation to projects dashboard
+    window.location.href = '/dashboard/projects';
   };
 
   // Render: Completed State (Minimal transition state, no duplicate modal)
@@ -192,7 +208,7 @@ function CheckoutHandler() {
       <div className="flex min-h-screen items-center justify-center bg-[#0b0b0b] text-[#f4f4f5] p-4 font-sans">
         <div className="flex items-center gap-3 text-xs font-mono text-zinc-400 bg-[#121214] border border-[#27272a] rounded-lg px-5 py-3 shadow-xl">
           <Loader2 className="h-4 w-4 animate-spin text-[#ff6600]" />
-          <span>Opening your projects dashboard...</span>
+          <span>Opening your project workspace...</span>
         </div>
       </div>
     );

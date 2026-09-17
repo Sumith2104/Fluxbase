@@ -53,11 +53,53 @@ export async function POST(req: NextRequest) {
       const cleanPlan = plan === 'student_max' ? 'max' : plan === 'student_pro' ? 'pro' : plan;
       await pool.query(
         `UPDATE fluxbase_global.users 
-         SET plan_type = $1, user_role = $1, updated_at = NOW() 
+         SET plan_type = $1, user_role = $1, billing_cycle_end = NOW() + INTERVAL '1 month', status = 'active', updated_at = NOW() 
          WHERE id = $2`,
         [cleanPlan, userId]
       );
       logger.info(`[FluxPay Webhook] User ${userId} upgraded to plan: ${cleanPlan}`);
+
+      try {
+        const { invalidateAuthCache } = await import('@/lib/auth');
+        await invalidateAuthCache(userId);
+      } catch (cacheErr) {
+        logger.warn('[FluxPay Webhook] Cache invalidation warning:', cacheErr);
+      }
+
+      // Auto-provision project if projectData was included
+      if (projectData) {
+        try {
+          const pData = typeof projectData === 'string' ? JSON.parse(projectData) : projectData;
+          if (pData?.projectName) {
+            const existing = await pool.query(
+              "SELECT project_id FROM fluxbase_global.projects WHERE user_id = $1::text AND display_name = $2",
+              [userId, pData.projectName.trim()]
+            );
+            if (existing.rows.length === 0) {
+              const { createProject } = await import('@/lib/data');
+              const { TenantProvisioner } = await import('@/lib/tenant-engine');
+              const newProject = await createProject(
+                pData.projectName.trim(),
+                pData.workDescription || 'Provisioned upon payment confirmation',
+                pData.dialect || 'postgresql',
+                pData.timezone || 'UTC',
+                'internal',
+                {},
+                pData.userRole || cleanPlan,
+                userId
+              );
+              await TenantProvisioner.createTenantSchema(newProject.project_id, pData.dialect || 'postgresql');
+              await pool.query(
+                'UPDATE fluxbase_global.projects SET creator_role = $1 WHERE project_id = $2',
+                [pData.userRole || cleanPlan, newProject.project_id]
+              );
+              logger.info(`[FluxPay Webhook] Auto-provisioned project ${newProject.project_id} for user ${userId}`);
+            }
+          }
+        } catch (projErr) {
+          logger.error('[FluxPay Webhook] Project auto-provisioning error:', projErr);
+        }
+      }
     }
 
     // 4. Record bank payment into fluxbase_global.bank_payments

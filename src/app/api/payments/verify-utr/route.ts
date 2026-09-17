@@ -187,6 +187,13 @@ export async function POST(req: Request) {
             await client.query('COMMIT');
             logger.info(`[Verify Payment] Successfully verified payment for session ${activeSessionId} (₹${sessionAmount})!`);
 
+            try {
+                const { invalidateAuthCache } = await import('@/lib/auth');
+                await invalidateAuthCache(userId);
+            } catch (cacheErr) {
+                logger.warn('[Verify Payment] Cache invalidation warning:', cacheErr);
+            }
+
             return NextResponse.json({
                 success: true,
                 message: 'Payment verified and confirmed successfully!',

@@ -302,6 +302,15 @@ export async function POST(req: Request) {
 
             await client.query('COMMIT');
 
+            if (matchedUserId) {
+                try {
+                    const { invalidateAuthCache } = await import('@/lib/auth');
+                    await invalidateAuthCache(matchedUserId);
+                } catch (cacheErr) {
+                    logger.warn('[Payment Webhook] Cache invalidation warning:', cacheErr);
+                }
+            }
+
             // 2.3 Instant Slot Recycling: delete Redis slot keys for this offset so another user gets assigned immediately
             try {
                 const { redis } = await import('@/lib/redis');

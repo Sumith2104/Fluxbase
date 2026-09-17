@@ -84,7 +84,11 @@ export function PaymentsBillsManager() {
 
     const handleStartCheckout = (planKey: string) => {
         setUpgradingPlan(planKey);
-        router.push(`/checkout?plan=${planKey}`);
+        const currentPath = typeof window !== 'undefined' ? (window.location.pathname + window.location.search) : '/settings';
+        try {
+            sessionStorage.setItem('checkout_return_to', currentPath);
+        } catch {}
+        router.push(`/checkout?plan=${planKey}&returnTo=${encodeURIComponent(currentPath)}`);
     };
 
     if (loading) {

@@ -7,6 +7,15 @@ import { LRUCache } from 'lru-cache';
 
 const _billingCache = new LRUCache<string, BillingDetails>({ max: 500, ttl: 2 * 60 * 1000 }); // 2-min cache
 
+export async function invalidateBillingCache(userId?: string) {
+    if (userId) {
+        _billingCache.delete(`${userId}:live`);
+        _billingCache.delete(`${userId}:all`);
+    } else {
+        _billingCache.clear();
+    }
+}
+
 export interface BillingDetails {
     plan: string;
     role?: string;

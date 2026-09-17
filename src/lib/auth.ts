@@ -73,6 +73,18 @@ export async function createSessionToken(uid: string, isMfaVerified: boolean = t
 }
 
 /**
+ * Retrieves the appropriate cookie domain for multi-subdomain session persistence (*.fluxbasedb.me)
+ */
+export function getSessionCookieDomain(hostOrReq?: string | null): string | undefined {
+    if (process.env.NODE_ENV !== 'production') return undefined;
+    const cleanHost = (hostOrReq || process.env.NEXT_PUBLIC_APP_URL || '').toLowerCase();
+    if (cleanHost.includes('fluxbasedb.me')) {
+        return '.fluxbasedb.me';
+    }
+    return undefined;
+}
+
+/**
  * Creates a JWT session cookie from a raw user ID.
  * @param uid The user ID
  * @param isMfaVerified Whether 2FA has been completed for this session
@@ -82,6 +94,7 @@ export async function createSessionCookie(uid: string, isMfaVerified: boolean = 
         const sessionCookie = await createSessionToken(uid, isMfaVerified);
 
         const isProduction = process.env.NODE_ENV === 'production';
+        const domain = getSessionCookieDomain();
 
         (await cookies()).set('session', sessionCookie, {
             expires: new Date(Date.now() + ACCESS_TOKEN_TTL * 1000),
@@ -89,6 +102,7 @@ export async function createSessionCookie(uid: string, isMfaVerified: boolean = 
             httpOnly: true,
             secure: isProduction,
             path: '/',
+            domain,
             sameSite: 'lax',
         });
 
@@ -201,8 +215,15 @@ export async function logout() {
             // Token may be expired — that's fine, just clear cookies
         }
     }
+    const domain = getSessionCookieDomain();
     (await cookies()).delete('session');
     (await cookies()).delete('refresh_token');
+    if (domain) {
+        try {
+            (await cookies()).set('session', '', { path: '/', domain, maxAge: 0 });
+            (await cookies()).set('refresh_token', '', { path: '/', domain, maxAge: 0 });
+        } catch {}
+    }
 }
 
 /**
@@ -346,6 +367,21 @@ export async function invalidateAuthCache(userId: string) {
     } catch (e) {
         logger.warn('[Redis Error] invalidateAuthCache Redis delete failed:', e);
     }
+
+    try {
+        const { invalidateUserCache } = await import('@/lib/auth-actions');
+        await invalidateUserCache(userId);
+    } catch {}
+
+    try {
+        const { invalidateBillingCache } = await import('@/app/(app)/settings/billing-actions');
+        await invalidateBillingCache(userId);
+    } catch {}
+
+    try {
+        const { invalidateUserProjectsCache } = await import('@/lib/data');
+        await invalidateUserProjectsCache(userId);
+    } catch {}
     
     if (_authContextCache.size === 0) return;
 

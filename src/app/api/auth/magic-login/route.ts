@@ -87,6 +87,7 @@ export async function GET(req: NextRequest) {
         const sessionToken = await createSessionToken(user.id, true);
         const refreshToken = await createRefreshToken(user.id);
         const isProd = process.env.NODE_ENV === 'production';
+        const domain = getSessionCookieDomain(baseUrl);
         const targetPath = returnTo.startsWith('/') ? returnTo : '/dashboard/projects';
         const response = NextResponse.redirect(new URL(targetPath, baseUrl));
 
@@ -96,6 +97,7 @@ export async function GET(req: NextRequest) {
             httpOnly: true,
             secure: isProd,
             path: '/',
+            domain,
             sameSite: 'lax',
         });
 
@@ -103,6 +105,7 @@ export async function GET(req: NextRequest) {
             httpOnly: true,
             secure: isProd,
             path: '/',
+            domain,
             sameSite: 'lax',
             maxAge: 7 * 24 * 60 * 60,
         });

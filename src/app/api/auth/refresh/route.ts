@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
-import { createSessionCookie, verifyAndRotateRefreshToken } from '@/lib/auth';
+import { createSessionCookie, verifyAndRotateRefreshToken, getSessionCookieDomain } from '@/lib/auth';
 import logger from '@/lib/logger';
 
 export const dynamic = 'force-dynamic';
@@ -30,8 +30,15 @@ export async function POST(req: NextRequest) {
                 { success: false, error: { message: 'Refresh token is invalid or expired. Please sign in again.', code: 'UNAUTHORIZED' } },
                 { status: 401 }
             );
+            const domain = getSessionCookieDomain(req.headers.get('host'));
             response.cookies.delete('refresh_token');
             response.cookies.delete('session');
+            if (domain) {
+                try {
+                    response.cookies.set('refresh_token', '', { path: '/', domain, maxAge: 0 });
+                    response.cookies.set('session', '', { path: '/', domain, maxAge: 0 });
+                } catch {}
+            }
             return response;
         }
 
@@ -40,11 +47,13 @@ export async function POST(req: NextRequest) {
 
         // Set new refresh token cookie
         const isProduction = process.env.NODE_ENV === 'production';
+        const domain = getSessionCookieDomain(req.headers.get('host'));
         const response = NextResponse.json({ success: true, message: 'Token refreshed' });
         response.cookies.set('refresh_token', result.newToken, {
             httpOnly: true,
             secure: isProduction,
             path: '/',
+            domain,
             sameSite: 'lax',
             maxAge: 7 * 24 * 60 * 60, // 7 days
         });

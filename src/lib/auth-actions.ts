@@ -7,6 +7,14 @@ import { LRUCache } from 'lru-cache';
 
 const _userCache = new LRUCache<string, User>({ max: 500, ttl: 30_000 });
 
+export async function invalidateUserCache(userId?: string) {
+    if (userId) {
+        _userCache.delete(userId);
+    } else {
+        _userCache.clear();
+    }
+}
+
 export async function findUserById(userId: string): Promise<User | null> {
     const cached = _userCache.get(userId);
     if (cached) return cached;
