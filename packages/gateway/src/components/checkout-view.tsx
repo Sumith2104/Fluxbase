@@ -196,10 +196,13 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({ order }) => {
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
-      setIsMobile(
+      const isMob =
         /Android|iPhone|iPad|iPod|Opera Mini|IEMobile|WPDesktop/i.test(navigator.userAgent) ||
-        window.innerWidth < 768
-      );
+        window.innerWidth < 768;
+      setIsMobile(isMob);
+      if (isMob) {
+        setViewStep('pay');
+      }
     }
   }, []);
 
@@ -222,7 +225,6 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({ order }) => {
 
   const finalAmountStr = finalAmount.toFixed(2);
   const upiIntentUrl = `upi://pay?pa=${encodeURIComponent(order.vpa)}&pn=${encodeURIComponent(order.merchant || 'Fluxbase')}&am=${finalAmountStr}&cu=INR&tn=${encodeURIComponent(order.id)}&tr=${encodeURIComponent(order.id)}&mode=04`;
-  const [showMobileQr, setShowMobileQr] = useState(false);
 
   // Helper to generate the exact intent URL for any app or generic OS chooser
   const getAppIntentUrl = (appKey?: string) => {
@@ -944,30 +946,19 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({ order }) => {
                     </div>
                   </div>
 
-                  {/* Explainer: Direct 1-Tap vs NPCI Gallery QR Limit */}
-                  <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg p-3 text-xs font-mono space-y-1">
-                    <div className="flex items-center gap-1.5 font-bold text-amber-400 text-[11px]">
+                  {/* Pure Intent Flow Banner */}
+                  <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-lg p-3 text-xs font-mono space-y-1">
+                    <div className="flex items-center gap-1.5 font-bold text-emerald-400 text-[11px]">
                       <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                       </svg>
-                      <span>Direct 1-Tap Mobile Pay (No ₹2,000 Limit)</span>
+                      <span>1-Tap Mobile UPI Intent Active</span>
                     </div>
                     <p className="text-[11px] text-zinc-300 leading-relaxed">
-                      Tapping any button above opens your UPI app directly with amount pre-filled and <strong>no amount limit</strong>.
+                      Tap any app above or tap <strong>PAY VIA ANY INSTALLED UPI APP</strong> to launch directly with amount pre-filled.
                       <br />
-                      <span className="text-amber-300 font-semibold">⚠️ Do not screenshot QR to scan via gallery:</span> Bank apps (PhonePe, GPay) limit gallery QR scans to ₹2,000. 1-Tap buttons above bypass this limit completely.
+                      <span className="text-emerald-300 font-semibold">✓ Pure Intent Flow:</span> No QR code scanning or screenshot required. Zero amount limits.
                     </p>
-                  </div>
-
-                  {/* Mobile QR Accordion Toggle */}
-                  <div className="pt-1">
-                    <button
-                      type="button"
-                      onClick={() => setShowMobileQr((prev) => !prev)}
-                      className="w-full py-2 bg-[#18181b] hover:bg-[#202023] border border-[#27272a] rounded text-[11px] font-mono text-zinc-400 hover:text-zinc-200 transition flex items-center justify-center gap-2"
-                    >
-                      <span>{showMobileQr ? '▲ Hide QR Code' : '▼ Need to scan with a 2nd device? Show QR Code'}</span>
-                    </button>
                   </div>
                 </div>
 
@@ -1013,13 +1004,13 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({ order }) => {
                   </div>
                 </div>
 
-                {/* Canvas QR - Always visible on desktop, toggleable on mobile */}
-                <div className={showMobileQr ? "flex flex-col items-center justify-center space-y-2" : "hidden md:flex flex-col items-center justify-center space-y-2"}>
+                {/* Canvas QR - Desktop Only (Mobile uses pure Intent flow) */}
+                <div className="hidden md:flex flex-col items-center justify-center space-y-2">
                   <div className="p-3 bg-[#0b0b0b] border border-[#27272a] rounded-lg shadow-inner">
                     <canvas ref={canvasRef} className="block rounded" />
                   </div>
                   <div className="text-[10px] font-mono text-[#71717a] text-center">
-                    Scan with any UPI app (GPay, PhonePe, Paytm, BHIM, CRED)
+                    Scan with any UPI app on your phone (GPay, PhonePe, Paytm, BHIM, CRED)
                   </div>
                 </div>
 
