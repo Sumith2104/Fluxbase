@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
-import { createSessionCookie, verifyAndRotateRefreshToken, getSessionCookieDomain } from '@/lib/auth';
+import { createSessionCookie, verifyAndRotateRefreshToken } from '@/lib/auth';
+import { getSessionCookieDomain } from '@/lib/cookie-domain';
 import logger from '@/lib/logger';
 
 export const dynamic = 'force-dynamic';

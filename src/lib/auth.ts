@@ -6,6 +6,7 @@ import { LRUCache } from 'lru-cache';
 import crypto from 'crypto';
 import { logToFluxDB } from '@/lib/fluxdb-logger';
 import logger from '@/lib/logger';
+import { getSessionCookieDomain } from '@/lib/cookie-domain';
 
 function getJwtSecret(): Uint8Array {
     const secret = process.env.JWT_SECRET;
@@ -72,17 +73,6 @@ export async function createSessionToken(uid: string, isMfaVerified: boolean = t
         .sign(getJwtSecret());
 }
 
-/**
- * Retrieves the appropriate cookie domain for multi-subdomain session persistence (*.fluxbasedb.me)
- */
-export function getSessionCookieDomain(hostOrReq?: string | null): string | undefined {
-    if (process.env.NODE_ENV !== 'production') return undefined;
-    const cleanHost = (hostOrReq || process.env.NEXT_PUBLIC_APP_URL || '').toLowerCase();
-    if (cleanHost.includes('fluxbasedb.me')) {
-        return '.fluxbasedb.me';
-    }
-    return undefined;
-}
 
 /**
  * Creates a JWT session cookie from a raw user ID.

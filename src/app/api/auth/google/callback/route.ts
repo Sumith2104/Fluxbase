@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getPgPool } from '@/lib/pg';
-import { createSessionCookie, createSessionToken, createRefreshToken, getSessionCookieDomain } from '@/lib/auth';
+import { createSessionCookie, createSessionToken, createRefreshToken } from '@/lib/auth';
+import { getSessionCookieDomain } from '@/lib/cookie-domain';
 import { sendWelcomeEmail } from '@/lib/email';
 import { getOAuthConfig, getBaseOrigin, decodeOAuthState, isAllowedOrigin } from '@/lib/oauth-config';
 import crypto from 'crypto';

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getPgPool } from '@/lib/pg';
-import { createSessionToken, getSessionCookieDomain, invalidateAuthCache, getCurrentUserId } from '@/lib/auth';
+import { createSessionToken, invalidateAuthCache, getCurrentUserId } from '@/lib/auth';
+import { getSessionCookieDomain } from '@/lib/cookie-domain';
 import logger from '@/lib/logger';
 
 export const dynamic = 'force-dynamic';
