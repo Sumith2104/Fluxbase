@@ -4,7 +4,7 @@ RUN apk add --no-cache libc6-compat
 WORKDIR /app
 
 COPY package.json package-lock.json ./
-RUN npm ci
+RUN npm install --legacy-peer-deps
 
 # 2. Build the application
 FROM node:20-alpine AS builder
@@ -14,6 +14,8 @@ COPY . .
 
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV NODE_ENV=production
+ENV NEXT_PUBLIC_APP_URL=https://fluxbasedb.me
+ENV NEXT_PUBLIC_WS_URL=wss://fluxbasedb.me/ws
 
 RUN npm run build
 
