@@ -4,7 +4,7 @@ WORKDIR /app
 RUN apk add --no-cache libc6-compat
 
 COPY package.json package-lock.json ./
-RUN npm install --legacy-peer-deps
+RUN npm install --ignore-scripts --legacy-peer-deps
 
 # Install tsx globally to run TypeScript directly in Node
 RUN npm install -g tsx
