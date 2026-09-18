@@ -36,6 +36,16 @@ Parameters:
     Default: '0.0.0.0/0'
     Description: 'CIDR block allowed to connect via SSH on port 22.'
 
+  UbuntuArmAmi:
+    Type: 'AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>'
+    Default: '/aws/service/canonical/ubuntu/server/24.04/stable/current/arm64/hvm/ebs-gp3/ami-id'
+    Description: 'SSM parameter path for Ubuntu 24.04 ARM64 AMI'
+
+  UbuntuAmdAmi:
+    Type: 'AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>'
+    Default: '/aws/service/canonical/ubuntu/server/24.04/stable/current/amd64/hvm/ebs-gp3/ami-id'
+    Description: 'SSM parameter path for Ubuntu 24.04 AMD64 AMI'
+
 Conditions:
   HasKeyName: !Not [!Equals [!Ref KeyName, '']]
   IsArmArchitecture: !Or
@@ -107,15 +117,13 @@ Resources:
       # Ubuntu 24.04 LTS dynamic AMI resolution
       ImageId: !If
         - IsArmArchitecture
-        - 'resolve:ssm:/aws/service/canonical/ubuntu/server/24.04/stable/current/arm64/hvm/ebs-gp3/ami-id'
-        - 'resolve:ssm:/aws/service/canonical/ubuntu/server/24.04/stable/current/amd64/hvm/ebs-gp3/ami-id'
+        - !Ref UbuntuArmAmi
+        - !Ref UbuntuAmdAmi
       BlockDeviceMappings:
         - DeviceName: '/dev/sda1'
           Ebs:
             VolumeSize: !Ref VolumeSize
             VolumeType: 'gp3'
-            Iops: 3000
-            Throughput: 125
             DeleteOnTermination: true
             Encrypted: true
       Tags:
