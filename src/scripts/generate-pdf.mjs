@@ -1,4 +1,4 @@
-// Script to generate the Fluxbase Integration Guide PDF
+// Script to generate the complete Fluxbase Integration Guide PDF (v4.2)
 // Run with: node src/scripts/generate-pdf.mjs
 
 import { jsPDF } from 'jspdf';
@@ -19,24 +19,48 @@ const doc = new jsPDF({ unit: 'pt', format: 'a4' });
 try {
 
 const W = doc.internal.pageSize.getWidth();
-const MARGIN = 50;
+const H = doc.internal.pageSize.getHeight();
+const MARGIN = 45;
 const CONTENT_W = W - MARGIN * 2;
 
-const PRIMARY = [255, 75, 41];
-const DARK = [17, 17, 17];
-const MUTED = [100, 100, 100];
-const CODE_BG = [28, 28, 28];
-const CODE_FG = [220, 220, 220];
+const PRIMARY = [255, 75, 41];       // Fluxbase Orange (#FF4B29)
+const DARK = [17, 17, 17];           // Charcoal Dark (#111111)
+const MUTED = [90, 90, 90];          // Muted text
+const CODE_BG = [24, 24, 27];        // Zinc Dark (#18181B)
+const CODE_FG = [228, 228, 231];     // Zinc Light (#E4E4E7)
 
 let y = 0;
 
 function newPage() {
     doc.addPage();
     y = MARGIN;
+    addHeaderFooter();
+}
+
+function addHeaderFooter() {
+    const pageNum = doc.internal.getCurrentPageInfo().pageNumber;
+    if (pageNum === 1) return; // Skip cover
+
+    // Running top header
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(8);
+    doc.setTextColor(150, 150, 150);
+    doc.text('Fluxbase Integration & API Architecture Manual • v4.2', MARGIN, 25);
+    doc.setDrawColor(220, 220, 220);
+    doc.setLineWidth(0.5);
+    doc.line(MARGIN, 30, W - MARGIN, 30);
+
+    // Running bottom footer
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(8);
+    doc.setTextColor(150, 150, 150);
+    doc.text('© 2026 Fluxbase Inc. — Confidential & Proprietary Developer Documentation', MARGIN, H - 20);
+    doc.text(`Page ${pageNum}`, W - MARGIN - 35, H - 20);
+    doc.line(MARGIN, H - 28, W - MARGIN, H - 28);
 }
 
 function checkPageBreak(needed = 40) {
-    if (y + needed > doc.internal.pageSize.getHeight() - MARGIN) {
+    if (y + needed > H - MARGIN - 15) {
         newPage();
         return true;
     }
@@ -44,57 +68,57 @@ function checkPageBreak(needed = 40) {
 }
 
 function addTitle(text) {
-    checkPageBreak(80);
+    checkPageBreak(70);
     doc.setFont('helvetica', 'bold');
-    doc.setFontSize(26);
+    doc.setFontSize(22);
     doc.setTextColor(...DARK);
     doc.text(text, MARGIN, y);
-    y += 8;
+    y += 7;
     doc.setFillColor(...PRIMARY);
-    doc.rect(MARGIN, y, CONTENT_W, 2, 'F');
-    y += 24;
+    doc.rect(MARGIN, y, CONTENT_W, 2.5, 'F');
+    y += 22;
 }
 
 function addH2(text) {
-    checkPageBreak(55);
-    y += 10;
+    checkPageBreak(50);
+    y += 8;
     doc.setFont('helvetica', 'bold');
-    doc.setFontSize(15);
+    doc.setFontSize(14);
     doc.setTextColor(...PRIMARY);
     doc.text(text, MARGIN, y);
-    y += 22; // Move line down to sit below text instead of striking through
+    y += 18;
     doc.setDrawColor(...PRIMARY);
-    doc.setLineWidth(0.7);
+    doc.setLineWidth(0.6);
     doc.line(MARGIN, y, MARGIN + CONTENT_W, y);
     y += 14;
 }
 
 function addH3(text, color = DARK) {
-    checkPageBreak(38);
+    checkPageBreak(35);
     y += 4;
     doc.setFont('helvetica', 'bold');
-    doc.setFontSize(12);
+    doc.setFontSize(11);
     doc.setTextColor(...color);
     doc.text(text, MARGIN, y);
-    y += 16;
+    y += 14;
 }
 
-function addText(text, size = 10) {
+function addText(text, size = 9.5) {
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(size);
     doc.setTextColor(...MUTED);
     const lines = doc.splitTextToSize(text, CONTENT_W);
     lines.forEach(line => {
-        checkPageBreak(16);
+        checkPageBreak(15);
         doc.text(line, MARGIN, y);
-        y += 15;
+        y += 14;
     });
     y += 4;
 }
 
 function addBullet(text, indent = 0) {
     doc.setFont('helvetica', 'normal');
-    doc.setFontSize(10);
+    doc.setFontSize(9.5);
     doc.setTextColor(...MUTED);
     const bx = MARGIN + indent;
     const bw = CONTENT_W - indent;
@@ -102,61 +126,77 @@ function addBullet(text, indent = 0) {
     const bW = doc.getTextWidth(bullet);
     const lines = doc.splitTextToSize(text, bw - bW - 4);
     lines.forEach((line, i) => {
-        checkPageBreak(16);
-        if (i === 0) doc.text(bullet, bx, y);
+        checkPageBreak(15);
+        if (i === 0) {
+            doc.setTextColor(...PRIMARY);
+            doc.text(bullet, bx, y);
+            doc.setTextColor(...MUTED);
+        }
         doc.text(line, bx + bW + 2, y);
-        y += 15;
+        y += 14;
     });
 }
 
 function addAlert(label, text, type = 'info') {
-    const colors = { info: [59, 130, 246], warn: [251, 191, 36], danger: [239, 68, 68] };
+    const colors = { 
+        info: [37, 99, 235], 
+        warn: [217, 119, 6], 
+        danger: [220, 38, 38],
+        success: [16, 185, 129]
+    };
     const col = colors[type] || colors.info;
-    const lineH = 14;
+    const lineH = 13;
     const lines = doc.splitTextToSize(text, CONTENT_W - 24);
-    const total = lines.length * lineH + 20;
+    const total = lines.length * lineH + 22;
     checkPageBreak(total + 10);
-    doc.setFillColor(col[0], col[1], col[2], 0.08);
+    
+    doc.setFillColor(col[0], col[1], col[2], 0.06);
     doc.setDrawColor(...col);
-    doc.setLineWidth(1);
+    doc.setLineWidth(0.8);
     doc.roundedRect(MARGIN, y, CONTENT_W, total, 4, 4, 'FD');
     doc.setFillColor(...col);
     doc.rect(MARGIN, y, 4, total, 'F');
+
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(9);
     doc.setTextColor(...col);
     doc.text(label, MARGIN + 12, y + 13);
+
     doc.setFont('helvetica', 'normal');
-    doc.setFontSize(9);
-    doc.setTextColor(...MUTED);
+    doc.setFontSize(8.5);
+    doc.setTextColor(70, 70, 70);
     lines.forEach((line, i) => {
         doc.text(line, MARGIN + 12, y + 13 + (i + 1) * lineH);
     });
-    y += total + 10;
+    y += total + 8;
 }
 
 function addCodeBlock(lines, lang = '') {
-    const lineH = 13;
-    const padV = 10;
-    const total = lines.length * lineH + padV * 2 + (lang ? 18 : 0);
-    checkPageBreak(total + 20);
+    const lineH = 12;
+    const padV = 8;
+    const total = lines.length * lineH + padV * 2 + (lang ? 16 : 0);
+    checkPageBreak(total + 15);
+
     doc.setFillColor(...CODE_BG);
-    doc.setDrawColor(55, 55, 55);
+    doc.setDrawColor(60, 60, 65);
     doc.setLineWidth(0.5);
     doc.roundedRect(MARGIN, y, CONTENT_W, total, 4, 4, 'FD');
+
     if (lang) {
         doc.setFont('helvetica', 'bold');
         doc.setFontSize(7.5);
-        doc.setTextColor(140, 140, 140);
-        doc.text(lang.toUpperCase(), MARGIN + 10, y + 12);
-        doc.setDrawColor(55, 55, 55);
-        doc.line(MARGIN, y + 18, MARGIN + CONTENT_W, y + 18);
-        y += 18;
+        doc.setTextColor(255, 120, 80);
+        doc.text(lang.toUpperCase(), MARGIN + 10, y + 11);
+        doc.setDrawColor(60, 60, 65);
+        doc.line(MARGIN, y + 16, MARGIN + CONTENT_W, y + 16);
+        y += 16;
     }
-    y += padV + lineH * 0.8;
+
+    y += padV + lineH * 0.75;
     doc.setFont('courier', 'normal');
-    doc.setFontSize(8.5);
+    doc.setFontSize(8);
     doc.setTextColor(...CODE_FG);
+
     lines.forEach(line => {
         const parts = doc.splitTextToSize(line || ' ', CONTENT_W - 20);
         parts.forEach(part => {
@@ -164,865 +204,669 @@ function addCodeBlock(lines, lang = '') {
             y += lineH;
         });
     });
-    y += padV + 8;
+    y += padV + 6;
 }
 
+function addTable(headers, rows, colWidths = null) {
+    const numCols = headers.length;
+    const widths = colWidths || headers.map(() => CONTENT_W / numCols);
+    const rowH = 16;
+    checkPageBreak(rowH * (rows.length + 2) + 15);
 
-// ─── COVER PAGE ─────────────────────────────────────────────────────────────
-doc.setFillColor(17, 17, 17);
-doc.rect(0, 0, W, doc.internal.pageSize.getHeight(), 'F');
+    // Header
+    doc.setFillColor(30, 30, 35);
+    doc.roundedRect(MARGIN, y, CONTENT_W, rowH + 2, 3, 3, 'F');
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(7.5);
+    doc.setTextColor(255, 120, 80);
+
+    let cx = MARGIN + 8;
+    headers.forEach((h, i) => {
+        doc.text(h, cx, y + 11);
+        cx += widths[i];
+    });
+    y += rowH + 3;
+
+    // Rows
+    rows.forEach((row, rIdx) => {
+        checkPageBreak(rowH + 4);
+        if (rIdx % 2 === 0) {
+            doc.setFillColor(246, 246, 248);
+            doc.rect(MARGIN, y, CONTENT_W, rowH, 'F');
+        }
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(7.5);
+        doc.setTextColor(60, 60, 60);
+
+        let rx = MARGIN + 8;
+        row.forEach((cell, cIdx) => {
+            const truncated = doc.splitTextToSize(String(cell || ''), widths[cIdx] - 10)[0] || '';
+            doc.text(truncated, rx, y + 11);
+            rx += widths[cIdx];
+        });
+        y += rowH;
+    });
+    y += 8;
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+// 1. COVER PAGE
+// ═════════════════════════════════════════════════════════════════════════════
+doc.setFillColor(15, 15, 18);
+doc.rect(0, 0, W, H, 'F');
 
 doc.setFillColor(...PRIMARY);
-doc.rect(0, 0, 6, doc.internal.pageSize.getHeight(), 'F');
+doc.rect(0, 0, 7, H, 'F');
 
-// Gradient bar at top
-doc.setFillColor(40, 40, 40);
-doc.rect(0, 0, W, 180, 'F');
+// Dark banner card
+doc.setFillColor(25, 25, 30);
+doc.rect(0, 0, W, 210, 'F');
 
 doc.setFont('helvetica', 'bold');
-doc.setFontSize(48);
+doc.setFontSize(50);
 doc.setTextColor(255, 255, 255);
-doc.text('Fluxbase', MARGIN, 120);
+doc.text('Fluxbase', MARGIN, 110);
 
 doc.setFont('helvetica', 'normal');
 doc.setFontSize(22);
 doc.setTextColor(...PRIMARY);
-doc.text('Backend Integration Guide', MARGIN, 155);
+doc.text('Developer Integration & Architecture Manual', MARGIN, 150);
 
 doc.setFontSize(11);
-doc.setTextColor(150, 150, 150);
-doc.text('How to connect your backend to Fluxbase using the REST API', MARGIN, 210);
+doc.setTextColor(170, 170, 175);
+doc.text('Complete Reference for REST SQL, AI Gateway, MCP, WebSockets & Storage', MARGIN, 180);
 
 // Badges
-const badges = ['Node.js', 'Python', 'Go', 'Java', 'Ruby', 'PHP', 'Rust', 'cURL'];
+const badges = ['v4.2 Production', 'PostgreSQL', 'MySQL', 'Flux AI Gateway', 'Model Context Protocol (MCP)', 'REST + WS'];
 let bx = MARGIN;
+let by = 245;
 badges.forEach(b => {
-    doc.setFillColor(40, 40, 40);
+    doc.setFillColor(32, 32, 38);
     const bw = doc.getTextWidth(b) + 16;
-    doc.roundedRect(bx, 240, bw, 18, 3, 3, 'F');
+    if (bx + bw > W - MARGIN) {
+        bx = MARGIN;
+        by += 26;
+    }
+    doc.roundedRect(bx, by, bw, 18, 3, 3, 'F');
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(8);
     doc.setTextColor(...PRIMARY);
-    doc.text(b, bx + 8, 253);
+    doc.text(b, bx + 8, by + 12);
     bx += bw + 8;
 });
 
-doc.setFontSize(10);
-doc.setTextColor(80, 80, 80);
-doc.text(`v4.0  •  Enhanced edition  •  ${new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long' })}`, MARGIN, doc.internal.pageSize.getHeight() - 60);
-doc.text('© 2025 Fluxbase Inc. — For developer use only.', MARGIN, doc.internal.pageSize.getHeight() - 44);
+// Quick Specs Grid
+y = 350;
+doc.setFillColor(22, 22, 26);
+doc.roundedRect(MARGIN, y, CONTENT_W, 160, 6, 6, 'F');
 
-// ─── PAGE 2: OVERVIEW ───────────────────────────────────────────────────────
+doc.setFont('helvetica', 'bold');
+doc.setFontSize(12);
+doc.setTextColor(255, 255, 255);
+doc.text('Production Gateway Specifications', MARGIN + 18, y + 26);
+
+const specs = [
+    ['Core SQL Endpoint', 'POST https://www.fluxbasedb.me/api/execute-sql'],
+    ['AI Gateway (Chat)', 'POST https://www.fluxbasedb.me/api/v1/chat/completions'],
+    ['MCP JSON-RPC', 'POST https://www.fluxbasedb.me/api/mcp'],
+    ['Real-Time WebSockets', 'wss://fluxbase-realtime.onrender.com'],
+    ['Authentication', 'Authorization: Bearer <FLUXBASE_API_KEY>'],
+    ['Default AI Model', 'flux (Flagship reasoning model family)'],
+];
+
+let sy = y + 50;
+specs.forEach(([k, v]) => {
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(8.5);
+    doc.setTextColor(...PRIMARY);
+    doc.text(k + ':', MARGIN + 18, sy);
+    doc.setFont('courier', 'normal');
+    doc.setFontSize(8);
+    doc.setTextColor(210, 210, 215);
+    doc.text(v, MARGIN + 150, sy);
+    sy += 18;
+});
+
+doc.setFont('helvetica', 'normal');
+doc.setFontSize(9);
+doc.setTextColor(110, 110, 115);
+doc.text(`Official Developer Manual • Edition 4.2 • Published September 2026`, MARGIN, H - 55);
+doc.text('© 2026 Fluxbase Inc. All rights reserved. Visit https://www.fluxbasedb.me/docs for interactive docs.', MARGIN, H - 40);
+
+// ═════════════════════════════════════════════════════════════════════════════
+// 2. OVERVIEW & GETTING STARTED
+// ═════════════════════════════════════════════════════════════════════════════
 newPage();
-addTitle('Overview & Correct API Reference');
+addTitle('1. Getting Started & Architecture');
 addText(
-    'Fluxbase exposes a single SQL execution endpoint that allows any backend application to run queries ' +
-    'against a Fluxbase-managed project database. Authentication uses a per-project API Key sent as a Bearer token.'
+    'Fluxbase is a unified backend database and AI infrastructure platform providing instant serverless databases, ' +
+    'an OpenAI-compatible AI gateway, Model Context Protocol (MCP) tooling for autonomous coding agents, ' +
+    'sub-second real-time streaming, AWS S3-backed file storage, and enterprise Row-Level Security (RLS).'
 );
 
-addAlert('IMPORTANT — Read Before Integrating',
-    'The API endpoint is POST /api/execute-sql (NOT /v1/projects/.../query). ' +
-    'The request body uses the field name "query" (NOT "sql"). ' +
-    'The response rows are at data.result.rows (NOT data). ' +
-    'Earlier documentation contained errors on all three points — this edition is the corrected reference.',
-    'warn'
+addAlert('Required Integration Credentials',
+    'Every Fluxbase integration requires three project parameters from your Project Settings:\n' +
+    '1. Project ID: Unique 16-character identifier (e.g., 51c04beb753a42f3)\n' +
+    '2. API Key: Scoped Bearer token (flx_live_...) with read, write, ai, or admin permissions\n' +
+    '3. Base URL: https://www.fluxbasedb.me (for all REST & Gateway APIs)',
+    'info'
 );
 
-addH2('API Endpoint');
+addH2('Environment Configuration');
+addText('Store your secrets in server-only environment variables. Never expose your live API key to the client browser.');
 addCodeBlock([
-    'Method:   POST',
-    'URL:      https://www.fluxbasedb.me/api/execute-sql',
-    'Auth:     Bearer <YOUR_API_KEY>',
-    'Content:  application/json',
+    '# .env.local (Server Only)',
+    'FLUXBASE_API_KEY=flx_live_xxxxxxxxxxxxxxxxxxxx',
+    'FLUXBASE_PROJECT_ID=51c04beb753a42f3',
+    'FLUXBASE_BASE_URL=https://www.fluxbasedb.me',
+    'NEXT_PUBLIC_WS_URL=wss://fluxbase-realtime.onrender.com',
+], 'bash');
+
+addH2('Authentication & Scope Hierarchy');
+addText('All requests must include an Authorization header with Bearer format. Requests without valid keys return 401 Unauthorized.');
+addCodeBlock([
+    'Authorization: Bearer flx_live_xxxxxxxxxxxxxxxxxxxx',
+    'Content-Type: application/json',
 ], 'HTTP');
 
-addH2('Request Body');
+addH3('Key Scopes');
+addTable(
+    ['Scope', 'Allowed Operations', 'Recommended Environment'],
+    [
+        ['read', 'SELECT queries only', 'Public dashboards, read-only analytics'],
+        ['write', 'SELECT, INSERT, UPDATE, DELETE', 'Backend services, user mutations'],
+        ['ai', 'Flux AI Gateway chat completions', 'Cursor, AI Agents, LLM services'],
+        ['admin', 'Full DDL (CREATE, ALTER, DROP) + DML', 'Migrations, seed scripts, CLI setup'],
+    ],
+    [70, 220, 215]
+);
+
+// ═════════════════════════════════════════════════════════════════════════════
+// 3. FLUX AI GATEWAY (CHAT & COMPLETIONS)
+// ═════════════════════════════════════════════════════════════════════════════
+newPage();
+addTitle('2. Flux AI Gateway (OpenAI-Compatible)');
+addText(
+    'Fluxbase provides a high-throughput, drop-in OpenAI-compatible AI gateway. Connect standard OpenAI SDKs, ' +
+    'LangChain, Cursor, Windsurf, or custom agent frameworks to Flux AI reasoning models without changing code.'
+);
+
+addAlert('Gateway Base URL & Compatibility',
+    'Endpoint: POST https://www.fluxbasedb.me/api/v1/chat/completions\n' +
+    'Set your client base_url to "https://www.fluxbasedb.me/api/v1" and supply your Fluxbase API Key.\n' +
+    'Supports both standard JSON responses and real-time Server-Sent Events (stream=true).',
+    'success'
+);
+
+addH2('Model Catalog');
+addTable(
+    ['Model ID', 'Tier & Speed', 'Capabilities & Best Use Case'],
+    [
+        ['flux', 'Flagship (Default)', 'General reasoning, high-precision SQL synthesis, code intelligence'],
+        ['flux-flash', 'Realtime Ultra-Fast', 'Sub-100ms token throughput. Ideal for autocompletion and chat UX'],
+        ['flux-pro', 'Balanced Pro', 'Complex multi-table queries, strict JSON schema mode, auditing'],
+        ['flux-ultra', 'Deep Reasoning', 'Maximum cognitive depth for system architecture and large chains'],
+        ['flux-5.2', 'Frontier Agentic', 'Specialized in multi-step autonomous agent execution and tool use'],
+        ['gpt-4o', 'OpenAI Alias', 'Drop-in alias automatically mapped to flux-ultra'],
+        ['gpt-3.5-turbo', 'OpenAI Alias', 'Drop-in alias automatically mapped to flux-flash'],
+    ],
+    [90, 110, 305]
+);
+
+addH2('Python Integration (OpenAI SDK)');
+addCodeBlock([
+    'from openai import OpenAI',
+    '',
+    'client = OpenAI(',
+    '    base_url="https://www.fluxbasedb.me/api/v1",',
+    '    api_key="flx_live_your_fluxbase_key"',
+    ')',
+    '',
+    '# Standard Completion',
+    'response = client.chat.completions.create(',
+    '    model="flux",',
+    '    messages=[',
+    '        {"role": "system", "content": "You are a senior PostgreSQL database architect."},',
+    '        {"role": "user", "content": "Design an optimized partition table for user telemetry."}',
+    '    ],',
+    '    temperature=0.2',
+    ')',
+    'print(response.choices[0].message.content)',
+    '',
+    '# Real-Time Streaming (SSE)',
+    'stream = client.chat.completions.create(',
+    '    model="flux-flash",',
+    '    messages=[{"role": "user", "content": "Explain window functions vs CTEs in SQL."}],',
+    '    stream=True',
+    ')',
+    'for chunk in stream:',
+    '    print(chunk.choices[0].delta.content or "", end="", flush=True)',
+], 'python');
+
+addH2('Node.js / TypeScript Integration');
+addCodeBlock([
+    "import OpenAI from 'openai';",
+    '',
+    'const client = new OpenAI({',
+    "  baseURL: 'https://www.fluxbasedb.me/api/v1',",
+    '  apiKey: process.env.FLUXBASE_API_KEY,',
+    '});',
+    '',
+    'async function generateSchema() {',
+    '  const stream = await client.chat.completions.create({',
+    "    model: 'flux',",
+    "    messages: [{ role: 'user', content: 'Generate a PostgreSQL partitioned table schema.' }],",
+    '    stream: true,',
+    '  });',
+    '  for await (const chunk of stream) {',
+    "    process.stdout.write(chunk.choices[0]?.delta?.content || '');",
+    '  }',
+    '}',
+], 'typescript');
+
+// ═════════════════════════════════════════════════════════════════════════════
+// 4. MODEL CONTEXT PROTOCOL (MCP) AI GATEWAY
+// ═════════════════════════════════════════════════════════════════════════════
+newPage();
+addTitle('3. Model Context Protocol (MCP) Gateway');
+addText(
+    'Fluxbase implements the Model Context Protocol (MCP) over JSON-RPC 2.0. This allows AI assistants such as ' +
+    'Google Antigravity, Cursor, Windsurf, and Claude Desktop to introspect live schemas, run migrations, and ' +
+    'execute queries autonomously with zero manual prompting.'
+);
+
+addAlert('MCP Gateway Endpoint',
+    'POST https://www.fluxbasedb.me/api/mcp\n' +
+    'Protocols: JSON-RPC 2.0 over HTTP POST. Supports tools/list and tools/call methods.\n' +
+    'Authenticated via Authorization: Bearer <API_KEY>',
+    'info'
+);
+
+addH2('Available MCP Tools');
+addTable(
+    ['Tool Name', 'Category', 'Description'],
+    [
+        ['create_project', 'PROJECT', 'Provisions new serverless PostgreSQL or MySQL database projects'],
+        ['list_projects', 'DISCOVERY', 'Lists all database projects owned by or shared with your account'],
+        ['get_schema', 'SCHEMA', 'Inspects live table structures, column definitions, data types, and primary keys'],
+        ['run_sql', 'EXECUTE', 'Executes raw SQL DDL and DML queries against the active project database'],
+    ],
+    [95, 80, 330]
+);
+
+addH2('Connecting with Google Antigravity');
+addText('Antigravity supports MCP natively via mcp_config.json. Add this to .agents/mcp_config.json in your workspace root:');
 addCodeBlock([
     '{',
-    '  "projectId": "YOUR_PROJECT_ID",',
-    '  "query":     "SELECT * FROM users LIMIT 10;"',
+    '  "mcpServers": {',
+    '    "fluxbase": {',
+    '      "serverUrl": "https://www.fluxbasedb.me/api/mcp",',
+    '      "headers": {',
+    '        "Authorization": "Bearer flx_live_your_fluxbase_key"',
+    '      }',
+    '    }',
+    '  }',
     '}',
-], 'JSON');
+], 'json');
 
-addH3('Fields', DARK);
-addBullet('"projectId" — Your project\'s unique ID (found in Dashboard → Settings). If your API key is already scoped to a project, this field can be omitted and will be auto-injected.');
-addBullet('"query"     — The SQL statement to execute (SELECT, INSERT, UPDATE, DELETE, CREATE TABLE, etc.).');
-
-addH2('Response Shape');
+addH2('Connecting with Cursor, Windsurf & Claude Desktop');
+addText('In Cursor or Windsurf (Settings → Features → MCP → Add Server) or Claude Desktop (claude_desktop_config.json):');
 addCodeBlock([
+    '{',
+    '  "mcpServers": {',
+    '    "fluxbase": {',
+    '      "url": "https://www.fluxbasedb.me/api/mcp",',
+    '      "headers": {',
+    '        "Authorization": "Bearer flx_live_your_fluxbase_key"',
+    '      }',
+    '    }',
+    '  }',
+    '}',
+], 'json');
+
+addH2('CLI Discovery Test (Node.js)');
+addCodeBlock([
+    "node -e \"fetch('https://www.fluxbasedb.me/api/mcp', {",
+    "  method: 'POST',",
+    "  headers: { 'Authorization': 'Bearer YOUR_KEY', 'Content-Type': 'application/json' },",
+    "  body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/list' })",
+    '}).then(r => r.json()).then(d => console.log(JSON.stringify(d, null, 2)))\"',
+], 'bash');
+
+// ═════════════════════════════════════════════════════════════════════════════
+// 5. CORE SQL API & ADVANCED ENGINE
+// ═════════════════════════════════════════════════════════════════════════════
+newPage();
+addTitle('4. Core SQL API & Execution Engine');
+addText(
+    'Execute any SQL statement against your project database via a single unified endpoint. ' +
+    'The Fluxbase engine supports full PostgreSQL syntax, Common Table Expressions (CTEs), window functions, ' +
+    'timestamp arithmetic, parameterized queries, and automatic transaction handling.'
+);
+
+addH2('Endpoint Specification');
+addCodeBlock([
+    'Method:  POST',
+    'URL:     https://www.fluxbasedb.me/api/execute-sql',
+    'Header:  Authorization: Bearer <API_KEY>',
+    'Header:  Content-Type: application/json',
+], 'HTTP');
+
+addH2('Request & Response Format');
+addCodeBlock([
+    '// Request Body',
+    '{',
+    '  "projectId": "51c04beb753a42f3",',
+    '  "query": "SELECT id, name, email FROM users WHERE active = $1 LIMIT 5;",',
+    '  "params": [true]',
+    '}',
+    '',
+    '// Success Response (HTTP 200)',
     '{',
     '  "success": true,',
     '  "result": {',
-    '    "rows":    [ { "id": 1, "name": "Alice" }, ... ],',
-    '    "columns": [ "id", "name" ],',
+    '    "rows": [{ "id": 1, "name": "Alice", "email": "alice@example.com" }],',
+    '    "columns": ["id", "name", "email"],',
+    '    "rowCount": 1,',
     '    "message": null',
     '  },',
-    '  "explanation": [],',
-    '  "executionInfo": {',
-    '    "time": "12ms",',
-    '    "rowCount": 1',
-    '  }',
+    '  "executionInfo": { "time": "9ms", "rowCount": 1, "operation": "SELECT" }',
     '}',
-], 'Success Response');
+], 'JSON');
 
-addH2('Error Response');
+addH2('Advanced SQL: Window Functions & CTEs');
+addText('Fluxbase fully executes complex analytical queries with LAG, LEAD, and epoch calculations:');
 addCodeBlock([
-    '{',
-    '  "success": false,',
-    '  "error": {',
-    '    "message": "Project not found",',
-    '    "code":    "NOT_FOUND"',
-    '  }',
-    '}',
-], 'Error Response');
-
-addH3('Error Codes', DARK);
-addBullet('AUTH_REQUIRED (401)     — Missing or invalid API key.');
-addBullet('SCOPE_MISMATCH (403)    — API key is scoped to a different project.');
-addBullet('NOT_FOUND (404)         — Project does not exist or you lack access.');
-addBullet('RATE_LIMIT_EXCEEDED (429) — 30 requests per 10 seconds per project exceeded.');
-addBullet('BAD_REQUEST (400)       — Missing projectId or query field.');
-addBullet('EXECUTION_ERROR (200)   — SQL syntax or runtime error (check body.error.message).');
-
-// ─── NODE.JS ─────────────────────────────────────────────────────────────────
-newPage();
-addTitle('Node.js — native fetch (REST)');
-addText('No external packages required. Uses built-in fetch (Node 18+).');
-addCodeBlock([
-    "const FLUXBASE_URL = 'https://www.fluxbasedb.me/api/execute-sql';",
-    "const API_KEY      = process.env.FLUXBASE_API_KEY;",
-    "const PROJECT_ID   = process.env.FLUXBASE_PROJECT_ID;",
-    "",
-    "async function runQuery(sql) {",
-    "  const res = await fetch(FLUXBASE_URL, {",
-    "    method: 'POST',",
-    "    headers: {",
-    "      'Content-Type': 'application/json',",
-    "      'Authorization': `Bearer ${API_KEY}`",
-    "    },",
-    "    body: JSON.stringify({",
-    "      projectId: PROJECT_ID,  // field name is 'query', NOT 'sql'",
-    "      query:     sql",
-    "    })",
-    "  });",
-    "",
-    "  const json = await res.json();",
-    "  if (!json.success) throw new Error(json.error.message);",
-    "",
-    "  // Rows are at json.result.rows — NOT json.data",
-    "  return json.result.rows;",
-    "}",
-    "",
-    "runQuery('SELECT * FROM users LIMIT 5').then(rows => {",
-    "  console.log('Rows:', rows);",
-    "}).catch(console.error);",
-], 'JavaScript (Node.js)');
-
-// ─── PYTHON ─────────────────────────────────────────────────────────────────
-addH2('Python — requests');
-addText('Install: pip install requests');
-addCodeBlock([
-    "import os, requests",
-    "",
-    "FLUXBASE_URL = 'https://www.fluxbasedb.me/api/execute-sql'",
-    "API_KEY      = os.getenv('FLUXBASE_API_KEY')",
-    "PROJECT_ID   = os.getenv('FLUXBASE_PROJECT_ID')",
-    "",
-    "def run_query(sql: str):",
-    "    headers = {",
-    "        'Authorization': f'Bearer {API_KEY}',",
-    "        'Content-Type':  'application/json'",
-    "    }",
-    "    # Body uses field 'query' (NOT 'sql')",
-    "    payload = {'projectId': PROJECT_ID, 'query': sql}",
-    "    resp = requests.post(FLUXBASE_URL, json=payload, headers=headers)",
-    "    data = resp.json()",
-    "    if not data.get('success'):",
-    "        raise Exception(data['error']['message'])",
-    "    # Access via data['result']['rows']: (NOT data['data'])",
-    "    return data['result']['rows']",
-    "",
-    "rows = run_query('SELECT * FROM users')",
-    "print(rows)",
-], 'Python');
-
-// ─── GO ─────────────────────────────────────────────────────────────────────
-newPage();
-addTitle('Go — net/http (REST)');
-addText('Uses Go\'s standard library only.');
-addCodeBlock([
-    'package main',
-    '',
-    'import (',
-    '    "bytes"',
-    '    "encoding/json"',
-    '    "fmt"',
-    '    "net/http"',
-    '    "os"',
+    'WITH ordered_predictions AS (',
+    '  SELECT *,',
+    '         LAG(timestamp) OVER (ORDER BY timestamp) AS prev_timestamp',
+    '  FROM predictions',
+    '),',
+    'time_differences AS (',
+    '  SELECT timestamp,',
+    '         prev_timestamp,',
+    '         EXTRACT(EPOCH FROM (timestamp - prev_timestamp)) AS time_diff_seconds',
+    '  FROM ordered_predictions',
+    '  WHERE prev_timestamp IS NOT NULL',
     ')',
-    '',
-    'func runQuery(sql string) ([]map[string]interface{}, error) {',
-    '    body, _ := json.Marshal(map[string]string{',
-    '        "projectId": os.Getenv("FLUXBASE_PROJECT_ID"),',
-    '        "query":     sql,  // field is "query", not "sql"',
-    '    })',
-    '    req, _ := http.NewRequest("POST", "https://www.fluxbasedb.me/api/execute-sql",',
-    '        bytes.NewBuffer(body))',
-    '    req.Header.Set("Authorization", "Bearer "+os.Getenv("FLUXBASE_API_KEY"))',
-    '    req.Header.Set("Content-Type", "application/json")',
-    '',
-    '    resp, err := http.DefaultClient.Do(req)',
-    '    if err != nil { return nil, err }',
-    '    defer resp.Body.Close()',
-    '',
-    '    var result struct {',
-    '        Success bool `json:"success"`',
-    '        Result  struct {',
-    '            Rows []map[string]interface{} `json:"rows"`',
-    '        } `json:"result"` // nested under "result", not "data"',
-    '        Error struct{ Message string `json:"message"` } `json:"error"`',
-    '    }',
-    '    json.NewDecoder(resp.Body).Decode(&result)',
-    '    if !result.Success { return nil, fmt.Errorf(result.Error.Message) }',
-    '    return result.Result.Rows, nil',
-    '}',
-], 'Go');
+    'SELECT MAX(time_diff_seconds) AS longest_shutdown_time_seconds',
+    'FROM time_differences;',
+], 'sql');
 
-// ─── JAVA ─────────────────────────────────────────────────────────────────────
-addH2('Java — HttpURLConnection (REST)');
-addText('Uses Java 11+ standard library. No Maven dependency required.');
-addCodeBlock([
-    'import java.net.URI; import java.net.http.*;',
-    'import java.util.Map; import com.fasterxml.jackson.databind.ObjectMapper;',
-    '',
-    'HttpClient client = HttpClient.newHttpClient();',
-    'ObjectMapper mapper = new ObjectMapper();',
-    '',
-    '// Body: projectId + query (NOT "sql")',
-    'String body = mapper.writeValueAsString(Map.of(',
-    '    "projectId", System.getenv("FLUXBASE_PROJECT_ID"),',
-    '    "query",     "SELECT * FROM users"',
-    '));',
-    '',
-    'HttpRequest req = HttpRequest.newBuilder()',
-    '    .uri(URI.create("https://www.fluxbasedb.me/api/execute-sql"))',
-    '    .POST(HttpRequest.BodyPublishers.ofString(body))',
-    '    .header("Content-Type", "application/json")',
-    '    .header("Authorization", "Bearer " + System.getenv("FLUXBASE_API_KEY"))',
-    '    .build();',
-    '',
-    'HttpResponse<String> resp = client.send(req, HttpResponse.BodyHandlers.ofString());',
-    'Map<?,?> json = mapper.readValue(resp.body(), Map.class);',
-    '// Rows: ((Map)json.get("result")).get("rows")',
-    'System.out.println(((Map<?,?>)json.get("result")).get("rows"));',
-], 'Java');
+addAlert('Execution Rule',
+    'SQL runtime errors return HTTP 200 with { success: false, error: { message, code: "SQL_EXEC_ERROR" } }.\n' +
+    'Always verify the success boolean in application code rather than relying only on HTTP status.',
+    'warn'
+);
 
-// ─── RUBY ─────────────────────────────────────────────────────────────────────
+// ═════════════════════════════════════════════════════════════════════════════
+// 6. MULTI-LANGUAGE SDKS
+// ═════════════════════════════════════════════════════════════════════════════
 newPage();
-addTitle('Ruby — net/http (REST)');
-addText("Uses Ruby's standard library.");
-addCodeBlock([
-    "require 'uri', 'net/http', 'json'",
-    "",
-    "FLUXBASE_URL = URI('https://www.fluxbasedb.me/api/execute-sql')",
-    "",
-    "def run_query(sql)",
-    "  http = Net::HTTP.new(FLUXBASE_URL.host, FLUXBASE_URL.port)",
-    "  http.use_ssl = true",
-    "  req = Net::HTTP::Post.new(FLUXBASE_URL)",
-    "  req['Authorization'] = \"Bearer #{ENV['FLUXBASE_API_KEY']}\"",
-    "  req['Content-Type']  = 'application/json'",
-    "  # Body field is 'query', NOT 'sql'",
-    "  req.body = JSON.dump({ projectId: ENV['FLUXBASE_PROJECT_ID'], query: sql })",
-    "  body = JSON.parse(http.request(req).read_body)",
-    "  raise body['error']['message'] unless body['success']",
-    "  body['result']['rows']  # Access via result.rows, NOT data",
-    "end",
-    "",
-    "p run_query('SELECT * FROM users')",
-], 'Ruby');
+addTitle('5. Language SDKs & Code Snippets');
+addText('Fluxbase is a standard RESTful service. Use native HTTP clients in any programming language.');
 
-// ─── PHP ─────────────────────────────────────────────────────────────────────
-addH2('PHP — cURL (REST)');
-addText('Uses cURL, which ships with PHP by default.');
+addH2('Node.js / TypeScript (Native fetch)');
 addCodeBlock([
-    "<?php",
-    "\$url    = 'https://www.fluxbasedb.me/api/execute-sql';",
-    "\$apiKey = getenv('FLUXBASE_API_KEY');",
-    "\$projId = getenv('FLUXBASE_PROJECT_ID');",
-    "",
-    "// Body field is 'query' (NOT 'sql')",
-    "\$payload = json_encode(['projectId' => \$projId, 'query' => 'SELECT * FROM users']);",
-    "",
-    "\$ch = curl_init(\$url);",
-    "curl_setopt_array(\$ch, [",
-    "    CURLOPT_RETURNTRANSFER => true,",
-    "    CURLOPT_POST           => true,",
-    "    CURLOPT_POSTFIELDS     => \$payload,",
-    "    CURLOPT_HTTPHEADER     => [",
-    "        'Content-Type: application/json',",
-    "        'Authorization: Bearer ' . \$apiKey,",
-    "    ],",
-    "]);",
-    "\$resp = json_decode(curl_exec(\$ch), true);",
-    "curl_close(\$ch);",
-    "",
-    "if (!\$resp['success']) throw new Exception(\$resp['error']['message']);",
-    "\$rows = \$resp['result']['rows']; // NOT \$resp['data']",
-    "print_r(\$rows);",
-], 'PHP');
-
-// ─── RUST ─────────────────────────────────────────────────────────────────────
-newPage();
-addTitle('Rust — reqwest (REST)');
-addText('Add to Cargo.toml: reqwest = { version = "0.12", features = ["json"] }  tokio = { version = "1", features = ["full"] }  serde_json = "1"');
-addCodeBlock([
-    'use reqwest::header::{AUTHORIZATION, CONTENT_TYPE};',
-    'use serde_json::{json, Value};',
+    "const BASE_URL = 'https://www.fluxbasedb.me';",
+    "const API_KEY  = process.env.FLUXBASE_API_KEY;",
+    "const PROJECT  = process.env.FLUXBASE_PROJECT_ID;",
     '',
-    '#[tokio::main]',
-    'async fn main() -> Result<(), Box<dyn std::error::Error>> {',
-    '    let api_key    = std::env::var("FLUXBASE_API_KEY")?;',
-    '    let project_id = std::env::var("FLUXBASE_PROJECT_ID")?;',
-    '',
-    '    let client = reqwest::Client::new();',
-    '    // Body uses "query" field, NOT "sql"',
-    '    let body = json!({ "projectId": project_id, "query": "SELECT * FROM users" });',
-    '',
-    '    let resp: Value = client',
-    '        .post("https://www.fluxbasedb.me/api/execute-sql")',
-    '        .header(AUTHORIZATION, format!("Bearer {}", api_key))',
-    '        .header(CONTENT_TYPE, "application/json")',
-    '        .json(&body)',
-    '        .send().await?',
-    '        .json().await?;',
-    '',
-    '    if !resp["success"].as_bool().unwrap_or(false) {',
-    '        eprintln!("Error: {}", resp["error"]["message"]);',
-    '    } else {',
-    '        // Rows are at resp["result"]["rows"] NOT resp["data"]',
-    '        println!("{:#?}", resp["result"]["rows"]);',
-    '    }',
-    '    Ok(())',
+    'async function query(sql, params = []) {',
+    "  const res = await fetch(`${BASE_URL}/api/execute-sql`, {",
+    "    method: 'POST',",
+    "    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${API_KEY}` },",
+    '    body: JSON.stringify({ projectId: PROJECT, query: sql, params })',
+    '  });',
+    '  const json = await res.json();',
+    "  if (!json.success) throw new Error(json.error?.message ?? 'Query failed');",
+    '  return json.result.rows;',
     '}',
-], 'Rust');
+    '',
+    "const users = await query('SELECT * FROM users WHERE active = $1', [true]);",
+], 'javascript');
 
-// ─── CURL ────────────────────────────────────────────────────────────────────
-addH2('cURL — Shell / Terminal');
-addText('Directly test your integration from any terminal.');
+addH2('Python (requests)');
+addCodeBlock([
+    'import os, requests',
+    '',
+    "URL = 'https://www.fluxbasedb.me/api/execute-sql'",
+    "HEADERS = { 'Authorization': f'Bearer {os.getenv(\"FLUXBASE_API_KEY\")}', 'Content-Type': 'application/json' }",
+    '',
+    'def query(sql, params=None):',
+    "    payload = {'projectId': os.getenv('FLUXBASE_PROJECT_ID'), 'query': sql}",
+    "    if params: payload['params'] = params",
+    '    resp = requests.post(URL, json=payload, headers=HEADERS).json()',
+    "    if not resp.get('success'): raise Exception(resp.get('error', {}).get('message'))",
+    "    return resp['result']['rows']",
+    '',
+    "rows = query('SELECT * FROM users LIMIT 10')",
+], 'python');
+
+addH2('Go (net/http)');
+addCodeBlock([
+    'body, _ := json.Marshal(map[string]any{',
+    '    "projectId": os.Getenv("FLUXBASE_PROJECT_ID"),',
+    '    "query":     "SELECT * FROM users LIMIT 10",',
+    '})',
+    'req, _ := http.NewRequest("POST", "https://www.fluxbasedb.me/api/execute-sql", bytes.NewBuffer(body))',
+    'req.Header.Set("Authorization", "Bearer " + os.Getenv("FLUXBASE_API_KEY"))',
+    'req.Header.Set("Content-Type", "application/json")',
+    'resp, err := http.DefaultClient.Do(req)',
+], 'go');
+
+addH2('cURL');
 addCodeBlock([
     'curl -X POST "https://www.fluxbasedb.me/api/execute-sql" \\',
     '  -H "Authorization: Bearer $FLUXBASE_API_KEY" \\',
     '  -H "Content-Type: application/json" \\',
-    '  -d \'{',
-    '    "projectId": "YOUR_PROJECT_ID",',
-    '    "query":     "SELECT * FROM users LIMIT 5"',
-    '  }\'',
-    '',
-    '# Expected response structure:',
-    '# { "success": true, "result": { "rows": [...], "columns": [...] } }',
+    '  -d \'{"projectId":"YOUR_PROJECT_ID","query":"SELECT * FROM users LIMIT 5;"}\'',
 ], 'bash');
 
-// ─── COMMON PATTERNS ─────────────────────────────────────────────────────────
+// ═════════════════════════════════════════════════════════════════════════════
+// 7. REAL-TIME WEBSOCKETS & SSE
+// ═════════════════════════════════════════════════════════════════════════════
 newPage();
-addTitle('Common SQL Examples');
-
-addH2('Insert a Row');
-addCodeBlock([
-    '// Body to send:',
-    '{',
-    '  "projectId": "YOUR_PROJECT_ID",',
-    '  "query": "INSERT INTO users (name, email) VALUES (\'Alice\', \'alice@example.com\')"',
-    '}',
-    '',
-    '// Response: result.message will contain row count info',
-], 'JSON');
-
-addH2('Update a Row');
-addCodeBlock([
-    '{',
-    '  "projectId": "YOUR_PROJECT_ID",',
-    '  "query": "UPDATE users SET name = \'Bob\' WHERE id = 42"',
-    '}',
-], 'JSON');
-
-addH2('Delete a Row');
-addCodeBlock([
-    '{',
-    '  "projectId": "YOUR_PROJECT_ID",',
-    '  "query": "DELETE FROM users WHERE id = 42"',
-    '}',
-], 'JSON');
-
-addH2('Join Tables');
-addCodeBlock([
-    '{',
-    '  "projectId": "YOUR_PROJECT_ID",',
-    '  "query": "SELECT u.name, o.total FROM users u JOIN orders o ON u.id = o.user_id"',
-    '}',
-], 'JSON');
-
-addH2('Create a Table (DDL)');
-addCodeBlock([
-    '{',
-    '  "projectId": "YOUR_PROJECT_ID",',
-    '  "query": "CREATE TABLE products (id SERIAL PRIMARY KEY, name TEXT, price NUMERIC)"',
-    '}',
-], 'JSON');
-addText('DDL statements (CREATE, ALTER, DROP) return { success: true, result: { message: "..." } } with no rows.');
-
-addH2('Rate Limiting');
-addBullet('Limit: 30 requests per 10 seconds per project per user.');
-addBullet('When exceeded the API returns HTTP 429 with code RATE_LIMIT_EXCEEDED.');
-addBullet('SELECT queries are cached server-side for 15 seconds — duplicate identical reads are free.');
-
-y += 10;
-addH2('Getting Your Credentials');
-addBullet('Project ID   — Dashboard → Your Project → Settings → Project ID');
-addBullet('API Key      — Dashboard → Your Project → Settings → API Keys → Create Key');
-addBullet('Scope your API key to a single project for maximum security.');
-
-y += 10;
-addH2('Support');
-addBullet('Web:   https://www.fluxbasedb.me/docs');
-addBullet('Email: sumithsumith4567890@gmail.com');
-
-// ─── WEBHOOKS ─────────────────────────────────────────────────────────────────
-newPage();
-addTitle('Webhooks');
+addTitle('6. Real-Time WebSockets & Streaming');
 addText(
-    'Webhooks let Fluxbase automatically notify your application whenever data changes in a table — ' +
-    'a row is inserted, updated, or deleted. Fluxbase fires an outbound HTTP POST to your app\'s URL ' +
-    'within ~1–2 seconds of the event, no persistent connection required.'
+    'Fluxbase broadcasts database change events in real-time. Whenever an INSERT, UPDATE, DELETE, or DDL migration ' +
+    'occurs, change events stream directly to connected clients within 10–25 milliseconds.'
 );
 
-addAlert('Architecture — Outbound HTTP (No Extra Server Needed)',
-    'Direction: Fluxbase (on Vercel) ─── POST ───→ Your App\n\n' +
-    'Webhooks are OUTBOUND from Fluxbase. You do NOT need Render or any long-running server ' +
-    'for webhooks. Fluxbase calls YOUR endpoint. Any publicly accessible URL works — ' +
-    'Vercel, Railway, Render, AWS Lambda, Cloudflare Workers, etc.\n\n' +
-    'NOTE: SSE/Realtime is different and DOES require a persistent server. ' +
-    'Webhooks and Realtime are separate features with different infrastructure needs.',
+addAlert('WebSocket Gateway Architecture',
+    'Production WebSocket URL: wss://fluxbase-realtime.onrender.com\n' +
+    'Room Convention: "project_<PROJECT_ID>"\n' +
+    'Clients subscribe to project rooms and automatically receive filtered table mutation events.',
     'info'
 );
 
-addH2('Webhook Payload');
-addText('Every webhook event delivers this JSON body to your endpoint:');
+addH2('Browser / Node.js WebSocket Example');
 addCodeBlock([
+    "const ws = new WebSocket('wss://fluxbase-realtime.onrender.com');",
+    '',
+    'ws.onopen = () => {',
+    '  // Subscribe to project room',
+    '  ws.send(JSON.stringify({',
+    "    type: 'subscribe',",
+    "    roomId: 'project_YOUR_PROJECT_ID'",
+    '  }));',
+    '};',
+    '',
+    'ws.onmessage = (event) => {',
+    '  const msg = JSON.parse(event.data);',
+    "  if (msg.type === 'db_event') {",
+    '    console.log(`[${msg.payload.operation}] on table ${msg.payload.table}:`, msg.payload.record);',
+    '  }',
+    '};',
+], 'javascript');
+
+addH2('Real-time Event Schema');
+addTable(
+    ['Message Type', 'Payload Operation', 'Trigger Event'],
+    [
+        ['subscribed', '—', 'Server acknowledges subscription to project channel'],
+        ['db_event', 'INSERT', 'A new row was added via SQL API or Table Editor'],
+        ['db_event', 'UPDATE', 'An existing row was modified'],
+        ['db_event', 'DELETE', 'A row was removed from a table'],
+        ['db_event', 'schema_update', 'DDL executed: CREATE, ALTER, DROP, or TRUNCATE TABLE'],
+    ],
+    [90, 110, 305]
+);
+
+// ═════════════════════════════════════════════════════════════════════════════
+// 8. STORAGE V2
+// ═════════════════════════════════════════════════════════════════════════════
+newPage();
+addTitle('7. Storage v2 (AWS S3-Backed File Engine)');
+addText(
+    'Fluxbase Storage provides isolated S3 buckets, private-by-default access, and pre-signed temporary URLs. ' +
+    'Store user avatars, PDF invoices, datasets, media files, and backups securely.'
+);
+
+addH2('File Operations');
+addTable(
+    ['Method', 'Endpoint', 'Description'],
+    [
+        ['POST', '/api/storage/buckets', 'Create a bucket { projectId, name, isPublic }'],
+        ['GET', '/api/storage/buckets?projectId=...', 'List all buckets and size rollups'],
+        ['POST', '/api/storage/upload', 'Upload file via multipart/form-data (file, bucketId, projectId)'],
+        ['GET', '/api/storage/url?s3Key=...&projectId=...', 'Generate 15-minute secure pre-signed download URL'],
+        ['DELETE', '/api/storage/files', 'Delete file from S3 and metadata database'],
+    ],
+    [65, 230, 210]
+);
+
+addH2('Uploading via JavaScript');
+addCodeBlock([
+    'const formData = new FormData();',
+    "formData.append('file', fileInput.files[0]);",
+    "formData.append('bucketId', 'avatars');",
+    "formData.append('projectId', 'YOUR_PROJECT_ID');",
+    '',
+    "const res = await fetch('https://www.fluxbasedb.me/api/storage/upload', {",
+    "  method: 'POST',",
+    "  headers: { 'Authorization': `Bearer ${API_KEY}` },",
+    '  body: formData',
+    '});',
+    'const { file } = await res.json();',
+    '// file.s3_key is saved to your table for later URL retrieval',
+], 'javascript');
+
+addH2('Supported MIME Types & Tier Limits');
+addBullet('Images: JPEG, PNG, GIF, WebP, SVG, AVIF');
+addBullet('Documents: PDF, TXT, CSV, JSON, Markdown');
+addBullet('Media: MP4, WebM, MP3, WAV, ZIP archives');
+addBullet('Tier Limits: Free (50 MB/file), Pro (500 MB/file), Enterprise (2 GB/file)');
+
+// ═════════════════════════════════════════════════════════════════════════════
+// 9. TEAM COLLABORATION & WEBHOOKS
+// ═════════════════════════════════════════════════════════════════════════════
+newPage();
+addTitle('8. Team Collaboration & Webhooks');
+addText('Manage project collaborators, role-based access, and outbound webhooks programmatically.');
+
+addH2('Team Management API');
+addCodeBlock([
+    'GET    /api/team?projectId=YOUR_PROJECT_ID              // List active members & pending invites',
+    'POST   /api/team                                        // Invite member: { projectId, email, role }',
+    'DELETE /api/team?projectId=...&userId=...              // Remove user from project',
+    'POST   /api/team/invites/accept                         // Accept invite: { inviteId, status: "accepted" }',
+], 'HTTP');
+
+addH3('Role-Based Access Control (RBAC)');
+addTable(
+    ['Role', 'Data Access', 'Administrative Privileges'],
+    [
+        ['admin', 'Full SELECT, INSERT, UPDATE, DELETE', 'Manage billing, API keys, team members, and settings'],
+        ['developer', 'Full SELECT, INSERT, UPDATE, DELETE', 'Manage schemas, execute queries, view logs. No billing'],
+        ['viewer', 'Read-only (SELECT)', 'Inspect dashboard, schema, and read data. No modifications'],
+    ],
+    [75, 200, 230]
+);
+
+addH2('Outbound Webhooks');
+addText('Fluxbase posts JSON events directly to your serverless or backend endpoint on table mutations.');
+addCodeBlock([
+    'POST /api/fluxbase-webhook',
+    'X-Fluxbase-Signature: sha256=d58e37... (HMAC-SHA256 signature)',
+    'Content-Type: application/json',
+    '',
     '{',
     '  "event_type": "row.inserted",',
-    '  "table_id":   "orders",',
-    '  "timestamp":  "2026-03-27T19:00:00.000Z",',
+    '  "project_id": "YOUR_PROJECT_ID",',
+    '  "table_id": "orders",',
+    '  "timestamp": "2026-09-18T20:00:00.000Z",',
     '  "data": {',
-    '    "new": { "id": "abc123", "amount": 500, "status": "pending" },',
+    '    "new": { "id": 101, "amount": 89.50, "status": "paid" },',
     '    "old": null',
     '  }',
     '}',
-], 'Webhook Payload (JSON)');
+], 'JSON');
 
-addH3('Payload Fields', DARK);
-addBullet('"event_type" — One of: row.inserted | row.updated | row.deleted');
-addBullet('"table_id"   — The table name where the event occurred.');
-addBullet('"timestamp"  — ISO-8601 UTC timestamp of the event.');
-addBullet('"data.new"   — New row values (present on row.inserted and row.updated).');
-addBullet('"data.old"   — Previous row values (present on row.updated and row.deleted).');
-
-addH2('Step 1 — Create a Receiver Endpoint in Your App');
-addText('Add any HTTP POST route to your application. Fluxbase will call this URL every time a relevant event fires.');
-
-addH3('Next.js (App Router)', DARK);
+addH3('Signature Verification in Node.js');
 addCodeBlock([
-    '// app/api/fluxbase-webhook/route.ts',
-    "import { NextRequest, NextResponse } from 'next/server';",
+    "import crypto from 'crypto';",
     '',
-    'export async function POST(req: NextRequest) {',
-    '  const { event_type, table_id, data } = await req.json();',
-    '',
-    "  if (table_id === 'matches' && event_type === 'row.inserted') {",
-    '    await sendMatchNotification(data.new.user_b, data.new.id);',
-    '  }',
-    '',
-    "  if (table_id === 'messages' && event_type === 'row.inserted') {",
-    '    await broadcastToUser(data.new.recipient_id, data.new);',
-    '  }',
-    '',
-    '  return NextResponse.json({ ok: true });',
+    'export async function POST(req) {',
+    '  const rawBody = await req.text();',
+    "  const sig = req.headers.get('x-fluxbase-signature') ?? '';",
+    '  const secret = process.env.FLUXBASE_WEBHOOK_SECRET;',
+    "  const expected = 'sha256=' + crypto.createHmac('sha256', secret).update(rawBody).digest('hex');",
+    '  if (sig !== expected) return new Response("Unauthorized", { status: 401 });',
+    '  // Process webhook payload safely...',
+    '  return new Response("OK", { status: 200 });',
     '}',
-], 'TypeScript (Next.js)');
+], 'javascript');
 
-addH3('Node.js / Express', DARK);
-addCodeBlock([
-    "const express = require('express');",
-    'const app = express();',
-    'app.use(express.json());',
-    '',
-    "app.post('/fluxbase-webhook', (req, res) => {",
-    '  const { event_type, table_id, data } = req.body;',
-    "  if (event_type === 'row.inserted') console.log('New row in', table_id, data.new);",
-    '  res.status(200).send("ok");',
-    '});',
-    'app.listen(3000);',
-], 'JavaScript (Express)');
-
-addH2('Step 2 — Register the Webhook in Fluxbase');
-addText('Option A — Via the Dashboard: Settings → Webhooks → Add Webhook');
-addBullet('Name:  A descriptive label (e.g. "New Order Listener")');
-addBullet('URL:   The fully public URL (e.g. https://myapp.vercel.app/api/fluxbase-webhook)');
-addBullet('Event: row.inserted | row.updated | row.deleted | * for all events');
-addBullet('Table: A specific table name, or * to listen to all tables');
-
-addText('Option B — Via the REST API:');
-addCodeBlock([
-    'POST /api/webhooks',
-    'Authorization: Bearer YOUR_API_KEY',
-    'Content-Type: application/json',
-    '',
-    '{',
-    '  "projectId": "YOUR_PROJECT_ID",',
-    '  "name":      "New Order Listener",',
-    '  "url":       "https://myapp.vercel.app/api/fluxbase-webhook",',
-    '  "event":     "row.inserted",',
-    '  "table_id":  "orders",',
-    '  "is_active": true',
-    '}',
-], 'HTTP');
-
-addH2('Step 3 — Test Locally with ngrok');
-addText(
-    'Fluxbase can only POST to a public URL — localhost will not work. ' +
-    'Use ngrok to expose your local server during development:'
-);
-addCodeBlock([
-    '# Install ngrok once',
-    'npm install -g ngrok',
-    '',
-    '# Start your local dev server',
-    'npm run dev   # running on port 3000',
-    '',
-    '# In a 2nd terminal, open a tunnel',
-    'ngrok http 3000',
-    '',
-    '# ngrok gives you a URL like:',
-    '#   https://a1b2-103-123-456.ngrok-free.app',
-    '',
-    '# Register that URL in Fluxbase:',
-    '#   https://a1b2-103-123-456.ngrok-free.app/api/fluxbase-webhook',
-], 'bash');
-
-addH2('Quick Test Without Code');
-addText('Go to https://webhook.site, copy the unique URL it gives you, register it as your Fluxbase webhook, then insert a row via the Table Editor. The full JSON payload will appear on webhook.site instantly.');
-
-addAlert('Security Tip',
-    'Register a webhook Secret in Fluxbase. Your receiver endpoint can then verify the ' +
-    'X-Fluxbase-Signature header using HMAC-SHA256 to confirm requests are genuinely from Fluxbase.',
-    'warn'
-);
-
-// ─── STORAGE ─────────────────────────────────────────────────────────────────
+// ═════════════════════════════════════════════════════════════════════════════
+// 10. ERROR CODES & ROW LEVEL SECURITY
+// ═════════════════════════════════════════════════════════════════════════════
 newPage();
-addTitle('Storage');
+addTitle('9. Error Codes & Row-Level Security');
+
+addH2('Standardized Error Codes');
+addTable(
+    ['Status', 'Error Code', 'Remediation Guide'],
+    [
+        ['401', 'AUTH_REQUIRED', 'Missing Authorization: Bearer <key> header'],
+        ['401', 'TOKEN_EXPIRED', 'JWT session or API key has expired. Re-authenticate'],
+        ['403', 'SCOPE_MISMATCH', 'API key lacks required scope (e.g., ai key used for DDL)'],
+        ['403', 'PROJECT_SUSPENDED', 'Project is suspended due to quota limits or billing'],
+        ['404', 'PROJECT_NOT_FOUND', 'Verify project identifier in Settings → Project ID'],
+        ['429', 'RATE_LIMIT', 'Exceeded 50 req/10s per project. Use exponential backoff'],
+        ['200', 'SQL_EXEC_ERROR', 'Database execution syntax error. Inspect error.details'],
+        ['500', 'INTERNAL_ERROR', 'Unexpected server condition. Auto-logged for monitoring'],
+    ],
+    [50, 130, 325]
+);
+
+addH2('Row-Level Security (RLS) & Multi-Tenant Isolation');
 addText(
-    'Fluxbase Storage allows you to upload, manage and serve files (images, PDFs, videos, CSVs) ' +
-    'backed by AWS S3. All files are private by default — you use short-lived presigned URLs to serve them securely.'
+    'Fluxbase injects the authenticated caller ID via PostgreSQL session state before query execution: ' +
+    'SET LOCAL fluxbase.auth_uid = $1. This ensures data isolation at the database engine level.'
 );
 
-addH2('Storage Workflow');
-addCodeBlock([
-    '1. Create a Bucket  —  a logical container for your files',
-    '2. Upload a File    →  POST /api/storage/upload  (multipart/form-data)',
-    '3. Save s3_key      —  store the returned s3_key in your own database table',
-    '4. Serve the file   →  GET /api/storage/url?s3Key=...  →  15-min presigned URL',
-    '5. Render           →  <img src={url} /> or trigger a download',
-], 'Workflow');
+addH3('Common RLS Policy Patterns');
+addBullet('User Owns Their Data: USING (user_id = auth.uid())');
+addBullet('Organization Multi-Tenancy: USING (org_id = auth.uid())');
+addBullet('Public Read / Owner Write: Policy 1 SELECT (true), Policy 2 UPDATE (author_id = auth.uid())');
+addBullet('Full Internal Lockdown: USING (false) — prevents all external API access to sensitive audit tables');
 
-addH2('Bucket Management');
-
-addH3('List Buckets — GET /api/storage/buckets', DARK);
-addCodeBlock([
-    'GET  /api/storage/buckets?projectId=YOUR_PROJECT_ID',
-    'Authorization: Bearer YOUR_API_KEY',
-    '',
-    '// Response',
-    '{ "success": true, "buckets": [{ "id": "...", "name": "profile-pictures", "is_public": false }] }',
-], 'HTTP');
-
-addH3('Create a Bucket — POST /api/storage/buckets', DARK);
-addCodeBlock([
-    'POST /api/storage/buckets',
-    'Authorization: Bearer YOUR_API_KEY',
-    'Content-Type: application/json',
-    '',
-    '{ "projectId": "YOUR_PROJECT_ID", "name": "profile-pictures", "isPublic": false }',
-    '',
-    '// Name rules: lowercase, alphanumeric + hyphens/underscores, 1-63 characters',
-    '// Response: { "success": true, "bucket": { "id": "...", "name": "..." } }',
-], 'HTTP');
-
-addH2('Uploading a File — POST /api/storage/upload');
-addCodeBlock([
-    'POST /api/storage/upload',
-    'Authorization: Bearer YOUR_API_KEY',
-    'Content-Type: multipart/form-data',
-    '',
-    'Form fields:',
-    '  file      — the File object (from <input type="file">)',
-    '  bucketId  — destination bucket ID or Bucket Name (e.g. "photos")',
-    '  projectId — your project ID',
-    '',
-    '// Response',
-    '{',
-    '  "success": true,',
-    '  "file": {',
-    '    "id": "...", "name": "avatar.jpg",',
-    '    "s3_key": "project_xxx/buckets/yyy/1711000000_avatar.jpg",',
-    '    "size": 204800, "mime_type": "image/jpeg"',
-    '  }',
-    '}',
-], 'HTTP');
-
-addH3('JavaScript Example', DARK);
-addCodeBlock([
-    "const form = new FormData();",
-    "form.append('file', document.getElementById('file-input').files[0]);",
-    "form.append('bucketId', 'photos'); // Supports ID or Name",
-    "form.append('projectId', 'YOUR_PROJECT_ID');",
-    '',
-    "const res = await fetch('https://your-fluxbase.app/api/storage/upload', {",
-    "  method: 'POST',",
-    "  headers: { 'Authorization': 'Bearer YOUR_API_KEY' },",
-    "  body: form",
-    "});",
-    "const { file } = await res.json();",
-    "// Store file.s3_key in your DB, then use it later to get a download URL",
-], 'JavaScript');
-
-addH2('Getting a Download URL — GET /api/storage/url');
-addText('All files are private. Call this endpoint to get a 15-minute presigned URL to serve a file:');
-addCodeBlock([
-    'GET /api/storage/url?s3Key=YOUR_S3_KEY&projectId=YOUR_PROJECT_ID',
-    'Authorization: Bearer YOUR_API_KEY',
-    '',
-    '// Response',
-    '{ "success": true, "url": "https://s3.amazonaws.com/...", "expiresIn": 900 }',
-], 'HTTP');
-
-addH2('List Files — GET /api/storage/files');
-addCodeBlock([
-    'GET /api/storage/files?bucketId=YOUR_BUCKET_ID&projectId=YOUR_PROJECT_ID',
-    'Authorization: Bearer YOUR_API_KEY',
-    '',
-    '// Response',
-    '{ "success": true, "files": [{ "id", "name", "s3_key", "size", "mime_type", "created_at" }] }',
-], 'HTTP');
-
-addH2('Delete a File — DELETE /api/storage/files');
-addCodeBlock([
-    'DELETE /api/storage/files',
-    'Authorization: Bearer YOUR_API_KEY',
-    'Content-Type: application/json',
-    '',
-    '{ "fileId": "...", "s3Key": "...", "projectId": "YOUR_PROJECT_ID" }',
-    '',
-    '// Response: { "success": true }',
-], 'HTTP');
-
-addH2('Plan Limits & Supported File Types');
-addBullet('Free: up to 50 MB per file  |  Pro: 500 MB per file  |  Max: 2 GB per file');
-addBullet('Images: jpeg, png, gif, webp, svg');
-addBullet('Documents: pdf, txt, csv, json');
-addBullet('Video: mp4, webm  |  Audio: mp3, wav  |  Archives: zip');
-
-// ─── REAL-TIME SSE ─────────────────────────────────────────────────────────────
-newPage();
-addTitle('Real-time (SSE) — @fluxbaseteam/fluxbase SDK');
-addText(
-    'Fluxbase provides native Server-Sent Events (SSE) for real-time database change notifications. ' +
-    'The official SDK wraps the SSE connection with automatic reconnection, exponential backoff, ' +
-    'online/offline detection, and Node.js compatibility.'
+addAlert('Interactive Documentation & Support',
+    'Interactive Documentation: https://www.fluxbasedb.me/docs\n' +
+    'Direct PDF Download: https://www.fluxbasedb.me/api/docs/download-pdf\n' +
+    'Technical Support: sumithsumith4567890@gmail.com',
+    'success'
 );
 
-addAlert('Architecture — Two URLs Required',
-    'Fluxbase requires two separate URLs:\n' +
-    '  url         — Vercel deployment: handles all SQL/REST queries\n' +
-    '  realtimeUrl — Render sidecar:    handles persistent SSE connections\n\n' +
-    'The Render sidecar is required because Vercel serverless functions cannot hold ' +
-    'persistent connections. Pass both URLs to createClient().',
-    'warn'
-);
-
-addH2('Installation');
-addCodeBlock([
-    'npm install @fluxbaseteam/fluxbase',
-], 'bash');
-
-addH2('Initialize with Both URLs');
-addCodeBlock([
-    "import { createClient } from '@fluxbaseteam/fluxbase';",
-    '',
-    'const flux = createClient(',
-    "  'https://your-app.vercel.app',",
-    "  'your-project-id',",
-    "  'fl_your-api-key',",
-    '  {',
-    "    realtimeUrl: 'https://fluxbase-realtime.onrender.com', // SSE → Render",
-    '    debug: true,     // logs all events to console',
-    '    timeout: 8000,',
-    '    retries: 3,',
-    '  }',
-    ');',
-], 'TypeScript');
-
-addH2('Subscribe to Live Events');
-addCodeBlock([
-    "const channel = flux.channel('chat', 'messages')",
-    '',
-    "  .on('row.inserted', (payload) => {",
-    '    const newRow = payload.data?.new;',
-    "    console.log('New row:', newRow);",
-    '  })',
-    "  .on('row.updated', (p) => console.log('Updated:', p.data?.new))",
-    "  .on('row.deleted', (p) => console.log('Deleted:', p.data?.old))",
-    "  .on('*', (p) => console.log('Any event:', p.event_type))",
-    '',
-    '  // Lifecycle hooks',
-    "  .onConnect(() => setStatus('connected'))",
-    "  .onDisconnect(() => setStatus('disconnected'))",
-    '  .onReconnect((attempt, delay) => {',
-    "    console.log('Retry #' + attempt + ' in ' + delay + 'ms');",
-    '  })',
-    '',
-    '  .subscribe();',
-], 'TypeScript');
-
-addH2('Pause, Resume and Unsubscribe');
-addCodeBlock([
-    'channel.pause();       // stop receiving (keeps subscription registered)',
-    'channel.resume();      // reconnect after pause',
-    'channel.unsubscribe(); // permanently close and clean up',
-    "console.log(channel.state); // 'connected' | 'connecting' | 'disconnected' | 'paused'",
-], 'TypeScript');
-
-addH2('React Hook Pattern');
-addCodeBlock([
-    "import { useEffect } from 'react';",
-    "import { createClient } from '@fluxbaseteam/fluxbase';",
-    '',
-    'const flux = createClient(',
-    '  process.env.NEXT_PUBLIC_FLUXBASE_URL,',
-    '  process.env.NEXT_PUBLIC_FLUXBASE_PROJECT_ID,',
-    '  process.env.NEXT_PUBLIC_FLUXBASE_API_KEY,',
-    '  { realtimeUrl: process.env.NEXT_PUBLIC_FLUXBASE_REALTIME_URL }',
-    ');',
-    '',
-    'function ChatRoom() {',
-    '  useEffect(() => {',
-    "    const ch = flux.channel('chat', 'messages')",
-    "      .on('row.inserted', (p) => setMessages(m => [...m, p.data?.new]))",
-    '      .subscribe();',
-    '    return () => ch.unsubscribe(); // cleanup on unmount',
-    '  }, []);',
-    '}',
-], 'TypeScript (React)');
-
-addH2('Required Environment Variables');
-addCodeBlock([
-    '# .env.local',
-    'NEXT_PUBLIC_FLUXBASE_URL=https://your-app.vercel.app',
-    'NEXT_PUBLIC_FLUXBASE_PROJECT_ID=your-project-id',
-    'NEXT_PUBLIC_FLUXBASE_API_KEY=fl_your-api-key',
-    'NEXT_PUBLIC_FLUXBASE_REALTIME_URL=https://fluxbase-realtime.onrender.com',
-], '.env.local');
-
-addH2('Raw EventSource (Without SDK)');
-addText('For non-JS environments or advanced use only — the SDK handles reconnection automatically.');
-addCodeBlock([
-    "const url = new URL('https://fluxbase-realtime.onrender.com/api/realtime/subscribe');",
-    "url.searchParams.set('projectId', 'YOUR_PROJECT_ID');",
-    "url.searchParams.set('apiKey', 'fl_YOUR_API_KEY');",
-    '',
-    'const source = new EventSource(url.toString());',
-    "source.onopen = () => console.log('SSE connected');",
-    'source.onmessage = (event) => {',
-    '  const payload = JSON.parse(event.data);',
-    "  if (payload.type === 'connected') return; // ignore heartbeat",
-    '  console.log(payload.event_type, payload.data?.new);',
-    '};',
-    'source.onerror = () => console.warn("Connection lost — browser will auto-retry");',
-], 'JavaScript (Raw SSE)');
-
-addAlert('SDK Advantage',
-    'The @fluxbaseteam/fluxbase SDK adds: exponential backoff reconnect (1s→2s→4s→max 30s), ' +
-    'auto-pause/resume on browser offline/online events, Node.js compatibility via EventSource ponyfill, ' +
-    'and typed error codes. Use the SDK in production apps.',
-    'info'
-);
-
-// ─── ERROR CODES ─────────────────────────────────────────────────────────────────
-newPage();
-addTitle('Structured Error Codes');
-addText(
-    'Fluxbase APIs and the @fluxbaseteam/fluxbase SDK return standardized error objects ' +
-    'so your app can handle failures programmatically. Import ERROR_CODES for type-safe matching.'
-);
-
-addH2('SDK Error Handling');
-addCodeBlock([
-    "import { createClient, ERROR_CODES } from '@fluxbaseteam/fluxbase';",
-    '',
-    'const flux = createClient(url, projectId, apiKey, { realtimeUrl });',
-    '',
-    '// Global auth error handler',
-    'flux.onAuthError((err) => {',
-    "  if (err.code === ERROR_CODES.UNAUTHORIZED) router.push('/login');",
-    '});',
-    '',
-    '// Per-query error handling',
-    "const { data, error, success } = await flux.from('users').select('*');",
-    'if (!success) {',
-    '  switch (error.code) {',
-    '    case ERROR_CODES.TIMEOUT:',
-    "      showToast('Request timed out — check your connection.');",
-    '      break;',
-    '    case ERROR_CODES.CORS_ERROR:',
-    "      console.error('CORS: Add Authorization to Access-Control-Allow-Headers');",
-    '      break;',
-    '    case ERROR_CODES.RATE_LIMIT_EXCEEDED:',
-    "      showToast('Too many requests — slow down.');",
-    '      break;',
-    '    default:',
-    '      console.error(error.message, error.hint);',
-    '  }',
-    '}',
-], 'TypeScript');
-
-addH2('All Error Codes');
-addBullet('AUTH_REQUIRED (401)      — Missing or invalid API key.');
-addBullet('UNAUTHORIZED (401)       — API key is expired or revoked.');
-addBullet('SCOPE_MISMATCH (403)     — API key scoped to a different project.');
-addBullet('TOKEN_EXPIRED            — Session token has expired.');
-addBullet('BAD_REQUEST (400)        — Missing projectId or query field.');
-addBullet('PROJECT_NOT_FOUND (404)  — Project does not exist.');
-addBullet('TABLE_NOT_FOUND (404)    — Table referenced in query does not exist.');
-addBullet('SQL_EXECUTION_ERROR      — SQL syntax or runtime error. Check error.message.');
-addBullet('RATE_LIMIT_EXCEEDED (429)— 30 requests / 10 seconds per project exceeded.');
-addBullet('NETWORK_ERROR            — Could not reach the server (connection issue).');
-addBullet('TIMEOUT                  — Request exceeded the configured timeout ms.');
-addBullet('CORS_ERROR               — Cross-origin request blocked. Check CORS headers.');
-addBullet('ABORTED                  — Request cancelled via AbortController.abort().');
-addBullet('REALTIME_CONNECTION_FAILED — SSE connection could not be established.');
-addBullet('INTERNAL_ERROR (500)     — Server-side error. Check Render/Vercel logs.');
-
-doc.setFontSize(9);
-doc.setTextColor(70, 70, 70);
-doc.text('© 2025 Fluxbase Inc. All rights reserved.  —  v4.0 Enhanced edition', MARGIN, doc.internal.pageSize.getHeight() - 30);
-
-// ─── WRITE FILE ──────────────────────────────────────────────────────────────
+// ═════════════════════════════════════════════════════════════════════════════
+// WRITE PDF FILE
+// ═════════════════════════════════════════════════════════════════════════════
 const pdfBytes = doc.output('arraybuffer');
 writeFileSync(join(publicDir, 'fluxbase-integration-guide.pdf'), Buffer.from(pdfBytes));
-console.log('✅  PDF written to public/fluxbase-integration-guide.pdf');
+console.log('✅  Successfully generated comprehensive PDF at public/fluxbase-integration-guide.pdf');
 
 } catch (error) {
-    console.error('FATAL ERROR DURING PDF GENERATION:');
-    console.error(error);
+    console.error('FATAL ERROR DURING PDF GENERATION:', error);
     process.exit(1);
 }

@@ -172,7 +172,7 @@ export default function SettingsDocsPage() {
 
                 <div className="mt-6 pt-6 border-t border-border space-y-2">
                     <Button variant="outline" size="sm" className="w-full justify-start gap-2 border-border bg-secondary/70 text-foreground/85 hover:bg-muted text-xs" asChild>
-                        <a href="/fluxbase-integration-guide.pdf" download>
+                        <a href="/api/docs/download-pdf" download="Fluxbase-Integration-Guide.pdf">
                             <Download className="h-3.5 w-3.5 text-orange-400" /> Download PDF Guide
                         </a>
                     </Button>
@@ -187,8 +187,15 @@ export default function SettingsDocsPage() {
                 <button onClick={() => router.back()} className="flex items-center gap-2 text-muted-foreground hover:text-white text-sm">
                     <ArrowLeft className="h-4 w-4" /> Back
                 </button>
-                <span className="font-bold text-white text-sm">Documentation</span>
-                <span className="text-[10px] px-2 py-0.5 rounded bg-orange-500/10 text-orange-400 font-mono">v4.2</span>
+                <div className="flex items-center gap-2">
+                    <span className="font-bold text-white text-sm">Documentation</span>
+                    <span className="text-[10px] px-2 py-0.5 rounded bg-orange-500/10 text-orange-400 font-mono">v4.2</span>
+                </div>
+                <Button size="sm" variant="ghost" className="h-8 px-2 text-orange-400 hover:text-orange-300" asChild>
+                    <a href="/api/docs/download-pdf" download="Fluxbase-Integration-Guide.pdf" title="Download PDF Guide">
+                        <Download className="h-4 w-4" />
+                    </a>
+                </Button>
             </div>
 
             {/* ── Scrollable Content ── */}
@@ -929,7 +936,7 @@ if (sig !== expected) return res.status(401).send('Unauthorized');`} />
                             </div>
                             <div className="flex gap-3">
                                 <Button variant="outline" className="border-border bg-secondary text-foreground/85 hover:bg-muted rounded-lg" asChild>
-                                    <a href="/fluxbase-integration-guide.pdf" download><Download className="h-4 w-4 mr-2 text-orange-400" />PDF Guide</a>
+                                    <a href="/api/docs/download-pdf" download="Fluxbase-Integration-Guide.pdf"><Download className="h-4 w-4 mr-2 text-orange-400" />PDF Guide</a>
                                 </Button>
                                 <Button className="bg-orange-500 hover:bg-orange-600 text-white rounded-lg font-semibold shadow-lg shadow-orange-500/20" asChild>
                                     <Link href="/docs" target="_blank"><ExternalLink className="h-4 w-4 mr-2" />Full Docs</Link>

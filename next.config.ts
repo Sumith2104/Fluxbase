@@ -21,6 +21,25 @@ const nextConfig: NextConfig = {
       bodySizeLimit: '200mb',
     },
   },
+  async redirects() {
+    return [
+      {
+        source: '/doc',
+        destination: '/docs',
+        permanent: true,
+      },
+      {
+        source: '/doc/pdf',
+        destination: '/api/docs/download-pdf',
+        permanent: false,
+      },
+      {
+        source: '/docs/pdf',
+        destination: '/api/docs/download-pdf',
+        permanent: false,
+      },
+    ];
+  },
   async headers() {
     return [
       {

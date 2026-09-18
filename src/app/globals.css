@@ -365,3 +365,39 @@ input[type="reset"] {
   animation: checkmarkCheck 0.4s cubic-bezier(0.65, 0, 0.45, 1) 0.3s forwards;
 }
 
+/* Print / Save as PDF optimizations for Documentation */
+@media print {
+  aside, 
+  nav, 
+  .lg\:hidden,
+  .not-print,
+  button,
+  header a[href="/"] {
+    display: none !important;
+  }
+
+  body, html, .docs-mobile-safe {
+    background: #ffffff !important;
+    color: #111111 !important;
+  }
+
+  .lg\:pl-64 {
+    padding-left: 0 !important;
+  }
+
+  pre, code {
+    background: #f4f4f5 !important;
+    color: #18181b !important;
+    border: 1px solid #e4e4e7 !important;
+  }
+
+  h1, h2, h3, h4 {
+    color: #111111 !important;
+    page-break-after: avoid;
+  }
+
+  section {
+    page-break-inside: avoid;
+  }
+}
+

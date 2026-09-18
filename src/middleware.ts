@@ -124,7 +124,9 @@ export async function middleware(request: NextRequest) {
         }
 
         // allow public access to marketing pages: '/', '/pricing', etc., and '/checkout' for payment handoffs & returns
-        const isPublicStaticPage = ['/', '/pricing', '/privacy', '/terms', '/docs', '/contact', '/reset-password', '/checkout'].includes(pathname);
+        const isPublicStaticPage = [
+            '/', '/pricing', '/privacy', '/terms', '/docs', '/doc', '/contact', '/reset-password', '/checkout'
+        ].includes(pathname) || pathname.startsWith('/docs') || pathname.startsWith('/doc');
 
         // and tries to access a protected page (non-public, non-api), redirect to root
         if (!isPublicStaticPage && !pathname.startsWith('/api/')) {

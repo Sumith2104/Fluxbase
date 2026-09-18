@@ -6,7 +6,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { 
     Download, Book, Code2, Webhook, Database, ShieldCheck, Shield,
     Zap, Copy, Check, ArrowRight, HardDrive, AlertCircle,
-    Info, Lock, Users, Eye, KeyRound, Globe, Cpu, ChevronRight, Bot, Sparkles
+    Info, Lock, Users, Eye, KeyRound, Globe, Cpu, ChevronRight, Bot, Sparkles, Printer
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -126,6 +126,20 @@ export default function DocsPage() {
             const el = document.getElementById(s.id);
             if (el) observer.observe(el);
         });
+
+        // If URL has ?download=true or ?pdf=true, automatically trigger the PDF manual download
+        if (typeof window !== 'undefined') {
+            const params = new URLSearchParams(window.location.search);
+            if (params.get('download') === 'true' || params.get('pdf') === 'true') {
+                const link = document.createElement('a');
+                link.href = '/api/docs/download-pdf';
+                link.download = 'Fluxbase-Integration-Guide.pdf';
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+            }
+        }
+
         return () => observer.disconnect();
     }, []);
 
@@ -163,7 +177,7 @@ export default function DocsPage() {
 
                 <div className="mt-6 pt-6 border-t border-border space-y-2">
                     <Button variant="outline" size="sm" className="w-full justify-start gap-2 border-border bg-secondary/70 text-foreground/85 hover:bg-muted text-xs" asChild>
-                        <a href="/fluxbase-integration-guide.pdf" download>
+                        <a href="/api/docs/download-pdf" download="Fluxbase-Integration-Guide.pdf">
                             <Download className="h-3.5 w-3.5 text-orange-400" /> Download PDF Guide
                         </a>
                     </Button>
@@ -177,8 +191,28 @@ export default function DocsPage() {
             <div className="min-w-0 flex-1 lg:pl-64">
                 <div className="mx-auto w-full max-w-5xl px-5 py-14 sm:px-8 sm:py-20 lg:px-12 lg:py-28">
 
+                    {/* Mobile Quick Action Banner */}
+                    <div className="lg:hidden flex items-center justify-between gap-3 p-3.5 mb-8 rounded-xl border border-border bg-card/85 shadow-sm">
+                        <div className="flex items-center gap-2 min-w-0">
+                            <div className="p-1.5 rounded-lg bg-orange-500/10 shrink-0">
+                                <Book className="h-4 w-4 text-orange-400" />
+                            </div>
+                            <span className="font-bold text-white text-xs truncate">Documentation Manual (v4.2)</span>
+                        </div>
+                        <div className="flex items-center gap-2 shrink-0">
+                            <Button size="sm" className="bg-orange-500 hover:bg-orange-600 text-white font-semibold text-xs h-8 gap-1.5 px-3" asChild>
+                                <a href="/api/docs/download-pdf" download="Fluxbase-Integration-Guide.pdf">
+                                    <Download className="h-3.5 w-3.5" /> PDF
+                                </a>
+                            </Button>
+                            <Button size="sm" variant="outline" onClick={() => window.print()} className="h-8 px-2.5 text-xs text-muted-foreground hover:text-white" title="Print or save as PDF">
+                                <Printer className="h-3.5 w-3.5" />
+                            </Button>
+                        </div>
+                    </div>
+
                     {/* Hero */}
-                    <header className="mb-12 max-w-full space-y-4 sm:mb-20 sm:max-w-2xl">
+                    <header className="mb-12 max-w-full space-y-4 sm:mb-20 sm:max-w-3xl">
                         <Link href="/" className="inline-flex items-center gap-1.5 text-xs text-muted-foreground/75 hover:text-orange-400 transition-colors font-medium mb-2">
                             <ArrowRight className="h-3 w-3 rotate-180" /> Back to Fluxbase
                         </Link>
@@ -186,17 +220,39 @@ export default function DocsPage() {
                             Integration <span className="text-orange-400">Guide</span>
                         </h1>
                         <p className="text-base text-muted-foreground/75 leading-relaxed">
-                            The complete technical reference for connecting your apps to Fluxbase. Covers authentication, the SQL API, real-time WebSockets, file storage, team management, and row-level security.
+                            The complete technical reference for connecting your apps to Fluxbase. Covers authentication, the SQL API, OpenAI-compatible AI gateway, MCP autonomous coding agent tooling, real-time WebSockets, file storage, team management, and row-level security.
                         </p>
                         <div className="flex max-w-full flex-wrap items-center gap-2 pt-2 sm:gap-3">
                             {[
-                                { label: 'v4.2', color: 'bg-orange-500/10 text-orange-400' },
+                                { label: 'v4.2 Production', color: 'bg-orange-500/10 text-orange-400' },
                                 { label: 'PostgreSQL', color: 'bg-blue-500/10 text-blue-400' },
                                 { label: 'MySQL', color: 'bg-emerald-500/10 text-emerald-400' },
+                                { label: 'OpenAI AI Gateway', color: 'bg-amber-500/10 text-amber-400' },
+                                { label: 'MCP JSON-RPC', color: 'bg-cyan-500/10 text-cyan-400' },
                                 { label: 'REST + WebSocket', color: 'bg-purple-500/10 text-purple-400' },
                             ].map(b => (
                                 <span key={b.label} className={cn('text-[11px] font-bold px-2.5 py-1 rounded-full uppercase tracking-wider', b.color)}>{b.label}</span>
                             ))}
+                        </div>
+
+                        {/* Prominent PDF Download & Export Action Bar */}
+                        <div className="flex flex-wrap items-center gap-3 pt-4">
+                            <Button size="lg" className="bg-orange-500 hover:bg-orange-600 text-white font-semibold gap-2 shadow-lg shadow-orange-500/20" asChild>
+                                <a href="/api/docs/download-pdf" download="Fluxbase-Integration-Guide.pdf">
+                                    <Download className="h-4 w-4" /> Download PDF Manual
+                                </a>
+                            </Button>
+                            <Button size="lg" variant="outline" onClick={() => window.print()} className="border-border bg-secondary/80 hover:bg-secondary text-foreground/90 font-medium gap-2">
+                                <Printer className="h-4 w-4 text-orange-400" /> Print / Save as PDF
+                            </Button>
+                            <a 
+                                href="/api/docs" 
+                                target="_blank" 
+                                rel="noreferrer" 
+                                className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-mono text-muted-foreground hover:text-orange-400 transition-colors border border-border/70 rounded-md bg-secondary/40"
+                            >
+                                <Code2 className="h-3.5 w-3.5 text-blue-400" /> OpenAPI JSON
+                            </a>
                         </div>
                     </header>
 
@@ -1427,7 +1483,7 @@ def handle():
                             </div>
                             <div className="flex items-center gap-3 shrink-0">
                                 <Button variant="outline" className="border-border bg-secondary text-foreground/85 hover:bg-muted rounded-lg" asChild>
-                                    <a href="/fluxbase-integration-guide.pdf" download>
+                                    <a href="/api/docs/download-pdf" download="Fluxbase-Integration-Guide.pdf">
                                         <Download className="h-4 w-4 mr-2 text-orange-400" />PDF Guide
                                     </a>
                                 </Button>
