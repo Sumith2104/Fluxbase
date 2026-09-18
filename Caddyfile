@@ -1,0 +1,54 @@
+{
+    # Global options
+    email sumithsumith4567890@gmail.com
+    admin off
+}
+
+# Production Domain with Automatic SSL
+fluxbasedb.me, www.fluxbasedb.me {
+    # Canonical redirection: www.fluxbasedb.me -> fluxbasedb.me
+    @www host www.fluxbasedb.me
+    redir @www https://fluxbasedb.me{uri} permanent
+
+    # Real-Time WebSocket connections
+    @websockets {
+        path /ws* /api/realtime/subscribe*
+    }
+    handle @websockets {
+        reverse_proxy websocket:4000 {
+            header_up Host {host}
+            header_up X-Real-IP {remote_host}
+            header_up X-Forwarded-For {remote_host}
+            header_up X-Forwarded-Proto {scheme}
+        }
+    }
+
+    # Next.js Application, REST SQL Engine, Flux AI Gateway & MCP Gateway
+    handle {
+        encode zstd gzip
+
+        reverse_proxy app:3000 {
+            header_up Host {host}
+            header_up X-Real-IP {remote_host}
+            header_up X-Forwarded-For {remote_host}
+            header_up X-Forwarded-Proto {scheme}
+
+            # Response buffer configuration for high-speed streaming
+            flush_interval -1
+        }
+    }
+}
+
+# Fallback for Direct IP Access (for testing before DNS cutover)
+:80 {
+    @websockets {
+        path /ws* /api/realtime/subscribe*
+    }
+    handle @websockets {
+        reverse_proxy websocket:4000
+    }
+
+    handle {
+        reverse_proxy app:3000
+    }
+}

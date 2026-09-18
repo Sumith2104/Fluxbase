@@ -1,0 +1,198 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'Fluxbase All-in-One Production Stack on AWS EC2 (ap-south-1 Mumbai) for fluxbasedb.me'
+
+Parameters:
+  InstanceType:
+    Type: String
+    Default: 't4g.large'
+    AllowedValues:
+      - 't4g.medium'
+      - 't4g.large'
+      - 't4g.xlarge'
+      - 'c7g.large'
+      - 't3.large'
+      - 't3.xlarge'
+    Description: 'EC2 instance type. t4g series uses high-efficiency AWS Graviton processors.'
+
+  KeyName:
+    Type: String
+    Default: ''
+    Description: 'Optional EC2 Key Pair name for SSH access. Leave blank to use AWS SSM Session Manager.'
+
+  VolumeSize:
+    Type: Number
+    Default: 40
+    MinValue: 20
+    MaxValue: 500
+    Description: 'Root EBS gp3 volume size in GB.'
+
+  DomainName:
+    Type: String
+    Default: 'fluxbasedb.me'
+    Description: 'Primary domain name for Fluxbase.'
+
+  AdminSshCidr:
+    Type: String
+    Default: '0.0.0.0/0'
+    Description: 'CIDR block allowed to connect via SSH on port 22.'
+
+Conditions:
+  HasKeyName: !Not [!Equals [!Ref KeyName, '']]
+  IsArmArchitecture: !Or
+    - !Equals [!Ref InstanceType, 't4g.medium']
+    - !Equals [!Ref InstanceType, 't4g.large']
+    - !Equals [!Ref InstanceType, 't4g.xlarge']
+    - !Equals [!Ref InstanceType, 'c7g.large']
+
+Resources:
+  # IAM Role for SSM Session Manager and CloudWatch Metrics
+  FluxbaseInstanceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub 'fluxbase-instance-role-${AWS::Region}'
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ec2.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore
+        - arn:aws:iam::aws:policy/CloudWatchAgentServerPolicy
+
+  FluxbaseInstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      Path: '/'
+      Roles:
+        - !Ref FluxbaseInstanceRole
+
+  # Security Group
+  FluxbaseSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: 'Security group for Fluxbase All-in-One server (HTTP, HTTPS, SSH)'
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: 0.0.0.0/0
+          Description: 'Allow HTTP for Let-s Encrypt challenges and redirection'
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          CidrIp: 0.0.0.0/0
+          Description: 'Allow HTTPS traffic for fluxbasedb.me and WebSockets'
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: !Ref AdminSshCidr
+          Description: 'Allow SSH administration'
+      Tags:
+        - Key: Name
+          Value: 'fluxbase-sg'
+        - Key: Project
+          Value: 'Fluxbase'
+
+  # EC2 Instance
+  FluxbaseInstance:
+    Type: AWS::EC2::Instance
+    Properties:
+      InstanceType: !Ref InstanceType
+      KeyName: !If [HasKeyName, !Ref KeyName, !Ref 'AWS::NoValue']
+      IamInstanceProfile: !Ref FluxbaseInstanceProfile
+      SecurityGroupIds:
+        - !Ref FluxbaseSecurityGroup
+      # Ubuntu 24.04 LTS dynamic AMI resolution
+      ImageId: !If
+        - IsArmArchitecture
+        - 'resolve:ssm:/aws/service/canonical/ubuntu/server/24.04/stable/current/arm64/hvm/ebs-gp3/ami-id'
+        - 'resolve:ssm:/aws/service/canonical/ubuntu/server/24.04/stable/current/amd64/hvm/ebs-gp3/ami-id'
+      BlockDeviceMappings:
+        - DeviceName: '/dev/sda1'
+          Ebs:
+            VolumeSize: !Ref VolumeSize
+            VolumeType: 'gp3'
+            Iops: 3000
+            Throughput: 125
+            DeleteOnTermination: true
+            Encrypted: true
+      Tags:
+        - Key: Name
+          Value: 'fluxbase-production-server'
+        - Key: Environment
+          Value: 'Production'
+        - Key: Domain
+          Value: !Ref DomainName
+      UserData:
+        Fn::Base64: !Sub |
+          #!/bin/bash
+          set -e
+          exec > >(tee /var/log/user-data.log|logger -t user-data -s 2>/dev/console) 2>&1
+          echo "Starting Fluxbase Server Bootstrap..."
+
+          # Update and install dependencies
+          apt-get update -y
+          apt-get install -y apt-transport-https ca-certificates curl gnupg lsb-release git ufw
+
+          # Install Docker CE
+          install -m 0755 -d /etc/apt/keyrings
+          curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
+          chmod a+r /etc/apt/keyrings/docker.asc
+          echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | tee /etc/apt/sources.list.d/docker.list > /dev/null
+          apt-get update -y
+          apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+
+          # Enable Docker service
+          systemctl enable docker
+          systemctl start docker
+          usermod -aG docker ubuntu
+
+          # Configure Firewall
+          ufw allow 22/tcp
+          ufw allow 80/tcp
+          ufw allow 443/tcp
+          ufw --force enable
+
+          # Setup working directory
+          mkdir -p /opt/fluxbase
+          chown -R ubuntu:ubuntu /opt/fluxbase
+
+          echo "Fluxbase Server Bootstrap Complete!"
+
+  # Static Elastic IP
+  FluxbaseElasticIP:
+    Type: AWS::EC2::EIP
+    Properties:
+      Domain: vpc
+      Tags:
+        - Key: Name
+          Value: 'fluxbase-static-eip'
+        - Key: Project
+          Value: 'Fluxbase'
+
+  FluxbaseEIPAssociation:
+    Type: AWS::EC2::EIPAssociation
+    Properties:
+      InstanceId: !Ref FluxbaseInstance
+      AllocationId: !GetAtt FluxbaseElasticIP.AllocationId
+
+Outputs:
+  ElasticIP:
+    Description: 'Static public IPv4 address to configure in your DNS records for fluxbasedb.me'
+    Value: !Ref FluxbaseElasticIP
+    Export:
+      Name: !Sub '${AWS::StackName}-ElasticIP'
+
+  InstanceId:
+    Description: 'ID of the newly created Fluxbase EC2 instance'
+    Value: !Ref FluxbaseInstance
+
+  DomainConfigurationGuide:
+    Description: 'Add an A-Record in your DNS provider pointing fluxbasedb.me to this Elastic IP'
+    Value: !Sub 'A-Record: @ -> ${FluxbaseElasticIP}, CNAME: www -> fluxbasedb.me'
+
+  ConsoleConnectUrl:
+    Description: 'One-click AWS Session Manager connection link in AWS Console'
+    Value: !Sub 'https://${AWS::Region}.console.aws.amazon.com/systems-manager/session-manager/start-session?region=${AWS::Region}&instanceId=${FluxbaseInstance}'

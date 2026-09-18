@@ -1,0 +1,87 @@
+services:
+  # 1. Next.js Web App, REST Engine, AI Gateway & MCP Server
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: fluxbase-app
+    restart: unless-stopped
+    expose:
+      - "3000"
+    env_file:
+      - .env.production
+    environment:
+      - PORT=3000
+      - HOSTNAME=0.0.0.0
+      - NODE_ENV=production
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - fluxbase-network
+
+  # 2. Realtime WebSocket Server
+  websocket:
+    build:
+      context: .
+      dockerfile: Dockerfile.websocket
+    container_name: fluxbase-websocket
+    restart: unless-stopped
+    expose:
+      - "4000"
+    env_file:
+      - .env.production
+    environment:
+      - WS_PORT=4000
+      - NODE_ENV=production
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - fluxbase-network
+
+  # 3. High-Performance In-Memory Redis Cache & Rate Limiting
+  redis:
+    image: redis:7-alpine
+    container_name: fluxbase-redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes --maxmemory 512mb --maxmemory-policy allkeys-lru
+    expose:
+      - "6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    networks:
+      - fluxbase-network
+
+  # 4. Caddy Reverse Proxy with Automatic HTTPS (Let's Encrypt / ZeroSSL)
+  caddy:
+    image: caddy:2-alpine
+    container_name: fluxbase-proxy
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp" # HTTP/3 QUIC
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - app
+      - websocket
+    networks:
+      - fluxbase-network
+
+networks:
+  fluxbase-network:
+    driver: bridge
+
+volumes:
+  redis_data:
+  caddy_data:
+  caddy_config:

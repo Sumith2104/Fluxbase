@@ -1,0 +1,19 @@
+FROM node:20-alpine AS runner
+WORKDIR /app
+
+RUN apk add --no-cache libc6-compat
+
+COPY package.json package-lock.json ./
+RUN npm ci --omit=dev
+
+# Install tsx globally to run TypeScript directly in Node
+RUN npm install -g tsx
+
+COPY . .
+
+ENV NODE_ENV=production
+ENV WS_PORT=4000
+
+EXPOSE 4000
+
+CMD ["tsx", "src/server/websocket.ts"]
