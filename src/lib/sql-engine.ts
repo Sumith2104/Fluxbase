@@ -7,6 +7,8 @@ import { getPgPool } from '@/lib/pg';
 import { ERROR_CODES, FluxbaseError, FluxbaseErrorCode } from '@/lib/error-codes';
 import { getTenantPgPool, getTenantMysqlPool, getProjectDbAndSchema } from '@/lib/tenant-pools';
 import logger from '@/lib/logger';
+export { CsvSqlEngine } from '@/lib/csv-sql-engine';
+export { SQL_CAPABILITIES, getSqlCapabilityPrompt } from '@/lib/sql-capabilities';
 
 // --- Result Size Limit ---
 const MAX_SELECT_ROWS = parseInt(process.env.FLUX_MAX_SELECT_ROWS || '10000', 10);
@@ -87,14 +89,24 @@ export class SqlEngine {
     }
 
     private sanitizeTenantQuery(queryStr: string): string {
-        if (!this.projectObj) return queryStr;
-        const { schemaName, dbName } = getProjectDbAndSchema(this.projectObj);
-        const targetSchema = this.projectDialect?.toLowerCase() === 'mysql' ? dbName : schemaName;
-
         let sanitized = queryStr
             .replace(/--.*$/gm, '') // Remove single-line comments
             .replace(/\/\*[\s\S]*?\*\//g, '') // Remove multi-line comments
-            .replace(/\/[a-zA-Z0-9_]+\./g, '') // Strip corrupted schema prefixes
+            .replace(/\/[a-zA-Z0-9_]+\./g, ''); // Strip corrupted schema prefixes
+
+        // Normalize illegal trailing commas after CTE definitions before main statement (e.g. "), SELECT ...")
+        sanitized = sanitized.replace(/\)\s*,\s*(?=(?:SELECT|INSERT|UPDATE|DELETE|MERGE)\b)/gi, ') ');
+
+        // Dialect-specific compatibility: Translate EXTRACT(EPOCH FROM (a - b)) for MySQL
+        if (this.projectDialect?.toLowerCase() === 'mysql') {
+            sanitized = sanitized.replace(/EXTRACT\s*\(\s*EPOCH\s+FROM\s*\(\s*([a-zA-Z0-9_."`]+)\s*-\s*([a-zA-Z0-9_."`]+)\s*\)\s*\)/gi, 'TIMESTAMPDIFF(SECOND, $2, $1)');
+        }
+
+        if (!this.projectObj) return sanitized;
+        const { schemaName, dbName } = getProjectDbAndSchema(this.projectObj);
+        const targetSchema = this.projectDialect?.toLowerCase() === 'mysql' ? dbName : schemaName;
+
+        sanitized = sanitized
             .replace(/["'\`]?(?:project|schema)_[a-zA-Z0-9_-]+["'\`]?\./gi, '') // Strip hardcoded tenant schemas with/without quotes
             .replace(/["'\`]?fluxbase_global["'\`]?\./gi, '') // Block access to fluxbase_global system tables
             .replace(/["'\`]?public["'\`]?\./gi, ''); // Strip explicit public. prefix
@@ -363,7 +375,7 @@ export class SqlEngine {
                     `;
                     const claimsJson = JSON.stringify({ sub: this.userId || '', role: 'authenticated' });
                     const sessionParams = [
-                        schemaName, 
+                        `"${schemaName}", public`, 
                         this.userId || '', 
                         this.projectTimezone || 'UTC', 
                         claimsJson

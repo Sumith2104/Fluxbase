@@ -7,6 +7,7 @@ import { getProjectById } from '@/lib/data';
 import { getProjectDbAndSchema } from '@/lib/tenant-pools';
 import { getRagContext } from '@/lib/rag-service';
 import { fluxTools } from '@/ai/tools';
+import { getSqlCapabilityPrompt } from '@/lib/sql-capabilities';
 
 // ── Schema Cache ──────────────────────────────────────────────────────────────
 // Avoids querying information_schema on every chat message.
@@ -185,6 +186,7 @@ AVAILABLE ROUTES:
 /settings (Project configurations, API keys, team members, backups)
 
 ${projectContext}${screenContextStr}
+${getSqlCapabilityPrompt(dialect)}
 ${rag.schemaSnippet}
 ${rag.docSnippet}
 ${rag.errorMemorySnippet}
@@ -231,6 +233,20 @@ CRITICAL RULES:
      WHERE prev_balance IS NOT NULL
        AND ABS(balance - prev_balance) >= 1.0;
    - When the user asks for balance changes of at least 1 rupee (ignoring decimals/paisa), filter with "ABS(balance - prev_balance) >= 1.0".
+9. CTE & TIMESTAMP GAP ANALYSIS:
+   - When calculating downtime, longest gap, or shutdown time between consecutive rows:
+     WITH ordered_predictions AS (
+       SELECT *, LAG(timestamp) OVER (ORDER BY timestamp) AS prev_timestamp
+       FROM predictions
+     ),
+     time_differences AS (
+       SELECT timestamp, prev_timestamp, EXTRACT(EPOCH FROM (timestamp - prev_timestamp)) / 3600.0 AS time_diff_hours
+       FROM ordered_predictions
+       WHERE prev_timestamp IS NOT NULL
+     )
+     SELECT MAX(time_diff_hours) AS longest_shutdown_time_hours
+     FROM time_differences;
+   - CRITICAL: Never put a comma after the final CTE closing parenthesis before SELECT. ")" is correct; "), SELECT" is a syntax error.
 
 AVAILABLE ACTION TAGS (append at the very end of your response):
 - Safe Read SQL (immediate execution): [EXECUTE_SQL:<exact_sql_query>]

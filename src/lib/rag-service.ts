@@ -151,6 +151,37 @@ Note on paisa vs whole rupee:
         keywords: ['balance', 'balance changed', 'previous_balance', 'lag', 'paisa', 'rupee', 'rs', 'change', 'diff', 'window function', 'previous', 'not the . value', 'not paisa']
     },
     {
+        id: 'timestamp_diff_and_gaps',
+        source: 'Database Best Practices',
+        title: 'Calculating Longest Shutdown Time or Gaps Between Timestamps',
+        content: `To find the longest gap, shutdown time, or downtime between consecutive rows (e.g. in 'predictions' table):
+Use Common Table Expressions (CTEs) with the LAG() window function:
+WITH ordered_predictions AS (
+    SELECT *,
+           LAG(timestamp) OVER (ORDER BY timestamp) AS prev_timestamp
+    FROM predictions
+),
+time_differences AS (
+    SELECT timestamp,
+           prev_timestamp,
+           EXTRACT(EPOCH FROM (
+               timestamp - prev_timestamp
+           )) / 3600.0 AS time_diff_hours
+    FROM ordered_predictions
+    WHERE prev_timestamp IS NOT NULL
+)
+SELECT MAX(time_diff_hours) AS longest_shutdown_time_hours
+FROM time_differences;
+
+SYNTAX RULES:
+1. When chaining multiple CTEs, separate CTE definitions with a comma: WITH cte1 AS (...), cte2 AS (...)
+2. NEVER place a comma after the last CTE closing parenthesis before SELECT:
+   DO: ) SELECT MAX(...)
+   DON'T: ), SELECT MAX(...) -- (Syntax Error!)
+3. In PostgreSQL and MySQL, Fluxbase supports timestamp arithmetic even when the timestamp column is VARCHAR/string.`,
+        keywords: ['shutdown', 'shutdown time', 'downtime', 'gap', 'longest gap', 'longest shutdown', 'time difference', 'time diff', 'lag timestamp', 'consecutive timestamp', 'epoch']
+    },
+    {
         id: 'mcp_integration',
         source: 'MCP Protocol Reference',
         title: 'Fluxbase Model Context Protocol (MCP) Server',
