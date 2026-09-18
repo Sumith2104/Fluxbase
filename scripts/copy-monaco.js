@@ -9,8 +9,8 @@ console.log(`[Copy Monaco] Destination: ${dest}`);
 
 try {
     if (!fs.existsSync(src)) {
-        console.error('[Copy Monaco] Error: Source directory does not exist. Make sure monaco-editor is installed.');
-        process.exit(1);
+        console.log('[Copy Monaco] Note: Local monaco-editor source not found. @monaco-editor/react will load from CDN.');
+        process.exit(0);
     }
 
     // Create destination directory if it doesn't exist
@@ -20,6 +20,6 @@ try {
     fs.cpSync(src, dest, { recursive: true, force: true });
     console.log('[Copy Monaco] Success: Monaco assets copied to public folder.');
 } catch (err) {
-    console.error('[Copy Monaco] Failed to copy Monaco assets:', err);
-    process.exit(1);
+    console.warn('[Copy Monaco] Notice: Monaco assets could not be copied, falling back to CDN:', err.message);
+    process.exit(0);
 }

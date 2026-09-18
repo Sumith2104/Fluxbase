@@ -17,7 +17,6 @@ ENV NODE_ENV=production
 ENV NEXT_PUBLIC_APP_URL=https://fluxbasedb.me
 ENV NEXT_PUBLIC_WS_URL=wss://fluxbasedb.me/ws
 
-RUN node scripts/copy-monaco.js
 RUN npm run build
 
 # 3. Production runner
