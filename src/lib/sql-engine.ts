@@ -21,6 +21,7 @@ const tenantRateLimit = new Ratelimit({
         '1 s',
         parseInt(process.env.FLUX_TENANT_RATE_LIMIT_REFILL || '50', 10)
     ),
+    ephemeralCache: new Map(),
     analytics: false,
 });
 
@@ -31,6 +32,7 @@ const globalRateLimit = new Ratelimit({
         '1 s',
         parseInt(process.env.FLUX_GLOBAL_RATE_LIMIT_REFILL || '2000', 10)
     ),
+    ephemeralCache: new Map(),
     analytics: false,
 });
 

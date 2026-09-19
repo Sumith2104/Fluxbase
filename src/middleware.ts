@@ -23,6 +23,7 @@ if (redisUrl && redisToken) {
     ratelimit = new Ratelimit({
         redis: new Redis({ url: redisUrl, token: redisToken }),
         limiter: Ratelimit.slidingWindow(50, '10 s'), // 50 requests per 10s per IP globally
+        ephemeralCache: new Map(),
         analytics: false, // Disabled: analytics: true writes extra data to Upstash on every request
     });
 }
