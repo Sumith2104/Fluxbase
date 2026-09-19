@@ -263,8 +263,8 @@ wss.on('connection', async (ws, req) => {
         }
 
         let maxConnections = 100;
-        if (planType === 'pro') maxConnections = 500;
-        if (planType === 'max') maxConnections = 5000;
+        if (planType === 'pro' || planType === 'employee' || planType === 'pay_as_you_go') maxConnections = 500;
+        if (planType === 'max' || planType === 'org_owner') maxConnections = 5000;
 
         const currentConns = userConnectionCounts.get(userId) || 0;
         if (currentConns >= maxConnections) {
