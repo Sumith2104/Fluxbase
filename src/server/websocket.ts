@@ -39,7 +39,15 @@ if (!process.env.AWS_RDS_POSTGRES_URL) {
 
 const pool = new Pool({
     connectionString: process.env.AWS_RDS_POSTGRES_URL,
-    ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: true } : false
+    ssl: { rejectUnauthorized: false },
+    max: 10,
+    idleTimeoutMillis: 300000,
+    connectionTimeoutMillis: 10000,
+    keepAlive: true,
+});
+
+pool.on('error', (err: any) => {
+    logger.warn('[WS Pool Error handled]:', err?.message || err);
 });
 
 // Broadcast helper
@@ -78,44 +86,60 @@ function broadcastToSubscribers(payload: any) {
     }
 }
 
-// PostgreSQL Listener
+// PostgreSQL Listener with Auto-Reconnect
 async function setupPgListener() {
-    const pgClient = await pool.connect();
-    await pgClient.query('LISTEN fluxbase_changes');
-    await pgClient.query('LISTEN flux_realtime');
-    await pgClient.query('LISTEN fluxbase_live');
-
-    pgClient.on('notification', (msg) => {
+    while (true) {
+        let pgClient: any = null;
         try {
-            if (msg.payload) {
-                const payload = JSON.parse(msg.payload);
-                
-                if (msg.channel === 'fluxbase_changes' || msg.channel === 'flux_realtime') {
-                    broadcastToSubscribers(payload);
-                } else if (msg.channel === 'fluxbase_live') {
-                    // Broadcast to project wildcard listeners
-                    const projectId = payload.project_id;
-                    if (projectId) {
-                        const wildcardSubs = clients.get(`${projectId}:*`);
-                        if (wildcardSubs) {
-                            const message = JSON.stringify({ type: 'live', ...payload });
-                            for (const ws of wildcardSubs) {
-                                if (ws.readyState === WebSocket.OPEN) {
-                                    ws.send(message);
+            pgClient = await pool.connect();
+            logger.info('PostgreSQL realtime listener active on "fluxbase_changes", "flux_realtime", and "fluxbase_live"');
+            await pgClient.query('LISTEN fluxbase_changes');
+            await pgClient.query('LISTEN flux_realtime');
+            await pgClient.query('LISTEN fluxbase_live');
+
+            pgClient.on('notification', (msg: any) => {
+                try {
+                    if (msg.payload) {
+                        const payload = JSON.parse(msg.payload);
+                        
+                        if (msg.channel === 'fluxbase_changes' || msg.channel === 'flux_realtime') {
+                            broadcastToSubscribers(payload);
+                        } else if (msg.channel === 'fluxbase_live') {
+                            // Broadcast to project wildcard listeners
+                            const projectId = payload.project_id;
+                            if (projectId) {
+                                const wildcardSubs = clients.get(`${projectId}:*`);
+                                if (wildcardSubs) {
+                                    const message = JSON.stringify({ type: 'live', ...payload });
+                                    for (const ws of wildcardSubs) {
+                                        if (ws.readyState === WebSocket.OPEN) {
+                                            ws.send(message);
+                                        }
+                                    }
                                 }
                             }
                         }
                     }
+                } catch (e) {
+                    logger.error('Error parsing pg_notify payload:', e);
                 }
-            }
-        } catch (e) {
-            logger.error('Error parsing pg_notify payload:', e);
-        }
-    });
+            });
 
-    logger.info('PostgreSQL realtime listener active on "fluxbase_changes", "flux_realtime", and "fluxbase_live"');
+            // Wait until client disconnects or encounters an error before reconnecting
+            await new Promise((resolve, reject) => {
+                pgClient.on('error', reject);
+                pgClient.on('end', resolve);
+            });
+        } catch (e: any) {
+            logger.error('[WS] PostgreSQL listener disconnected, reconnecting in 5s:', e?.message || e);
+            if (pgClient) {
+                try { pgClient.release(true); } catch {}
+            }
+            await new Promise(r => setTimeout(r, 5000));
+        }
+    }
 }
-setupPgListener().catch((e) => { logger.error(e); });
+setupPgListener().catch((e) => { logger.error('[WS] Fatal listener error:', e); });
 
 // Auth helper — supports session cookies (browser) AND API keys (external clients)
 async function authenticateRequest(req: http.IncomingMessage): Promise<{ userId: string; allowedProjectId?: string } | null> {
@@ -197,42 +221,58 @@ async function verifyProjectAccess(userId: string, projectId: string, allowedPro
         return false;
     }
 
-    const res = await pool.query(`
-        SELECT p.project_id 
-        FROM fluxbase_global.projects p
-        LEFT JOIN fluxbase_global.project_members pm ON p.project_id = pm.project_id AND pm.user_id = $1
-        WHERE p.project_id = $2 AND (p.user_id = $1 OR pm.user_id = $1)
-    `, [userId, projectId]);
+    try {
+        const res = await pool.query(`
+            SELECT p.project_id 
+            FROM fluxbase_global.projects p
+            LEFT JOIN fluxbase_global.project_members pm ON p.project_id = pm.project_id AND pm.user_id = $1
+            WHERE p.project_id = $2 AND (p.user_id = $1 OR pm.user_id = $1)
+        `, [userId, projectId]);
 
-    return res.rows.length > 0;
+        return res.rows.length > 0;
+    } catch (err) {
+        logger.error('[WS] verifyProjectAccess error:', err);
+        return false;
+    }
 }
 
 // WebSocket Connection Handler
 wss.on('connection', async (ws, req) => {
-    const auth = await authenticateRequest(req);
+    try {
+        let auth = null;
+        try {
+            auth = await authenticateRequest(req);
+        } catch (authErr) {
+            logger.warn('[WS] Auth error during connection:', authErr);
+        }
 
-    if (!auth) {
-        ws.close(1008, 'Unauthorized — provide a valid session cookie or ?token=<api_key>');
-        return;
-    }
+        if (!auth) {
+            ws.close(1008, 'Unauthorized — provide a valid session cookie or ?token=<api_key>');
+            return;
+        }
 
-    const { userId, allowedProjectId } = auth;
+        const { userId, allowedProjectId } = auth;
 
-    // Rate Limiting (Phase 3 Gatekeeping)
-    const userRes = await pool.query('SELECT plan_type FROM fluxbase_global.users WHERE id = $1', [userId]);
-    const planType = userRes.rows[0]?.plan_type || 'free';
+        // Rate Limiting (Phase 3 Gatekeeping)
+        let planType = 'free';
+        try {
+            const userRes = await pool.query('SELECT plan_type FROM fluxbase_global.users WHERE id = $1', [userId]);
+            planType = userRes.rows[0]?.plan_type || 'free';
+        } catch (dbErr) {
+            logger.warn('[WS] Could not query user plan, defaulting to free:', dbErr);
+        }
 
-    let maxConnections = 100;
-    if (planType === 'pro') maxConnections = 500;
-    if (planType === 'max') maxConnections = 5000;
+        let maxConnections = 100;
+        if (planType === 'pro') maxConnections = 500;
+        if (planType === 'max') maxConnections = 5000;
 
-    const currentConns = userConnectionCounts.get(userId) || 0;
-    if (currentConns >= maxConnections) {
-        ws.close(1008, `Rate Limit Exceeded. Your ${planType.toUpperCase()} plan only allows ${maxConnections} concurrent WebSocket connections.`);
-        return;
-    }
+        const currentConns = userConnectionCounts.get(userId) || 0;
+        if (currentConns >= maxConnections) {
+            ws.close(1008, `Rate Limit Exceeded. Your ${planType.toUpperCase()} plan only allows ${maxConnections} concurrent WebSocket connections.`);
+            return;
+        }
 
-    userConnectionCounts.set(userId, currentConns + 1);
+        userConnectionCounts.set(userId, currentConns + 1);
 
     // Keep track of what this socket subscribed to for cleanup
     const userSubscriptions = new Set<string>();
@@ -424,6 +464,12 @@ Provide your response in Markdown formatting. Do NOT use HTML. Keep code snippet
             }
         }
     });
+    } catch (connErr) {
+        logger.error('[WS] Unhandled connection error:', connErr);
+        try {
+            ws.close(1011, 'Internal Server Error');
+        } catch {}
+    }
 });
 
 logger.info('WebSocket Realtime Server running on ws://localhost:4000');

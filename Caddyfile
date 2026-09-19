@@ -10,9 +10,9 @@ fluxbasedb.me, www.fluxbasedb.me {
     @www host www.fluxbasedb.me
     redir @www https://fluxbasedb.me{uri} permanent
 
-    # Real-Time WebSocket connections
+    # Real-Time WebSocket connections (ONLY /ws* routes to standalone WS server)
     @websockets {
-        path /ws* /api/realtime/subscribe*
+        path /ws*
     }
     handle @websockets {
         reverse_proxy websocket:4000 {
@@ -20,6 +20,34 @@ fluxbasedb.me, www.fluxbasedb.me {
             header_up X-Real-IP {remote_host}
             header_up X-Forwarded-For {remote_host}
             header_up X-Forwarded-Proto {scheme}
+        }
+    }
+
+    # Static Assets Caching (Next.js immutable hashed assets)
+    @static {
+        path /_next/static/* /monaco-editor/* /favicon.ico /logo.png
+    }
+    handle @static {
+        header Cache-Control "public, max-age=31536000, immutable"
+        reverse_proxy app:3000 {
+            header_up Host {host}
+            header_up X-Real-IP {remote_host}
+            header_up X-Forwarded-For {remote_host}
+            header_up X-Forwarded-Proto {scheme}
+        }
+    }
+
+    # High-speed streaming routes (AI chat & realtime SSE)
+    @streaming {
+        path /api/ai/* /api/v1/chat/* /api/realtime/subscribe*
+    }
+    handle @streaming {
+        reverse_proxy app:3000 {
+            header_up Host {host}
+            header_up X-Real-IP {remote_host}
+            header_up X-Forwarded-For {remote_host}
+            header_up X-Forwarded-Proto {scheme}
+            flush_interval -1
         }
     }
 
@@ -32,9 +60,6 @@ fluxbasedb.me, www.fluxbasedb.me {
             header_up X-Real-IP {remote_host}
             header_up X-Forwarded-For {remote_host}
             header_up X-Forwarded-Proto {scheme}
-
-            # Response buffer configuration for high-speed streaming
-            flush_interval -1
         }
     }
 }
@@ -42,7 +67,7 @@ fluxbasedb.me, www.fluxbasedb.me {
 # Fallback for Direct IP Access (for testing before DNS cutover)
 :80 {
     @websockets {
-        path /ws* /api/realtime/subscribe*
+        path /ws*
     }
     handle @websockets {
         reverse_proxy websocket:4000
