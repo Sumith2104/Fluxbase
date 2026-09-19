@@ -5,10 +5,10 @@ import { WebSocketServer, WebSocket } from 'ws';
 import { Pool } from 'pg';
 import { SignJWT, jwtVerify } from 'jose';
 import http from 'http';
-import { Redis } from '@upstash/redis';
 import fs from 'fs';
 import path from 'path';
 import logger from '@/lib/logger';
+import { redis } from '@/lib/redis';
 
 let docsContext = '';
 try {
@@ -21,10 +21,6 @@ try {
 } catch (e) {
     logger.warn("Could not load integration guide for WS context", e);
 }
-
-const url = process.env.UPSTASH_REDIS_REST_URL || 'https://dummy.upstash.io';
-const token = process.env.UPSTASH_REDIS_REST_TOKEN || 'dummy';
-const redis = new Redis({ url, token });
 
 function getWsSecret(): Uint8Array { const s = process.env.JWT_SECRET; if (!s || s.trim() === '') throw new Error('JWT_SECRET required'); return new TextEncoder().encode(s); }
 const PORT = parseInt(process.env.WS_PORT || '4000', 10);

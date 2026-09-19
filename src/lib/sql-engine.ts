@@ -15,7 +15,7 @@ const MAX_SELECT_ROWS = parseInt(process.env.FLUX_MAX_SELECT_ROWS || '10000', 10
 
 // --- 1. Distributed Rate Limiting Configuration ---
 const tenantRateLimit = new Ratelimit({
-    redis: redis,
+    redis: redis as any,
     limiter: Ratelimit.tokenBucket(
         parseInt(process.env.FLUX_TENANT_RATE_LIMIT_TOKENS || '200', 10),
         '1 s',
@@ -26,7 +26,7 @@ const tenantRateLimit = new Ratelimit({
 });
 
 const globalRateLimit = new Ratelimit({
-    redis: redis,
+    redis: redis as any,
     limiter: Ratelimit.tokenBucket(
         parseInt(process.env.FLUX_GLOBAL_RATE_LIMIT_TOKENS || '8000', 10),
         '1 s',

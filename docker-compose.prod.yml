@@ -77,6 +77,23 @@ services:
     networks:
       - fluxbase-network
 
+  # 5. Fluxbase Headless Scraper Engine
+  scraper-engine:
+    build:
+      context: ./fluxbase-scraper-engine
+      dockerfile: Dockerfile
+    container_name: fluxbase-scraper-engine
+    restart: unless-stopped
+    expose:
+      - "8080"
+    env_file:
+      - .env.production
+    environment:
+      - PORT=8080
+      - NODE_ENV=production
+    networks:
+      - fluxbase-network
+
 networks:
   fluxbase-network:
     driver: bridge

@@ -1,6 +1,4 @@
 import { NextResponse, type NextRequest } from 'next/server';
-import { Ratelimit } from '@upstash/ratelimit';
-import { Redis } from '@upstash/redis';
 import { jwtVerify } from 'jose';
 
 
@@ -14,18 +12,31 @@ function getJwtSecretValue(): string {
     return 'fluxbase_dev_secret_key_123';
 }
 
-// Only create ratelimiter if we have env vars, otherwise bypass locally to avoid breaking dev
-const redisUrl = process.env.UPSTASH_REDIS_REST_URL;
-const redisToken = process.env.UPSTASH_REDIS_REST_TOKEN;
+// In-memory sliding window fallback for local/AWS native deployments (0ms latency, zero external calls)
+const memoryRateLimitMap = new Map<string, { count: number; resetAt: number }>();
 
-let ratelimit: Ratelimit | null = null;
-if (redisUrl && redisToken) {
-    ratelimit = new Ratelimit({
-        redis: new Redis({ url: redisUrl, token: redisToken }),
-        limiter: Ratelimit.slidingWindow(50, '10 s'), // 50 requests per 10s per IP globally
-        ephemeralCache: new Map(),
-        analytics: false, // Disabled: analytics: true writes extra data to Upstash on every request
-    });
+function checkLocalRateLimit(key: string, limit = 50, windowMs = 10000): { success: boolean; limit: number; remaining: number; reset: number } {
+    const now = Date.now();
+    const entry = memoryRateLimitMap.get(key);
+    
+    // Periodically prune stale entries
+    if (memoryRateLimitMap.size > 5000) {
+        for (const [k, v] of memoryRateLimitMap.entries()) {
+            if (v.resetAt < now) memoryRateLimitMap.delete(k);
+        }
+    }
+
+    if (!entry || entry.resetAt < now) {
+        memoryRateLimitMap.set(key, { count: 1, resetAt: now + windowMs });
+        return { success: true, limit, remaining: limit - 1, reset: now + windowMs };
+    }
+
+    if (entry.count >= limit) {
+        return { success: false, limit, remaining: 0, reset: entry.resetAt };
+    }
+
+    entry.count++;
+    return { success: true, limit, remaining: limit - entry.count, reset: entry.resetAt };
 }
 
 export async function middleware(request: NextRequest) {
@@ -74,26 +85,17 @@ export async function middleware(request: NextRequest) {
     const ip = (request as any).ip || request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || '127.0.0.1';
     const isLoopback = ip === '127.0.0.1' || ip === '::1' || ip.startsWith('192.168.') || ip === 'localhost';
 
-    if (isProd && !isLoopback && pathname.startsWith('/api/') && !pathname.startsWith('/api/realtime/subscribe') && ratelimit) {
-        try {
-            const { success, limit, reset, remaining } = await ratelimit.limit(`global_api_${ip}`);
-            
-            if (!success) {
-                return NextResponse.json({ success: false, error: 'Too Many Requests' }, { 
-                    status: 429,
-                    headers: {
-                        'X-RateLimit-Limit': limit.toString(),
-                        'X-RateLimit-Remaining': remaining.toString(),
-                        'X-RateLimit-Reset': reset.toString()
-                    }
-                });
-            }
-        } catch (rateError: any) {
-            // Fail open cleanly if Redis or Upstash quota limit is reached
-            const isQuotaError = rateError?.message?.includes('max requests limit exceeded');
-            if (!isQuotaError) {
-                console.warn('[Middleware] Rate limiter fallback active:', rateError?.message || rateError);
-            }
+    if (isProd && !isLoopback && pathname.startsWith('/api/') && !pathname.startsWith('/api/realtime/subscribe')) {
+        const { success, limit, reset, remaining } = checkLocalRateLimit(`global_api_${ip}`);
+        if (!success) {
+            return NextResponse.json({ success: false, error: 'Too Many Requests' }, { 
+                status: 429,
+                headers: {
+                    'X-RateLimit-Limit': limit.toString(),
+                    'X-RateLimit-Remaining': remaining.toString(),
+                    'X-RateLimit-Reset': reset.toString()
+                }
+            });
         }
     }
 

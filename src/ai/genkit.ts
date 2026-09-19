@@ -100,6 +100,7 @@ async function tryThirdPartyProvider(provider: string, prompt: string, schema: a
             'Authorization': `Bearer ${apiKey}`,
             'Content-Type': 'application/json'
           },
+          signal: AbortSignal.timeout(20000),
           body: JSON.stringify({
             model: glmModel,
             messages: [{ role: 'user', content: finalPrompt }],
@@ -146,6 +147,7 @@ async function tryThirdPartyProvider(provider: string, prompt: string, schema: a
       'Authorization': `Bearer ${apiKey}`,
       'Content-Type': 'application/json'
     },
+    signal: AbortSignal.timeout(20000),
     body: JSON.stringify({
       model,
       messages: [{ role: 'user', content: finalPrompt }],

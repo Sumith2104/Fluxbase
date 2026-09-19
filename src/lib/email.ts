@@ -1,6 +1,28 @@
 import nodemailer from 'nodemailer';
+import { SESClient, SendEmailCommand } from '@aws-sdk/client-ses';
 import path from 'path';
 import logger from '@/lib/logger';
+
+let _sesClient: SESClient | null = null;
+function getSesClient(): SESClient | null {
+    const isSesConfigured = process.env.USE_AWS_SES === 'true' || 
+        process.env.SMTP_HOST?.includes('amazonses.com') ||
+        (process.env.AWS_ACCESS_KEY_ID && !process.env.SMTP_HOST);
+
+    if (isSesConfigured) {
+        if (!_sesClient) {
+            _sesClient = new SESClient({
+                region: process.env.AWS_SES_REGION || process.env.AWS_REGION || 'ap-south-1',
+                credentials: process.env.AWS_ACCESS_KEY_ID && process.env.AWS_SECRET_ACCESS_KEY ? {
+                    accessKeyId: process.env.AWS_ACCESS_KEY_ID,
+                    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
+                } : undefined,
+            });
+        }
+        return _sesClient;
+    }
+    return null;
+}
 
 function getTransporter() {
     const host = process.env.SMTP_HOST || '';
@@ -44,6 +66,34 @@ function htmlToPlainText(html: string): string {
 }
 
 export async function sendEmail(to: string, subject: string, html: string, attachments?: any[], text?: string) {
+    const ses = getSesClient();
+    const fromAddress = process.env.SMTP_FROM || 'Fluxbase <support@fluxbasedb.me>';
+    const plainText = text || htmlToPlainText(html);
+
+    // 1. AWS SES Dispatch
+    if (ses && !attachments?.length) {
+        try {
+            logger.info(`[Email] Dispatching message to ${to} via AWS SES (ap-south-1)...`);
+            const command = new SendEmailCommand({
+                Source: fromAddress,
+                Destination: { ToAddresses: [to] },
+                Message: {
+                    Subject: { Data: subject, Charset: 'UTF-8' },
+                    Body: {
+                        Html: { Data: html, Charset: 'UTF-8' },
+                        Text: { Data: plainText, Charset: 'UTF-8' }
+                    }
+                }
+            });
+            const result = await ses.send(command);
+            logger.info(`[Email] Successfully sent via AWS SES. MessageId: ${result.MessageId}`);
+            return { messageId: result.MessageId };
+        } catch (sesErr: any) {
+            logger.warn('[Email] AWS SES direct send warning, falling back to SMTP transporter:', sesErr?.message || sesErr);
+        }
+    }
+
+    // 2. SMTP Transporter Dispatch
     if (!process.env.SMTP_HOST && !process.env.SMTP_USER) {
         logger.info("SMTP not configured. Skipping email:", { to, subject });
         return;
