@@ -173,6 +173,67 @@ export const redis: RedisInterface = new Proxy({} as any, {
                 };
             }
 
+            if (prop === 'eval') {
+                return async (script: string, keys: any = [], args: any = []) => {
+                    try {
+                        if (Array.isArray(keys)) {
+                            const flatArgs = [...keys, ...(Array.isArray(args) ? args : [])];
+                            return await ioClient!.eval(script, keys.length, ...flatArgs);
+                        } else if (typeof keys === 'number') {
+                            return await (ioClient as any).eval(script, keys, ...(Array.isArray(args) ? args : [args]));
+                        }
+                        return await ioClient!.eval(script, 0);
+                    } catch (e: any) {
+                        logger.warn('[Redis Native eval Error]:', e?.message || e);
+                        throw e;
+                    }
+                };
+            }
+
+            if (prop === 'evalsha') {
+                return async (sha1: string, keys: any = [], args: any = []) => {
+                    try {
+                        if (Array.isArray(keys)) {
+                            const flatArgs = [...keys, ...(Array.isArray(args) ? args : [])];
+                            return await ioClient!.evalsha(sha1, keys.length, ...flatArgs);
+                        } else if (typeof keys === 'number') {
+                            return await (ioClient as any).evalsha(sha1, keys, ...(Array.isArray(args) ? args : [args]));
+                        }
+                        return await ioClient!.evalsha(sha1, 0);
+                    } catch (e: any) {
+                        if (e?.message && e.message.includes('NOSCRIPT')) {
+                            throw e;
+                        }
+                        logger.warn('[Redis Native evalsha Error]:', e?.message || e);
+                        throw e;
+                    }
+                };
+            }
+
+            if (prop === 'sadd') {
+                return async (key: string, ...members: any[]) => {
+                    try {
+                        const flatMembers = members.flat();
+                        if (flatMembers.length === 0) return 0;
+                        return await ioClient!.sadd(key, ...flatMembers);
+                    } catch (e) {
+                        logger.warn('[Redis Native SADD Error]:', e);
+                        return 0;
+                    }
+                };
+            }
+
+            if (prop === 'smembers') {
+                return async (key: string) => {
+                    try {
+                        return await ioClient!.smembers(key);
+                    } catch (e) {
+                        logger.warn('[Redis Native SMEMBERS Error]:', e);
+                        return [];
+                    }
+                };
+            }
+
             if (prop === 'ping') {
                 return async () => {
                     try {

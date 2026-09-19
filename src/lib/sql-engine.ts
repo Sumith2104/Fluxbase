@@ -248,13 +248,25 @@ export class SqlEngine {
         let lastResult: SqlResult = { rows: [], columns: [], explanation: [] };
         const startTime = Date.now();
 
-        // Distributed rate limiting checks via Upstash Redis
-        const [globalLimitRes, tenantLimitRes] = await Promise.all([
-            globalRateLimit.limit('sql_global_rate_limit'),
-            tenantRateLimit.limit(`sql_tenant_rate_limit:${this.projectId}`)
-        ]);
+        // Distributed rate limiting checks via Redis (fail-open to protect queries)
+        let globalLimitRes: any = { success: true };
+        let tenantLimitRes: any = { success: true };
+        try {
+            [globalLimitRes, tenantLimitRes] = await Promise.all([
+                globalRateLimit.limit('sql_global_rate_limit').catch(err => {
+                    logger.warn('[SqlEngine] Global rate limit check error (fail-open):', err?.message || err);
+                    return { success: true };
+                }),
+                tenantRateLimit.limit(`sql_tenant_rate_limit:${this.projectId}`).catch(err => {
+                    logger.warn('[SqlEngine] Tenant rate limit check error (fail-open):', err?.message || err);
+                    return { success: true };
+                })
+            ]);
+        } catch (rlErr: any) {
+            logger.warn('[SqlEngine] Rate limit check exception (fail-open):', rlErr?.message || rlErr);
+        }
 
-        if (!globalLimitRes.success) {
+        if (globalLimitRes && !globalLimitRes.success) {
             throw new FluxbaseError(
                 "Too Many Requests: Global SQL execution capacity limit reached. Please try again in a few moments.", 
                 ERROR_CODES.RATE_LIMIT_EXCEEDED, 
@@ -262,7 +274,7 @@ export class SqlEngine {
             );
         }
 
-        if (!tenantLimitRes.success) {
+        if (tenantLimitRes && !tenantLimitRes.success) {
             throw new FluxbaseError(
                 "Too Many Requests: SQL execution rate limit exceeded for this project. Please wait a moment and try again.", 
                 ERROR_CODES.RATE_LIMIT_EXCEEDED, 
