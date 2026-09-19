@@ -72,7 +72,7 @@ export class LimitExceededError extends Error {
 // In-memory cache for traffic limit results to avoid slamming Redis/DB on every SQL request
 // Key: projectId, Value: { timestamp, error? }
 const trafficLimitCache = new Map<string, { timestamp: number; error: string | null }>();
-const CACHE_TTL_MS = 60 * 1000; // 60 seconds
+const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes (matches Redis TTL)
 
 export async function getUserPlan(userId: string): Promise<PlanType> {
     const pool = getPgPool();
@@ -242,6 +242,16 @@ export async function checkProjectTrafficLimits(projectId: string): Promise<void
             return;
         }
         const pConfig = pRes.rows[0];
+
+        // Fast-path: If project has no custom limits and no alert email configured, return immediately
+        if (!pConfig.custom_request_limit && !pConfig.custom_api_limit && !pConfig.alert_email) {
+            trafficLimitCache.set(projectId, { timestamp: now, error: null });
+            try {
+                const { redis } = await import('@/lib/redis');
+                await redis.set(redisKey, 'OK', { ex: 300 });
+            } catch {}
+            return;
+        }
 
         // Read cached traffic stats (assuming it tracks current period)
         const { getAnalyticsStatsAction } = await import('@/app/(app)/dashboard/analytics-actions');

@@ -7,7 +7,7 @@ import { getDashboardWidgets } from '@/lib/dashboards';
 import logger from '@/lib/logger';
 import { LRUCache } from 'lru-cache';
 
-const _analyticsStatsCache = new LRUCache<string, any>({ max: 200, ttl: 30_000 });
+const _analyticsStatsCache = new LRUCache<string, any>({ max: 200, ttl: 60_000 });
 const _realtimeHistoryCache = new LRUCache<string, any>({ max: 200, ttl: 15_000 });
 const _projectHistoryCache = new LRUCache<string, any>({ max: 200, ttl: 60_000 });
 
@@ -132,14 +132,14 @@ export async function getAnalyticsStatsAction(projectId: string) {
         stats.total_requests = Math.max(stats.total_requests, stats.type_api_call, stats.type_sql_execution);
         stats.type_api_call = Math.max(stats.type_api_call, stats.total_requests);
 
-        // Fetch cumulative all-time total requests from audit_logs
+        // Fetch cumulative all-time total requests from payg_usage_cycles (instant, avoids multi-million audit_logs scan)
         let allTimeRequests = 0;
         try {
-            const allTimeRes = await pool.query(
-                'SELECT COUNT(*) as total FROM fluxbase_global.audit_logs WHERE project_id = $1',
+            const paygRes = await pool.query(
+                'SELECT COALESCE(SUM(total_requests::bigint), 0) as total FROM fluxbase_global.payg_usage_cycles WHERE project_id = $1',
                 [projectId]
             );
-            allTimeRequests = parseInt(allTimeRes.rows[0]?.total || '0', 10);
+            allTimeRequests = parseInt(paygRes.rows[0]?.total || '0', 10);
         } catch (allTimeErr) {
             logger.warn('All-time stats error:', allTimeErr);
         }
@@ -156,7 +156,7 @@ export async function getAnalyticsStatsAction(projectId: string) {
 
         _analyticsStatsCache.set(projectId, stats);
         try {
-            await redis.set(cacheKey, stats, { ex: 30 }); 
+            await redis.set(cacheKey, stats, { ex: 60 }); 
         } catch {}
 
         return stats;
