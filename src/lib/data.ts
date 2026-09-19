@@ -1466,6 +1466,138 @@ export async function getColumnsForTable(projectId: string, tableId: string, exp
     }
 }
 
+export async function getAllColumnsForProject(projectId: string, explicitUserId?: string): Promise<Column[]> {
+    const userId = explicitUserId || await getCurrentUserId();
+    if (!userId) throw new FluxbaseError("Unauthorized", ERROR_CODES.UNAUTHORIZED, 401);
+
+    const project = await getProjectById(projectId, userId);
+    if (!project) throw new FluxbaseError("Project not found", ERROR_CODES.PROJECT_NOT_FOUND, 404);
+
+    try {
+        if (project.dialect?.toLowerCase() === 'mysql') {
+            const mysqlPool = await getTenantMysqlPool(project);
+            const { dbName } = getProjectDbAndSchema(project);
+            const targetDb = dbName || `project_${projectId}`;
+
+            let [rows]: any = await mysqlPool.query(`
+                SELECT 
+                    TABLE_NAME as table_id,
+                    COLUMN_NAME as column_name, 
+                    DATA_TYPE as data_type, 
+                    IS_NULLABLE as is_nullable, 
+                    COLUMN_DEFAULT as column_default,
+                    CASE WHEN COLUMN_KEY = 'PRI' THEN true ELSE false END as is_primary_key
+                FROM information_schema.columns 
+                WHERE TABLE_SCHEMA = ?
+                ORDER BY TABLE_NAME, ORDINAL_POSITION
+            `, [targetDb]);
+
+            const allCols: Column[] = (rows || []).map((row: any) => ({
+                column_id: `${row.table_id}.${row.column_name}`,
+                table_id: row.table_id,
+                column_name: row.column_name,
+                data_type: row.data_type,
+                is_nullable: row.is_nullable === 'YES',
+                is_primary_key: row.is_primary_key === 1 || row.is_primary_key === true,
+                default_value: row.column_default,
+                created_at: new Date().toISOString()
+            }));
+
+            // Warm individual table column cache
+            const groupedByTable = new Map<string, Column[]>();
+            for (const col of allCols) {
+                if (!groupedByTable.has(col.table_id)) groupedByTable.set(col.table_id, []);
+                groupedByTable.get(col.table_id)!.push(col);
+            }
+            for (const [tbl, cols] of groupedByTable.entries()) {
+                _tableColumnsCache.set(`${projectId}:${tbl}`, cols);
+            }
+
+            return allCols;
+        } else {
+            const pool = await getTenantPgPool(project);
+            const { schemaName } = getProjectDbAndSchema(project);
+            const activeSchema = schemaName || `project_${projectId}`;
+
+            let result;
+            try {
+                result = await pool.query(`
+                    SELECT
+                        c.relname AS table_id,
+                        a.attname AS column_name,
+                        format_type(a.atttypid, a.atttypmod) AS data_type,
+                        NOT a.attnotnull AS is_nullable,
+                        pg_get_expr(d.adbin, d.adrelid) AS column_default,
+                        COALESCE(i.indisprimary, false) AS is_primary_key
+                    FROM pg_attribute a
+                    JOIN pg_class c ON c.oid = a.attrelid
+                    JOIN pg_namespace n ON n.oid = c.relnamespace
+                    LEFT JOIN pg_attrdef d ON d.adrelid = a.attrelid AND d.adnum = a.attnum
+                    LEFT JOIN pg_index i ON i.indrelid = a.attrelid AND a.attnum = ANY(i.indkey) AND i.indisprimary
+                    WHERE n.nspname = $1 
+                      AND c.relkind IN ('r', 'p')
+                      AND a.attnum > 0 
+                      AND NOT a.attisdropped
+                    ORDER BY c.relname, a.attnum
+                `, [activeSchema]);
+            } catch {
+                result = { rows: [] };
+            }
+
+            if (result.rows.length === 0) {
+                // Fallback to information_schema
+                result = await pool.query(`
+                    SELECT 
+                        c.table_name as table_id,
+                        c.column_name, 
+                        c.data_type, 
+                        c.is_nullable, 
+                        c.column_default,
+                        (
+                            SELECT count(*) > 0
+                            FROM information_schema.key_column_usage kcu
+                            JOIN information_schema.table_constraints tc 
+                                ON kcu.constraint_name = tc.constraint_name
+                            WHERE tc.constraint_type = 'PRIMARY KEY' 
+                                AND kcu.table_schema = c.table_schema 
+                                AND kcu.table_name = c.table_name 
+                                AND kcu.column_name = c.column_name
+                        ) as is_primary_key
+                    FROM information_schema.columns c
+                    WHERE c.table_schema = $1
+                    ORDER BY c.table_name, c.ordinal_position
+                `, [activeSchema]);
+            }
+
+            const allCols: Column[] = result.rows.map(row => ({
+                column_id: `${row.table_id}.${row.column_name}`,
+                table_id: row.table_id,
+                column_name: row.column_name,
+                data_type: row.data_type as any,
+                is_nullable: row.is_nullable === 'YES' || row.is_nullable === true,
+                is_primary_key: Boolean(row.is_primary_key),
+                default_value: row.column_default,
+                created_at: new Date().toISOString()
+            }));
+
+            // Warm individual table column cache
+            const groupedByTable = new Map<string, Column[]>();
+            for (const col of allCols) {
+                if (!groupedByTable.has(col.table_id)) groupedByTable.set(col.table_id, []);
+                groupedByTable.get(col.table_id)!.push(col);
+            }
+            for (const [tbl, cols] of groupedByTable.entries()) {
+                _tableColumnsCache.set(`${projectId}:${tbl}`, cols);
+            }
+
+            return allCols;
+        }
+    } catch (error) {
+        console.error("Native Get All Columns Error:", error);
+        return [];
+    }
+}
+
 export async function addColumn(projectId: string, tableId: string, column: Omit<Column, 'column_id' | 'table_id'>, explicitUserId?: string) {
     const userId = explicitUserId || await getCurrentUserId();
     if (!userId) throw new FluxbaseError("Unauthorized", ERROR_CODES.UNAUTHORIZED, 401);
@@ -2554,7 +2686,7 @@ export async function getProjectAnalytics(projectId: string, explicitUserId?: st
                 const name = r.name || r.NAME;
                 let rowsCount = Math.max(0, parseInt(r.row_count || r.rows || r.ROWS || '0', 10));
                 const size = parseInt(r.size || r.SIZE || '0', 10);
-                if (rowsCount <= 0 || rowsCount < 100000) {
+                if (rowsCount === 0) {
                     try {
                         const [cRows]: any = await mysqlPool.query(`SELECT COUNT(*) as count FROM \`${targetDb}\`.\`${name}\``);
                         rowsCount = parseInt(cRows[0]?.count ?? rowsCount, 10);
@@ -2605,7 +2737,7 @@ export async function getProjectAnalytics(projectId: string, explicitUserId?: st
                 const schema = r.schema_name || activeSchema;
                 let rowsCount = Math.max(0, parseInt(r.rows || '0', 10));
                 const size = parseInt(r.size || '0', 10);
-                if (rowsCount <= 0 || rowsCount < 100000) {
+                if (rowsCount === 0) {
                     try {
                         const countRes = await pool.query(`SELECT COUNT(*) as count FROM "${schema}"."${name}"`);
                         rowsCount = parseInt(countRes.rows[0]?.count ?? rowsCount, 10);

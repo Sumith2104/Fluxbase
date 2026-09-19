@@ -27,6 +27,7 @@ import {
 import { ProjectProvider, ProjectContext } from "@/contexts/project-context";
 import { TimezoneSelector } from "@/components/timezone-selector";
 import { useRealtimeSubscription } from "@/hooks/use-realtime-subscription";
+import { useQueryClient } from "@tanstack/react-query";
 import { FluxAiIcon } from "@/components/ui/flux-ai-icon";
 import Dock from "@/components/dock";
 // Phase 5+6: Lazy-load heavy components â€” they are NOT needed on initial page render.
@@ -86,6 +87,7 @@ const navItems = [
 function AppLayoutContent({ children }: { children: React.ReactNode }) {
     const pathname = usePathname();
     const router = useRouter();
+    const queryClient = useQueryClient();
 
     const [user, setUser] = useState<User | null>(null);
     const [userId, setUserId] = useState<string | null>(null);
@@ -98,8 +100,8 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
     const { project: selectedProject, setProject, loading: projectContextLoading, isSuspended, setIsSuspended } = useContext(ProjectContext);
     const [isAiOpen, setIsAiOpen] = useState(false);
 
-    // Maintain persistent global/project realtime WebSocket subscription across the app
-    useRealtimeSubscription(selectedProject?.project_id || 'global');
+    // Maintain persistent global/project realtime WebSocket subscription across the app without forcing layout re-renders
+    useRealtimeSubscription(selectedProject?.project_id || 'global', { trackLastEvent: false });
 
     // Real-time synchronization for projects list across top navbar & application
     useEffect(() => {
@@ -113,13 +115,19 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
                 if (newProj && newProj.project_id) {
                     setProjects(prev => {
                         if (prev.some(p => p.project_id === newProj.project_id)) return prev;
-                        return [newProj, ...prev];
+                        const next = [newProj, ...prev];
+                        queryClient.setQueryData(['projects'], next);
+                        return next;
                     });
                 }
             } else if (detail?.action === 'DELETE') {
                 const delId = detail?.record?.project_id || detail?.projectId || detail?.data?.project_id;
                 if (delId) {
-                    setProjects(prev => prev.filter(p => p.project_id !== delId));
+                    setProjects(prev => {
+                        const next = prev.filter(p => p.project_id !== delId);
+                        queryClient.setQueryData(['projects'], next);
+                        return next;
+                    });
                     if (selectedProject?.project_id === delId) {
                         setProject(null);
                     }
@@ -132,6 +140,7 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
                 const data = await res.json();
                 if (data.success && Array.isArray(data.projects)) {
                     setProjects(data.projects);
+                    queryClient.setQueryData(['projects'], data.projects);
                     if (!selectedProject && data.projects.length > 0) {
                         setProject({ ...data.projects[0], role: data.projects[0].role || 'admin' });
                     }
@@ -185,9 +194,15 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
                         else if (rawType === 'pay_as_you_go') setPlanType('Pay-As-You-Go');
                         else setPlanType('Free');
                         setIsSuspended(data.plan.status === 'suspended');
+                        queryClient.setQueryData(['user-plan'], data.plan);
                     }
 
-                    setProjects(data.projects || []);
+                    if (data.projects) {
+                        setProjects(data.projects);
+                        queryClient.setQueryData(['projects'], data.projects);
+                    } else {
+                        setProjects([]);
+                    }
                     setInvitations(data.invitations || []);
 
                     if (selectedProject) {

@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState, useContext } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import Image from 'next/image';
 import { getProjectsForCurrentUser, Project } from '@/lib/data';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
@@ -29,11 +30,34 @@ type UserRoleOption = 'student' | 'employee' | 'org_owner';
 type BillingOption = 'monthly' | 'pay_as_you_go' | 'hybrid';
 
 export default function SelectProjectPage() {
-  const [projects, setProjects] = useState<Project[]>([]);
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
+
+  const { data: projects = [], isLoading: loading, error: queryError } = useQuery<Project[]>({
+    queryKey: ['projects'],
+    queryFn: async () => {
+      const res = await fetch('/api/projects');
+      const data = await res.json();
+      if (data.success && data.projects) {
+        return data.projects;
+      }
+      return await getProjectsForCurrentUser();
+    },
+    staleTime: 60 * 1000,
+    gcTime: 10 * 60 * 1000,
+    refetchOnWindowFocus: false,
+  });
+
+  const { data: planData } = useQuery({
+    queryKey: ['user-plan'],
+    queryFn: () => getUserPlanAction(),
+    staleTime: 60 * 1000,
+    gcTime: 10 * 60 * 1000,
+    refetchOnWindowFocus: false,
+  });
+
+  const currentPlan = (planData?.plan || 'free').toLowerCase();
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
-  const [currentPlan, setCurrentPlan] = useState<string>('free');
   const router = useRouter();
   const searchParams = useSearchParams();
   const { setProject } = useContext(ProjectContext);
@@ -106,27 +130,7 @@ export default function SelectProjectPage() {
   const hasAvailableQuota = isUpgradedAccount && projects.length < maxAllowedProjects;
 
   const fetchProjects = async (silent = false) => {
-    if (!silent && projects.length === 0) {
-      setLoading(true);
-    }
-    setError(null);
-    try {
-      const res = await fetch('/api/projects');
-      const data = await res.json();
-      if (data.success && data.projects) {
-        setProjects(data.projects);
-      } else {
-        const userProjects = await getProjectsForCurrentUser();
-        setProjects(userProjects);
-      }
-    } catch (e: any) {
-      console.error("Failed to fetch projects:", e);
-      if (projects.length === 0) {
-        setError("We couldn't load your projects. Please try again.");
-      }
-    } finally {
-      setLoading(false);
-    }
+    await queryClient.invalidateQueries({ queryKey: ['projects'] });
   };
 
   const checkConnection = async () => {
@@ -352,12 +356,6 @@ export default function SelectProjectPage() {
   };
 
   useEffect(() => {
-    fetchProjects();
-
-    getUserPlanAction().then(res => {
-      if (res?.plan) setCurrentPlan(res.plan.toLowerCase());
-    }).catch(() => {});
-
     // Check GitHub connection return param
     if (typeof window !== 'undefined') {
       const urlParams = new URLSearchParams(window.location.search);
@@ -430,14 +428,14 @@ export default function SelectProjectPage() {
       console.error('Error auto-provisioning paid project:', e);
     }
 
-
     const handleProjectChange = async (e?: Event) => {
       const customEvent = e as CustomEvent;
       const detail = customEvent?.detail;
       if (detail?.action === 'INSERT' && (detail?.record || detail?.project || detail?.data)) {
         const newProj: Project = detail.record || detail.project || detail.data;
         if (newProj && newProj.project_id) {
-          setProjects(prev => {
+          queryClient.setQueryData<Project[]>(['projects'], prev => {
+            if (!prev) return [newProj];
             if (prev.some(p => p.project_id === newProj.project_id)) return prev;
             return [newProj, ...prev];
           });
@@ -445,23 +443,17 @@ export default function SelectProjectPage() {
       } else if (detail?.action === 'DELETE') {
         const delId = detail?.record?.project_id || detail?.projectId || detail?.data?.project_id;
         if (delId) {
-          setProjects(prev => prev.filter(p => p.project_id !== delId));
+          queryClient.setQueryData<Project[]>(['projects'], prev => (prev || []).filter(p => p.project_id !== delId));
         }
       }
-      try {
-        const res = await fetch('/api/projects');
-        const data = await res.json();
-        if (data.success && Array.isArray(data.projects)) {
-          setProjects(data.projects);
-        }
-      } catch (err) {}
+      queryClient.invalidateQueries({ queryKey: ['projects'] });
     };
 
     window.addEventListener('flux:project-change', handleProjectChange);
     return () => {
       window.removeEventListener('flux:project-change', handleProjectChange);
     };
-  }, []);
+  }, [queryClient]);
 
   const handleProjectSelect = (project: Project) => {
     setProject(project);

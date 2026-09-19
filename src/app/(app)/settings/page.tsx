@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useContext, useEffect, useMemo } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import Image from 'next/image';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
@@ -100,10 +101,46 @@ export default function GeneralSettingsPage() {
     const [timezone, setTimezone] = useState(selectedProject?.timezone || 'UTC');
     const [savingTimezone, setSavingTimezone] = useState(false);
 
-    // 2FA State
+    const queryClient = useQueryClient();
+
+    // User Plan Cached via TanStack Query (Shared across layout and pages)
+    const { data: cachedPlan } = useQuery({
+        queryKey: ['user-plan'],
+        queryFn: () => getUserPlanAction(),
+        staleTime: 60 * 1000,
+        refetchOnWindowFocus: false,
+    });
+
+    const [userPlan, setUserPlan] = useState<{ plan: string; billing_cycle_end: string | null; status?: string }>({ 
+        plan: cachedPlan?.plan || 'free', 
+        billing_cycle_end: cachedPlan?.billing_cycle_end || null, 
+        status: cachedPlan?.status || 'active' 
+    });
+
+    useEffect(() => {
+        if (cachedPlan) {
+            setUserPlan(cachedPlan);
+        }
+    }, [cachedPlan]);
+
+    // 2FA Cached Query
+    const { data: twoFaData, isLoading: is2faLoading } = useQuery({
+        queryKey: ['2fa-status'],
+        queryFn: () => get2FAStatusAction(),
+        staleTime: 60 * 1000,
+        refetchOnWindowFocus: false,
+    });
+
     const [is2faEnabled, setIs2faEnabled] = useState(false);
     const [has2faSecret, setHas2faSecret] = useState(false);
-    const [is2faLoading, setIs2faLoading] = useState(true);
+
+    useEffect(() => {
+        if (twoFaData) {
+            setIs2faEnabled(twoFaData.enabled ?? false);
+            setHas2faSecret(twoFaData.hasSecret ?? false);
+        }
+    }, [twoFaData]);
+
     const [isSettingUp2fa, setIsSettingUp2fa] = useState(false);
     const [setupData, setSetupData] = useState<{ secret: string; qrUrl: string } | null>(null);
     const [verificationCode, setVerificationCode] = useState('');
@@ -111,7 +148,6 @@ export default function GeneralSettingsPage() {
     const [qrCodeDataUrl, setQrCodeDataUrl] = useState('');
 
     // Organization & Suspension State
-    const [userPlan, setUserPlan] = useState<{ plan: string; billing_cycle_end: string | null; status?: string }>({ plan: 'free', billing_cycle_end: null, status: 'active' });
     const [suspendConfirmation, setSuspendConfirmation] = useState('');
     const [suspendOrgAckChecked, setSuspendOrgAckChecked] = useState(false);
     const [isSuspending, setIsSuspending] = useState(false);
@@ -133,23 +169,8 @@ export default function GeneralSettingsPage() {
     }, [timezone]);
 
     useEffect(() => {
-        getUserPlanAction().then(res => {
-            setUserPlan(res);
-        }).catch(() => {});
-    }, []);
-
-    useEffect(() => {
         if (selectedProject) {
             setTimezone(selectedProject.timezone || 'UTC');
-
-            // Check 2FA Status
-            get2FAStatusAction().then(res => {
-                setIs2faEnabled(res.enabled ?? false);
-                setHas2faSecret(res.hasSecret ?? false);
-                setIs2faLoading(false);
-            }).catch(() => {
-                setIs2faLoading(false);
-            });
         }
     }, [selectedProject]);
 

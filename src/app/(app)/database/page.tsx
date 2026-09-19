@@ -2,7 +2,7 @@
 import { Suspense } from 'react';
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
-import { getTablesForProject, getColumnsForTable, getConstraintsForProject } from '@/lib/data';
+import { getTablesForProject, getAllColumnsForProject, getConstraintsForProject } from '@/lib/data';
 import { Skeleton } from '@/components/ui/skeleton';
 import { DatabaseErdSkeleton } from '@/components/skeletons/page-skeletons';
 import { ErdView } from '@/components/erd-view';
@@ -18,11 +18,11 @@ async function Database({ projectId }: { projectId: string }) {
         redirect('/dashboard');
     }
 
-    const allTables = await getTablesForProject(projectId);
-    const allColumns = await Promise.all(
-        allTables.map(table => getColumnsForTable(projectId, table.table_id))
-    ).then(cols => cols.flat());
-    const allConstraints = await getConstraintsForProject(projectId);
+    const [allTables, allColumns, allConstraints] = await Promise.all([
+        getTablesForProject(projectId),
+        getAllColumnsForProject(projectId),
+        getConstraintsForProject(projectId)
+    ]);
 
     return (
         <div className="h-full w-full">

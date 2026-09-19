@@ -154,6 +154,8 @@ export default function StoragePage() {
         },
         enabled: !!projectId,
         staleTime: 30 * 1000,
+        gcTime: 5 * 60 * 1000,
+        refetchOnWindowFocus: false,
     });
 
     // Auto-select first bucket if none is selected
@@ -184,6 +186,8 @@ export default function StoragePage() {
         },
         enabled: !!projectId && !!selectedBucket,
         staleTime: 15 * 1000,
+        gcTime: 5 * 60 * 1000,
+        refetchOnWindowFocus: false,
     });
 
     const filteredFiles = useMemo(() => {

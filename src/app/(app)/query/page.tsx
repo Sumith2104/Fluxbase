@@ -364,7 +364,7 @@ export default function QueryPage() {
     }
   }, [isFetchingMore, hasMore, project?.project_id, queryResponse, page, executedQuery, toast]);
 
-  const { lastEvent } = useRealtimeSubscription(project?.project_id);
+  const { lastEvent } = useRealtimeSubscription(project?.project_id, { trackLastEvent: true });
 
   const handleLiveRefresh = useCallback(async () => {
     if (!project?.project_id || !executedQuery || !queryResponse?.success || isExecuting || isLiveUpdating) return;

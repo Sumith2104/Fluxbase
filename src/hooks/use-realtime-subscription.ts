@@ -24,11 +24,13 @@ export interface RealtimeEvent {
 // --- Singleton state per projectId ---
 
 type Listener = (event: RealtimeEvent) => void;
+type StatusListener = (status: 'idle' | 'connecting' | 'open' | 'closed') => void;
 
 interface ConnectionState {
     status: 'idle' | 'connecting' | 'open' | 'closed';
     lastEvent: RealtimeEvent | null;
     listeners: Set<Listener>;
+    statusListeners: Set<StatusListener>;
     abortController: AbortController | null;
     retryTimer: ReturnType<typeof setTimeout> | null;
     retryCount: number;
@@ -44,6 +46,7 @@ function getOrCreateState(projectId: string): ConnectionState {
             status: 'idle',  // 'idle' = not started yet, distinct from 'connecting'
             lastEvent: null,
             listeners: new Set(),
+            statusListeners: new Set(),
             abortController: null,
             retryTimer: null,
             retryCount: 0,
@@ -52,6 +55,15 @@ function getOrCreateState(projectId: string): ConnectionState {
         });
     }
     return connections.get(projectId)!;
+}
+
+function updateConnectionStatus(projectId: string, newStatus: 'idle' | 'connecting' | 'open' | 'closed') {
+    const state = connections.get(projectId);
+    if (!state) return;
+    if (state.status !== newStatus) {
+        state.status = newStatus;
+        state.statusListeners.forEach(fn => fn(newStatus));
+    }
 }
 
 function notifyListeners(projectId: string, event: RealtimeEvent) {
@@ -68,7 +80,7 @@ function scheduleReconnect(projectId: string) {
         clearTimeout(state.retryTimer);
         state.retryTimer = null;
     }
-    state.status = 'closed';
+    updateConnectionStatus(projectId, 'closed');
     state.retryCount += 1;
 
     // Guaranteed backoff: 2.5s -> 3.75s -> 5.6s ... up to 20s (Never 0ms!)
@@ -107,7 +119,7 @@ async function startConnection(projectId: string) {
         state.retryTimer = null;
     }
 
-    state.status = 'connecting';
+    updateConnectionStatus(projectId, 'connecting');
 
     const defaultWsUrl = typeof window !== 'undefined'
         ? `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}/ws`
@@ -122,7 +134,7 @@ async function startConnection(projectId: string) {
 
             ws.onopen = () => {
                 wsOpened = true;
-                state.status = 'open';
+                updateConnectionStatus(projectId, 'open');
                 state.retryCount = 0;
                 logger.info(`[Realtime] WebSocket connected for ${projectId}`);
                 resetWatchdog(projectId);
@@ -220,7 +232,7 @@ async function connectSSE(projectId: string, state: ConnectionState) {
             throw new Error(`SSE connect failed: ${response.status}`);
         }
 
-        state.status = 'open';
+        updateConnectionStatus(projectId, 'open');
         state.retryCount = 0;
         logger.info(`[Realtime] SSE connected for ${projectId}`);
         resetWatchdog(projectId);
@@ -291,7 +303,7 @@ async function connectSSE(projectId: string, state: ConnectionState) {
     }
 
     // Connection ended — schedule reconnect if still needed
-    state.status = 'closed';
+    updateConnectionStatus(projectId, 'closed');
     (state as any).socket = null;
     if (state.watchdogTimer) clearTimeout(state.watchdogTimer);
 
@@ -323,7 +335,22 @@ function subscribe(projectId: string, listener: Listener): () => void {
     };
 }
 
+function subscribeStatus(projectId: string, listener: StatusListener): () => void {
+    const state = getOrCreateState(projectId);
+    state.statusListeners.add(listener);
+    return () => {
+        const s = connections.get(projectId);
+        if (s) {
+            s.statusListeners.delete(listener);
+        }
+    };
+}
+
 // --- React Hook (thin wrapper around singleton) ---
+
+export interface UseRealtimeSubscriptionOptions {
+    trackLastEvent?: boolean;
+}
 
 // Global per-project, per-table debounce timers across all hook instances (prevents duplicate refetches from multiple components)
 const globalLastTableRefetch = new Map<string, number>();
@@ -333,9 +360,17 @@ const globalTableTimers = new Map<string, ReturnType<typeof setTimeout>>();
 const globalLastSchemaInvalidate = new Map<string, number>();
 const globalSchemaTimer = new Map<string, ReturnType<typeof setTimeout>>();
 
-export function useRealtimeSubscription(projectId: string | undefined) {
+export function useRealtimeSubscription(
+    projectId: string | undefined,
+    options?: UseRealtimeSubscriptionOptions
+) {
+    const trackLastEvent = options?.trackLastEvent ?? false;
     const [lastEvent, setLastEvent] = useState<RealtimeEvent | null>(null);
-    const [status, setStatus] = useState<'idle' | 'connecting' | 'open' | 'closed'>('connecting');
+    const [status, setStatus] = useState<'idle' | 'connecting' | 'open' | 'closed'>(() => {
+        if (!projectId) return 'closed';
+        const s = connections.get(projectId);
+        return s ? s.status : 'connecting';
+    });
     const queryClient = useQueryClient();
     const projectIdRef = useRef(projectId);
     projectIdRef.current = projectId;
@@ -493,14 +528,19 @@ export function useRealtimeSubscription(projectId: string | undefined) {
         if (!projectId) return;
 
         const listener: Listener = (event) => {
-            // 1. Update UI-facing state (Batched by React)
-            setLastEvent(event);
+            // 1. Only update UI-facing state if explicitly requested by consumer
+            if (trackLastEvent) {
+                setLastEvent(event);
+            }
 
             // 2. Trigger Database Sync (Instant, Event-driven)
             syncDatabase(event);
         };
 
         const unsubscribe = subscribe(projectId, listener);
+        const unsubscribeStatus = subscribeStatus(projectId, (newStatus) => {
+            setStatus(newStatus);
+        });
 
         // Client-side local custom event listener fallback (handles local/serverless disconnections)
         const handleLocalSchemaChange = (e: Event) => {
@@ -518,23 +558,17 @@ export function useRealtimeSubscription(projectId: string | undefined) {
         };
         window.addEventListener('flux:project-change', handleLocalProjectChange);
 
-        // Sync status from singleton
+        // Sync status from singleton on mount
         const state = connections.get(projectId);
         if (state) setStatus(state.status);
 
-        // Poll status so UI indicator stays correct (light-weight, 1-per-hook not 1-per-project)
-        const statusInterval = setInterval(() => {
-            const s = connections.get(projectId);
-            setStatus(s ? s.status : 'closed');
-        }, 2000);
-
         return () => {
             unsubscribe();
+            unsubscribeStatus();
             window.removeEventListener('flux:schema-change', handleLocalSchemaChange);
             window.removeEventListener('flux:project-change', handleLocalProjectChange);
-            clearInterval(statusInterval);
         };
-    }, [projectId, syncDatabase]);
+    }, [projectId, syncDatabase, trackLastEvent, queryClient]);
 
     const sendMessage = () => {
         logger.warn('[Realtime] sendMessage is a no-op in SSE mode.');
