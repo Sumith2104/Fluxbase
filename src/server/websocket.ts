@@ -239,7 +239,7 @@ async function verifyProjectAccess(userId: string, projectId: string, allowedPro
 // WebSocket Connection Handler
 wss.on('connection', async (ws, req) => {
     try {
-        let auth = null;
+        let auth: { userId: string; allowedProjectId?: string } | null = null;
         try {
             auth = await authenticateRequest(req);
         } catch (authErr) {
