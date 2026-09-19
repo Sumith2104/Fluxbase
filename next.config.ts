@@ -43,6 +43,37 @@ const nextConfig: NextConfig = {
       },
     ];
   },
+  async rewrites() {
+    // When deployed on Vercel, forward high-throughput SQL and mutation endpoints
+    // to the dedicated AWS EC2 production backend (fluxbasedb.me).
+    // This allows existing users and external clients calling fluxbase.vercel.app
+    // to get sub-second execution without cold starts or connection pool starvation.
+    if (process.env.VERCEL === '1') {
+      return [
+        {
+          source: '/api/execute-sql',
+          destination: 'https://fluxbasedb.me/api/execute-sql',
+        },
+        {
+          source: '/api/fast-insert',
+          destination: 'https://fluxbasedb.me/api/fast-insert',
+        },
+        {
+          source: '/api/bulk-fast-insert',
+          destination: 'https://fluxbasedb.me/api/bulk-fast-insert',
+        },
+        {
+          source: '/api/table-data',
+          destination: 'https://fluxbasedb.me/api/table-data',
+        },
+        {
+          source: '/api/v1/:path*',
+          destination: 'https://fluxbasedb.me/api/v1/:path*',
+        },
+      ];
+    }
+    return [];
+  },
   async headers() {
     return [
       {
