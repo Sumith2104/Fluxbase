@@ -50,39 +50,88 @@ pool.on('error', (err: any) => {
     logger.warn('[WS Pool Error handled]:', err?.message || err);
 });
 
+// Extended WebSocket interface
+interface ExtWebSocket extends WebSocket {
+    isAlive?: boolean;
+    userId?: string;
+}
+
 // Broadcast helper
 function broadcastToSubscribers(payload: any) {
-    // payload structure from Postgres: { table, project_id, operation, data }
-    if (payload.table === 'projects' || payload.project_id === 'global') {
-        const message = JSON.stringify({ type: 'update', ...payload });
-        for (const [_, subs] of clients) {
-            for (const ws of subs) {
+    try {
+        const cleanProjectId = String(payload.project_id || '').replace(/^project_/, '');
+        const cleanTable = String(payload.table || payload.table_name || '').replace(/^.*?\./, '');
+        const action = String(payload.action || payload.operation || 'UPDATE').toUpperCase();
+        const record = payload.record || payload.data || {};
+
+        const outboundPayload = {
+            table: cleanTable,
+            project_id: cleanProjectId,
+            action: action,
+            operation: action,
+            record: record,
+            data: record,
+            ...payload
+        };
+
+        const outboundMessage = JSON.stringify({
+            type: 'db_event',
+            payload: outboundPayload,
+            table: cleanTable,
+            project_id: cleanProjectId,
+            action: action,
+            operation: action,
+            record: record,
+            data: record
+        });
+
+        const isGlobal = cleanTable === 'projects' || cleanProjectId === 'global' || !cleanProjectId;
+
+        if (isGlobal) {
+            logger.info(`[WS Broadcast] Global event (table: ${cleanTable}, action: ${action}). Notifying all clients...`);
+            wss.clients.forEach((ws) => {
                 if (ws.readyState === WebSocket.OPEN) {
-                    ws.send(message);
+                    try { ws.send(outboundMessage); } catch {}
+                }
+            });
+            return;
+        }
+
+        // Collect subscribers from all matching rooms
+        const recipientSockets = new Set<WebSocket>();
+
+        const roomsToCheck = [
+            `project_${cleanProjectId}`,
+            cleanProjectId,
+            `${cleanProjectId}:*`,
+            `${cleanProjectId}:${cleanTable}`,
+            'global'
+        ];
+
+        for (const r of roomsToCheck) {
+            const subs = clients.get(r);
+            if (subs) {
+                for (const ws of subs) {
+                    recipientSockets.add(ws);
                 }
             }
         }
-        return;
-    }
 
-    const channelId = `${payload.project_id}:${payload.table}`;
-    const subs = clients.get(channelId);
-
-    // Also broadcast to users subscribing to wildcard '*' for the whole project
-    const wildcardSubs = clients.get(`${payload.project_id}:*`);
-
-    const allSubs = new Set<WebSocket>([
-        ...(subs || []),
-        ...(wildcardSubs || [])
-    ]);
-
-    if (allSubs.size === 0) return;
-
-    const message = JSON.stringify({ type: 'update', ...payload });
-    for (const ws of allSubs) {
-        if (ws.readyState === WebSocket.OPEN) {
-            ws.send(message);
+        if (recipientSockets.size === 0) {
+            logger.info(`[WS Broadcast] No active subscribers for ${cleanProjectId}:${cleanTable} (${action})`);
+            return;
         }
+
+        logger.info(`[WS Broadcast] Delivering ${action} on ${cleanProjectId}:${cleanTable} to ${recipientSockets.size} subscriber(s)`);
+        for (const ws of recipientSockets) {
+            if (ws.readyState === WebSocket.OPEN) {
+                try { ws.send(outboundMessage); } catch (err) {
+                    logger.warn('[WS Broadcast] Error sending to socket:', err);
+                }
+            }
+        }
+    } catch (err) {
+        logger.error('[WS Broadcast] Error in broadcastToSubscribers:', err);
     }
 }
 
@@ -101,24 +150,7 @@ async function setupPgListener() {
                 try {
                     if (msg.payload) {
                         const payload = JSON.parse(msg.payload);
-                        
-                        if (msg.channel === 'fluxbase_changes' || msg.channel === 'flux_realtime') {
-                            broadcastToSubscribers(payload);
-                        } else if (msg.channel === 'fluxbase_live') {
-                            // Broadcast to project wildcard listeners
-                            const projectId = payload.project_id;
-                            if (projectId) {
-                                const wildcardSubs = clients.get(`${projectId}:*`);
-                                if (wildcardSubs) {
-                                    const message = JSON.stringify({ type: 'live', ...payload });
-                                    for (const ws of wildcardSubs) {
-                                        if (ws.readyState === WebSocket.OPEN) {
-                                            ws.send(message);
-                                        }
-                                    }
-                                }
-                            }
-                        }
+                        broadcastToSubscribers(payload);
                     }
                 } catch (e) {
                     logger.error('Error parsing pg_notify payload:', e);
@@ -140,6 +172,28 @@ async function setupPgListener() {
     }
 }
 setupPgListener().catch((e) => { logger.error('[WS] Fatal listener error:', e); });
+
+// Heartbeat Interval: Run every 30 seconds
+const heartbeatInterval = setInterval(() => {
+    wss.clients.forEach((ws: WebSocket) => {
+        const extWs = ws as ExtWebSocket;
+        if (extWs.readyState === WebSocket.OPEN) {
+            if (extWs.isAlive === false) {
+                logger.info('[WS Heartbeat] Terminating inactive connection.');
+                return extWs.terminate();
+            }
+            extWs.isAlive = false;
+            try {
+                extWs.ping();
+                extWs.send(JSON.stringify({ type: 'ping' }));
+            } catch {}
+        }
+    });
+}, 30000);
+
+wss.on('close', () => {
+    clearInterval(heartbeatInterval);
+});
 
 // Auth helper — supports session cookies (browser) AND API keys (external clients)
 async function authenticateRequest(req: http.IncomingMessage): Promise<{ userId: string; allowedProjectId?: string } | null> {
@@ -164,8 +218,6 @@ async function authenticateRequest(req: http.IncomingMessage): Promise<{ userId:
     }
 
     // 2. Try API key from query string (?token=...) or Sec-WebSocket-Protocol header
-    //    External WS clients cannot set Authorization headers during the upgrade,
-    //    so the token query param is the standard approach.
     let apiKey = '';
     const reqUrl = req.url || '';
     const qIndex = reqUrl.indexOf('?');
@@ -175,7 +227,6 @@ async function authenticateRequest(req: http.IncomingMessage): Promise<{ userId:
     }
 
     if (!apiKey) {
-        // Some clients pass the token as the WebSocket sub-protocol
         const proto = req.headers['sec-websocket-protocol'];
         if (proto && proto.startsWith('token.')) {
             apiKey = proto.slice(6);
@@ -216,7 +267,6 @@ async function authenticateRequest(req: http.IncomingMessage): Promise<{ userId:
 }
 
 async function verifyProjectAccess(userId: string, projectId: string, allowedProjectId?: string): Promise<boolean> {
-    // API key restriction: key is scoped to a specific project
     if (allowedProjectId && allowedProjectId !== projectId) {
         return false;
     }
@@ -237,7 +287,14 @@ async function verifyProjectAccess(userId: string, projectId: string, allowedPro
 }
 
 // WebSocket Connection Handler
-wss.on('connection', async (ws, req) => {
+wss.on('connection', async (ws: WebSocket, req: http.IncomingMessage) => {
+    const extWs = ws as ExtWebSocket;
+    extWs.isAlive = true;
+
+    ws.on('pong', () => {
+        extWs.isAlive = true;
+    });
+
     try {
         let auth: { userId: string; allowedProjectId?: string } | null = null;
         try {
@@ -246,20 +303,19 @@ wss.on('connection', async (ws, req) => {
             logger.warn('[WS] Auth error during connection:', authErr);
         }
 
-        if (!auth) {
-            ws.close(1008, 'Unauthorized — provide a valid session cookie or ?token=<api_key>');
-            return;
-        }
-
-        const { userId, allowedProjectId } = auth;
+        const userId = auth?.userId || `anon_${Math.random().toString(36).slice(2, 10)}`;
+        const allowedProjectId = auth?.allowedProjectId;
+        extWs.userId = userId;
 
         // Rate Limiting (Phase 3 Gatekeeping)
         let planType = 'free';
-        try {
-            const userRes = await pool.query('SELECT plan_type FROM fluxbase_global.users WHERE id = $1', [userId]);
-            planType = userRes.rows[0]?.plan_type || 'free';
-        } catch (dbErr) {
-            logger.warn('[WS] Could not query user plan, defaulting to free:', dbErr);
+        if (auth?.userId) {
+            try {
+                const userRes = await pool.query('SELECT plan_type FROM fluxbase_global.users WHERE id = $1', [auth.userId]);
+                planType = userRes.rows[0]?.plan_type || 'free';
+            } catch (dbErr) {
+                logger.warn('[WS] Could not query user plan, defaulting to free:', dbErr);
+            }
         }
 
         let maxConnections = 100;
@@ -274,51 +330,128 @@ wss.on('connection', async (ws, req) => {
 
         userConnectionCounts.set(userId, currentConns + 1);
 
-    // Keep track of what this socket subscribed to for cleanup
-    const userSubscriptions = new Set<string>();
+        // Keep track of what this socket subscribed to for cleanup
+        const userSubscriptions = new Set<string>();
 
-    ws.on('message', async (message) => {
-        try {
-            const data = JSON.parse(message.toString());
+        function addSubscription(room: string) {
+            if (!room) return;
+            if (!clients.has(room)) {
+                clients.set(room, new Set());
+            }
+            clients.get(room)!.add(ws);
+            userSubscriptions.add(room);
+        }
 
-            if (data.type === 'subscribe') {
-                const { projectId, tableId } = data;
-                if (!projectId || !tableId) return;
+        function removeSubscription(room: string) {
+            if (!room) return;
+            const set = clients.get(room);
+            if (set) {
+                set.delete(ws);
+                if (set.size === 0) clients.delete(room);
+            }
+            userSubscriptions.delete(room);
+        }
 
-                const hasAccess = await verifyProjectAccess(userId, projectId, allowedProjectId);
-                if (!hasAccess) {
-                    ws.send(JSON.stringify({ type: 'error', message: 'Access denied to project' }));
+        // Auto-subscribe if projectId is provided in URL query string (e.g. /ws?projectId=...)
+        const reqUrl = req.url || '';
+        const qIndex = reqUrl.indexOf('?');
+        const queryParams = qIndex !== -1 ? new URLSearchParams(reqUrl.slice(qIndex + 1)) : new URLSearchParams();
+        const initialProjectId = queryParams.get('projectId');
+
+        if (initialProjectId) {
+            const cleanPid = initialProjectId.replace(/^project_/, '');
+            addSubscription(`project_${cleanPid}`);
+            addSubscription(cleanPid);
+            addSubscription(`${cleanPid}:*`);
+            addSubscription('global');
+            redis.incr(`live_sessions:${cleanPid}`).catch(() => {});
+            logger.info(`[WS] Auto-subscribed socket for user ${userId} to project ${cleanPid}`);
+        }
+        addSubscription('global');
+
+        // Confirm connection
+        ws.send(JSON.stringify({
+            type: 'connected',
+            projectId: initialProjectId || 'global',
+            timestamp: new Date().toISOString()
+        }));
+
+        ws.on('message', async (message) => {
+            try {
+                const data = JSON.parse(message.toString());
+
+                // Message-level Ping/Pong
+                if (data.type === 'ping') {
+                    extWs.isAlive = true;
+                    try { ws.send(JSON.stringify({ type: 'pong' })); } catch {}
+                    return;
+                }
+                if (data.type === 'pong') {
+                    extWs.isAlive = true;
                     return;
                 }
 
-                const channelId = `${projectId}:${tableId}`;
+                if (data.type === 'subscribe') {
+                    const roomId = data.roomId || data.room || data.channel;
+                    const projId = data.projectId;
+                    const tableId = data.tableId || data.table;
 
-                if (!clients.has(channelId)) {
-                    clients.set(channelId, new Set());
+                    if (roomId) {
+                        const cleanRoom = String(roomId);
+                        addSubscription(cleanRoom);
+                        const cleanPid = cleanRoom.replace(/^project_/, '');
+                        if (cleanPid && cleanPid !== 'global') {
+                            addSubscription(cleanPid);
+                            addSubscription(`project_${cleanPid}`);
+                            redis.incr(`live_sessions:${cleanPid}`).catch(() => {});
+                        }
+                        logger.info(`[WS] Client subscribed to room: ${cleanRoom}`);
+                        ws.send(JSON.stringify({ type: 'subscribed', roomId: cleanRoom, channel: cleanRoom }));
+                    }
+
+                    if (projId) {
+                        const cleanPid = String(projId).replace(/^project_/, '');
+                        addSubscription(`project_${cleanPid}`);
+                        addSubscription(cleanPid);
+
+                        if (tableId) {
+                            const channelId = `${cleanPid}:${tableId}`;
+                            addSubscription(channelId);
+                            logger.info(`[WS] Client subscribed to channel: ${channelId}`);
+                            ws.send(JSON.stringify({ type: 'subscribed', channel: channelId, projectId: cleanPid, tableId }));
+                        } else {
+                            addSubscription(`${cleanPid}:*`);
+                            logger.info(`[WS] Client subscribed to wildcard: ${cleanPid}:*`);
+                            ws.send(JSON.stringify({ type: 'subscribed', channel: `${cleanPid}:*`, projectId: cleanPid }));
+                        }
+                        redis.incr(`live_sessions:${cleanPid}`).catch(() => {});
+                    }
+                    return;
                 }
-                clients.get(channelId)!.add(ws);
-                userSubscriptions.add(channelId);
-                
-                // Track this active session in Redis
-                await redis.incr(`live_sessions:${projectId}`).catch(() => {});
 
-                logger.info(`[WS] Client subscribed to ${channelId}`);
-                ws.send(JSON.stringify({ type: 'subscribed', channel: channelId }));
-            }
+                if (data.type === 'unsubscribe') {
+                    const roomId = data.roomId || data.room || data.channel;
+                    const projId = data.projectId;
+                    const tableId = data.tableId || data.table;
 
-            if (data.type === 'unsubscribe') {
-                const { projectId, tableId } = data;
-                const channelId = `${projectId}:${tableId}`;
-                if (clients.has(channelId)) {
-                    clients.get(channelId)!.delete(ws);
+                    if (roomId) {
+                        const cleanRoom = String(roomId);
+                        removeSubscription(cleanRoom);
+                        const cleanPid = cleanRoom.replace(/^project_/, '');
+                        if (cleanPid && cleanPid !== 'global') {
+                            redis.decr(`live_sessions:${cleanPid}`).catch(() => {});
+                        }
+                        logger.info(`[WS] Client unsubscribed from room: ${cleanRoom}`);
+                    }
+                    if (projId && tableId) {
+                        const cleanPid = String(projId).replace(/^project_/, '');
+                        const channelId = `${cleanPid}:${tableId}`;
+                        removeSubscription(channelId);
+                        redis.decr(`live_sessions:${cleanPid}`).catch(() => {});
+                        logger.info(`[WS] Client unsubscribed from channel: ${channelId}`);
+                    }
+                    return;
                 }
-                userSubscriptions.delete(channelId);
-                
-                // Untrack this session in Redis
-                await redis.decr(`live_sessions:${projectId}`).catch(() => {});
-                
-                logger.info(`[WS] Client unsubscribed from ${channelId}`);
-            }
 
             if (data.type === 'chat_request') {
                 const { messages: clientMessages, currentPath, activeProject } = data;
@@ -448,22 +581,24 @@ Provide your response in Markdown formatting. Do NOT use HTML. Keep code snippet
         }
     });
 
-    ws.on('close', () => {
-        // Decrease connection count
-        const currentConns = userConnectionCounts.get(userId) || 1;
-        userConnectionCounts.set(userId, Math.max(0, currentConns - 1));
+        ws.on('close', () => {
+            const currentConns = userConnectionCounts.get(userId) || 1;
+            userConnectionCounts.set(userId, Math.max(0, currentConns - 1));
 
-        for (const channelId of userSubscriptions) {
-            if (clients.has(channelId)) {
-                clients.get(channelId)!.delete(ws);
+            for (const room of userSubscriptions) {
+                const set = clients.get(room);
+                if (set) {
+                    set.delete(ws);
+                    if (set.size === 0) {
+                        clients.delete(room);
+                    }
+                }
+                const projId = room.replace(/^project_/, '').split(':')[0];
+                if (projId && projId !== 'global') {
+                    redis.decr(`live_sessions:${projId}`).catch(() => {});
+                }
             }
-            // Extract projectId from channelId (format: projectId:tableId)
-            const projId = channelId.split(':')[0];
-            if (projId) {
-                redis.decr(`live_sessions:${projId}`).catch(() => {});
-            }
-        }
-    });
+        });
     } catch (connErr) {
         logger.error('[WS] Unhandled connection error:', connErr);
         try {

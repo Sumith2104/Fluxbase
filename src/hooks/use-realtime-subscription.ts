@@ -109,7 +109,10 @@ async function startConnection(projectId: string) {
 
     state.status = 'connecting';
 
-    const wsUrl = process.env.NEXT_PUBLIC_WS_URL;
+    const defaultWsUrl = typeof window !== 'undefined'
+        ? `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}/ws`
+        : '';
+    const wsUrl = process.env.NEXT_PUBLIC_WS_URL || defaultWsUrl;
     if (wsUrl && !state.useSSEOnly && typeof window !== 'undefined') {
         let wsOpened = false;
         try {
@@ -121,10 +124,10 @@ async function startConnection(projectId: string) {
                 wsOpened = true;
                 state.status = 'open';
                 state.retryCount = 0;
-                logger.info(`[Realtime] WebSocket connected to Render for ${projectId}`);
+                logger.info(`[Realtime] WebSocket connected for ${projectId}`);
                 resetWatchdog(projectId);
 
-                // Send subscription handshake to Render room system
+                // Send subscription handshake to server room system
                 try {
                     if (projectId && projectId !== 'global') {
                         ws.send(JSON.stringify({ type: 'subscribe', roomId: `project_${projectId}` }));
@@ -141,7 +144,11 @@ async function startConnection(projectId: string) {
                 try {
                     const data = JSON.parse(event.data);
                     resetWatchdog(projectId);
-                    if (data.type === 'ping' || data.type === 'connected') return;
+                    if (data.type === 'ping') {
+                        try { ws.send(JSON.stringify({ type: 'pong' })); } catch {}
+                        return;
+                    }
+                    if (data.type === 'connected' || data.type === 'subscribed' || data.type === 'pong') return;
 
                     const payload = data.payload || data;
                     const tableRef = payload.table || payload.table_name || data.table || data.table_name || '';
