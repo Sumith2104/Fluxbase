@@ -7,6 +7,7 @@ import { GlobalAlertProvider } from "@/components/global-alert-provider";
 import { QueryProvider } from "@/components/query-provider";
 import ErrorBoundary from "@/components/error-boundary";
 import { ThemeProvider } from "@/components/theme-provider";
+import { MaintenanceBanner } from "@/components/maintenance-banner";
 
 export const viewport: Viewport = {
   themeColor: '#0a0a0a',
@@ -97,6 +98,7 @@ export default function RootLayout({
             <ErrorBoundary>
               <GlobalAlertProvider>
                 <TooltipProvider delayDuration={200}>
+                  <MaintenanceBanner />
                   {children}
                   <ScrollIndicator />
                   <Toaster />

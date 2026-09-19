@@ -19,7 +19,7 @@ export default function Navbar({ children }: { children: React.ReactNode }) {
     const pathname = usePathname();
 
     return (
-        <nav className="fixed left-1/2 top-3 z-50 w-[calc(100%-1rem)] max-w-5xl -translate-x-1/2 sm:top-4 sm:w-[95%]">
+        <nav className="fixed left-1/2 top-11 z-50 w-[calc(100%-1rem)] max-w-5xl -translate-x-1/2 sm:top-12 sm:w-[95%]">
             <div className="flex min-w-0 items-center justify-between gap-2 rounded-lg border border-border/50 bg-background/80 px-3 py-2 shadow-xl shadow-black/20 backdrop-blur-xl sm:px-6 sm:py-3">
                 {/* Logo + Brand */}
                 <Link href="/" className="group flex min-w-0 items-center gap-2">
