@@ -149,8 +149,18 @@ export async function checkRowLimit(projectId: string, userId: string, tableName
                     targetSchema = fallbackCheck.rows[0].schemaname;
                 }
             }
-            const res = await pool.query(`SELECT COUNT(*) as count FROM "${targetSchema}"."${safeTable}"`);
-            currentRows = parseInt(res.rows[0].count, 10);
+            // Fast O(1) catalog estimation to avoid multi-second disk scans on large tables
+            const estRes = await pool.query(
+                `SELECT reltuples::bigint as estimate FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace WHERE n.nspname = $1 AND c.relname = $2`,
+                [targetSchema, safeTable]
+            );
+            const est = parseInt(estRes.rows[0]?.estimate || '0', 10);
+            if (est > 20000) {
+                currentRows = est;
+            } else {
+                const res = await pool.query(`SELECT COUNT(*) as count FROM "${targetSchema}"."${safeTable}"`);
+                currentRows = parseInt(res.rows[0].count, 10);
+            }
         } catch {
             currentRows = 0;
         }

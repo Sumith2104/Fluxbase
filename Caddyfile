@@ -60,6 +60,8 @@ fluxbasedb.me, www.fluxbasedb.me {
             header_up X-Real-IP {remote_host}
             header_up X-Forwarded-For {remote_host}
             header_up X-Forwarded-Proto {scheme}
+            lb_try_duration 30s
+            lb_try_interval 250ms
         }
     }
 }
@@ -74,6 +76,9 @@ fluxbasedb.me, www.fluxbasedb.me {
     }
 
     handle {
-        reverse_proxy app:3000
+        reverse_proxy app:3000 {
+            lb_try_duration 30s
+            lb_try_interval 250ms
+        }
     }
 }

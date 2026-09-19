@@ -123,10 +123,12 @@ export function AddRowDialog({
 
     let defaultVal: string | undefined = undefined;
     if (isTimestampCol || isDateTime) {
+      const d = new Date();
+      const pad = (n: number) => n.toString().padStart(2, '0');
       if (inputType === 'datetime-local') {
-        defaultVal = new Date().toISOString().slice(0, 16);
+        defaultVal = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
       } else {
-        defaultVal = new Date().toISOString().replace('T', ' ').slice(0, 19);
+        defaultVal = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
       }
     }
 
