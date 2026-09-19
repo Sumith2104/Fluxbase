@@ -84,7 +84,14 @@ export async function createSessionCookie(uid: string, isMfaVerified: boolean = 
         const sessionCookie = await createSessionToken(uid, isMfaVerified);
 
         const isProduction = process.env.NODE_ENV === 'production';
-        const domain = getSessionCookieDomain();
+        let reqHost: string | null = null;
+        try {
+            const { headers } = await import('next/headers');
+            const h = await headers();
+            reqHost = h.get('x-forwarded-host') || h.get('host');
+        } catch {}
+
+        const domain = getSessionCookieDomain(reqHost);
 
         (await cookies()).set('session', sessionCookie, {
             expires: new Date(Date.now() + ACCESS_TOKEN_TTL * 1000),
@@ -205,7 +212,13 @@ export async function logout() {
             // Token may be expired — that's fine, just clear cookies
         }
     }
-    const domain = getSessionCookieDomain();
+    let reqHost: string | null = null;
+    try {
+        const { headers } = await import('next/headers');
+        const h = await headers();
+        reqHost = h.get('x-forwarded-host') || h.get('host');
+    } catch {}
+    const domain = getSessionCookieDomain(reqHost);
     (await cookies()).delete('session');
     (await cookies()).delete('refresh_token');
     if (domain) {
