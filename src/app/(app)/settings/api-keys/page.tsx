@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useContext } from 'react';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
@@ -12,11 +12,12 @@ import {
     AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { useToast } from '@/hooks/use-toast';
-import { createApiKeyAction, getApiKeysAction, revokeApiKeyAction, getProjectsAction } from '../api-key-actions';
+import { createApiKeyAction, getApiKeysAction, revokeApiKeyAction } from '../api-key-actions';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Key, Shield, ShieldAlert, ShieldCheck, Bot, Copy, Loader2, Globe, Lock, Clock, Calendar } from 'lucide-react';
+import { Key, Shield, ShieldAlert, ShieldCheck, Bot, Copy, Loader2, Globe, Lock, Clock, Calendar, Layers } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { formatDistanceToNow } from 'date-fns';
+import { ProjectContext } from '@/contexts/project-context';
 
 const SCOPES = [
     { id: 'read', label: 'Read Access', description: 'Can only execute SELECT queries', icon: ShieldCheck },
@@ -27,18 +28,42 @@ const SCOPES = [
 
 export default function ApiKeysPage() {
     const { toast } = useToast();
+    const { project: selectedProject } = useContext(ProjectContext);
+
     const [keys, setKeys] = useState<any[]>([]);
     const [loading, setLoading] = useState(false);
     const [newKey, setNewKey] = useState<string | null>(null);
     const [keyName, setKeyName] = useState('');
     const [selectedScopes, setSelectedScopes] = useState<string[]>(['read']);
-    const [projects, setProjects] = useState<{ project_id: string, display_name: string }[]>([]);
-    const [selectedProjectId, setSelectedProjectId] = useState<string>('global');
+    const [selectedProjectId, setSelectedProjectId] = useState<string>(selectedProject?.project_id || 'global');
 
+    // Sync selectedProjectId with active project
     useEffect(() => {
-        getApiKeysAction().then(res => { if (res.success && res.data) setKeys(res.data); });
-        getProjectsAction().then(res => { if (res.success && res.data) setProjects(res.data); });
-    }, []);
+        if (selectedProject?.project_id) {
+            setSelectedProjectId(selectedProject.project_id);
+        } else {
+            setSelectedProjectId('global');
+        }
+    }, [selectedProject?.project_id]);
+
+    // Fetch keys strictly scoped to current project and global keys
+    useEffect(() => {
+        getApiKeysAction(selectedProject?.project_id).then(res => { 
+            if (res.success && res.data) {
+                setKeys(res.data); 
+            }
+        });
+    }, [selectedProject?.project_id]);
+
+    // Client-side guarantee: Only show current project's keys and global keys
+    const visibleKeys = keys.filter(k => {
+        const isGlobal = !k.projectId || k.projectId === 'global';
+        if (isGlobal) return true;
+        if (selectedProject?.project_id) {
+            return k.projectId === selectedProject.project_id;
+        }
+        return false;
+    });
 
     const handleCreateKey = async () => {
         if (!keyName.trim()) return;
@@ -77,7 +102,13 @@ export default function ApiKeysPage() {
                         <Key className="h-5 w-5 text-orange-400" />
                         API Access Keys
                     </CardTitle>
-                    <CardDescription>Manage keys for programmatic access with granular scopes.</CardDescription>
+                    <CardDescription>
+                        {selectedProject ? (
+                            <span>Manage programmatic access keys for <strong className="text-foreground">{selectedProject.display_name}</strong> and Global Workspace scope.</span>
+                        ) : (
+                            <span>Manage keys for programmatic access with granular scopes.</span>
+                        )}
+                    </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-6">
                     <div className="grid gap-6">
@@ -91,8 +122,12 @@ export default function ApiKeysPage() {
                                 <Select value={selectedProjectId} onValueChange={setSelectedProjectId}>
                                     <SelectTrigger className="bg-secondary border-border/80 h-10"><SelectValue /></SelectTrigger>
                                     <SelectContent className="bg-card border-border">
+                                        {selectedProject && (
+                                            <SelectItem value={selectedProject.project_id}>
+                                                This Project ({selectedProject.display_name})
+                                            </SelectItem>
+                                        )}
                                         <SelectItem value="global">Global (Full Workspace)</SelectItem>
-                                        {projects.map(p => <SelectItem key={p.project_id} value={p.project_id}>{p.display_name}</SelectItem>)}
                                     </SelectContent>
                                 </Select>
                             </div>
@@ -147,59 +182,88 @@ export default function ApiKeysPage() {
             </Card>
 
             <div className="space-y-3">
-                <h3 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground px-1">Manage Active Keys</h3>
-                {keys.length === 0 ? (
+                <div className="flex items-center justify-between px-1">
+                    <h3 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
+                        Manage Active Keys
+                    </h3>
+                    {selectedProject && (
+                        <span className="text-xs text-muted-foreground">
+                            Filtered: <span className="font-semibold text-foreground">{selectedProject.display_name}</span> &amp; Global
+                        </span>
+                    )}
+                </div>
+
+                {visibleKeys.length === 0 ? (
                     <div className="p-12 text-center text-sm text-muted-foreground border border-dashed border-border rounded-lg">
-                        No active API keys found.
+                        {selectedProject ? (
+                            <span>No API keys found for <strong>{selectedProject.display_name}</strong> or Global scope. Generate one above!</span>
+                        ) : (
+                            <span>No active API keys found.</span>
+                        )}
                     </div>
                 ) : (
                     <div className="grid gap-3">
-                        {keys.map(key => (
-                            <Card key={key.id} className="border-border bg-card/70 group hover:border-border/80 transition-colors overflow-hidden">
-                                <CardContent className="flex items-center gap-4 p-4">
-                                    <div className="p-2.5 rounded-lg bg-secondary border border-border shrink-0">
-                                        <Lock className="h-4 w-4 text-muted-foreground/75" />
-                                    </div>
-                                    <div className="flex-1 min-w-0">
-                                        <div className="flex items-center gap-2 mb-1">
-                                            <span className="font-semibold text-sm truncate">{key.name}</span>
-                                            <div className="flex items-center gap-1.5">
-                                                {key.scopes?.map((s: string) => (
-                                                    <Badge key={s} variant="outline" className="text-[9px] h-4 px-1.5 font-bold bg-secondary/70 border-border text-muted-foreground capitalize">
-                                                        {s}
-                                                    </Badge>
-                                                )) || <Badge variant="outline" className="text-[9px]">no-scopes</Badge>}
-                                            </div>
-                                        </div>
-                                        <div className="flex flex-wrap items-center gap-4 text-[10px] text-muted-foreground">
-                                            <code className="text-muted-foreground/55 bg-secondary/70 px-1.5 py-0.5 rounded font-mono border border-border/60">{key.preview}</code>
-                                            <span className="flex items-center gap-1"><Globe className="h-3 w-3" />{key.projectName || 'Global'}</span>
-                                            <span className="flex items-center gap-1"><Calendar className="h-3 w-3" />{new Date(key.createdAt).toLocaleDateString()}</span>
-                                            {key.lastUsedAt ? (
-                                                <span className="flex items-center gap-1 text-emerald-500/80"><Clock className="h-3 w-3" />Active {formatDistanceToNow(new Date(key.lastUsedAt), { addSuffix: true })}</span>
+                        {visibleKeys.map(key => {
+                            const isProjectKey = key.projectId && key.projectId !== 'global';
+                            return (
+                                <Card key={key.id} className="border-border bg-card/70 group hover:border-border/80 transition-colors overflow-hidden">
+                                    <CardContent className="flex items-center gap-4 p-4">
+                                        <div className="p-2.5 rounded-lg bg-secondary border border-border shrink-0">
+                                            {isProjectKey ? (
+                                                <Layers className="h-4 w-4 text-orange-400" />
                                             ) : (
-                                                <span className="flex items-center gap-1 opacity-50"><Clock className="h-3 w-3" />Never used</span>
+                                                <Globe className="h-4 w-4 text-cyan-400" />
                                             )}
                                         </div>
-                                    </div>
-                                    <AlertDialog>
-                                        <AlertDialogTrigger asChild>
-                                            <Button variant="ghost" size="sm" className="h-8 text-xs text-muted-foreground hover:text-red-400 shrink-0">Revoke</Button>
-                                        </AlertDialogTrigger>
-                                        <AlertDialogContent className="bg-card border-border">
-                                            <AlertDialogHeader>
-                                                <AlertDialogTitle>Revoke Key?</AlertDialogTitle>
-                                                <AlertDialogDescription>This will instantly block all programmatic requests using <code className="bg-muted px-1 rounded">{key.preview}</code>. This cannot be undone.</AlertDialogDescription>
-                                            </AlertDialogHeader>
-                                            <AlertDialogFooter>
-                                                <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                                <AlertDialogAction onClick={() => handleRevokeKey(key.id)} className="bg-destructive hover:bg-destructive/90">Revoke Access</AlertDialogAction>
-                                            </AlertDialogFooter>
-                                        </AlertDialogContent>
-                                    </AlertDialog>
-                                </CardContent>
-                            </Card>
-                        ))}
+                                        <div className="flex-1 min-w-0">
+                                            <div className="flex items-center gap-2 mb-1">
+                                                <span className="font-semibold text-sm truncate">{key.name}</span>
+                                                {isProjectKey ? (
+                                                    <Badge variant="outline" className="text-[9px] h-4 px-1.5 font-bold bg-orange-500/10 border-orange-500/30 text-orange-400">
+                                                        Project: {key.projectName || selectedProject?.display_name || 'Current'}
+                                                    </Badge>
+                                                ) : (
+                                                    <Badge variant="outline" className="text-[9px] h-4 px-1.5 font-bold bg-cyan-500/10 border-cyan-500/30 text-cyan-400">
+                                                        Global Scope
+                                                    </Badge>
+                                                )}
+                                                <div className="flex items-center gap-1.5">
+                                                    {key.scopes?.map((s: string) => (
+                                                        <Badge key={s} variant="outline" className="text-[9px] h-4 px-1.5 font-bold bg-secondary/70 border-border text-muted-foreground capitalize">
+                                                            {s}
+                                                        </Badge>
+                                                    )) || <Badge variant="outline" className="text-[9px]">no-scopes</Badge>}
+                                                </div>
+                                            </div>
+                                            <div className="flex flex-wrap items-center gap-4 text-[10px] text-muted-foreground">
+                                                <code className="text-muted-foreground/55 bg-secondary/70 px-1.5 py-0.5 rounded font-mono border border-border/60">{key.preview}</code>
+                                                <span className="flex items-center gap-1"><Calendar className="h-3 w-3" />{new Date(key.createdAt).toLocaleDateString()}</span>
+                                                {key.lastUsedAt ? (
+                                                    <span className="flex items-center gap-1 text-emerald-500/80"><Clock className="h-3 w-3" />Active {formatDistanceToNow(new Date(key.lastUsedAt), { addSuffix: true })}</span>
+                                                ) : (
+                                                    <span className="flex items-center gap-1 opacity-50"><Clock className="h-3 w-3" />Never used</span>
+                                                )}
+                                            </div>
+                                        </div>
+                                        <AlertDialog>
+                                            <AlertDialogTrigger asChild>
+                                                <Button variant="ghost" size="sm" className="h-8 text-xs text-muted-foreground hover:text-red-400 shrink-0">Revoke</Button>
+                                            </AlertDialogTrigger>
+                                            <AlertDialogContent className="bg-card border-border">
+                                                <AlertDialogHeader>
+                                                    <AlertDialogTitle>Revoke Key?</AlertDialogTitle>
+                                                    <AlertDialogDescription>This will instantly block all programmatic requests using <code className="bg-muted px-1 rounded">{key.preview}</code>. This cannot be undone.</AlertDialogDescription>
+                                                </AlertDialogHeader>
+                                                <AlertDialogFooter>
+                                                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                                    <AlertDialogAction onClick={() => handleRevokeKey(key.id)} className="bg-destructive hover:bg-destructive/90">Revoke Access</AlertDialogAction>
+                                                </AlertDialogFooter>
+                                            </AlertDialogContent>
+                                        </AlertDialog>
+                                    </CardContent>
+                                </Card>
+                            );
+                        })}
                     </div>
                 )}
             </div>

@@ -32,12 +32,12 @@ export async function createApiKeyAction(name: string, projectId?: string, scope
     }
 }
 
-export async function getApiKeysAction() {
+export async function getApiKeysAction(projectId?: string) {
     const userId = await getCurrentUserId();
     if (!userId) return { success: false, error: "Not authenticated" };
 
     try {
-        const keys = await listApiKeys(userId);
+        const keys = await listApiKeys(userId, projectId);
         return { success: true, data: keys };
     } catch (error: any) {
         return { success: false, error: error.message };

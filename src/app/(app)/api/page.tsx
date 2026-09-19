@@ -87,11 +87,11 @@ export default function ApiPage() {
                 .then(setTables)
                 .finally(() => setLoadingTables(false));
 
-            // Fetch Keys
+            // Fetch Keys (strictly scoped to current project and global keys)
             setLoadingKeys(true);
-            getApiKeysAction().then(res => {
+            getApiKeysAction(selectedProject.project_id).then(res => {
                 if (res.success && res.data) {
-                    const projectKeys = res.data.filter(k => k.projectId === selectedProject.project_id);
+                    const projectKeys = res.data.filter(k => !k.projectId || k.projectId === 'global' || k.projectId === selectedProject.project_id);
                     setKeys(projectKeys);
                 }
                 setLoadingKeys(false);

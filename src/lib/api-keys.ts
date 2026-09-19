@@ -89,9 +89,18 @@ export async function validateApiKey(rawKey: string): Promise<{ userId: string, 
     return apiKeyInfo;
 }
 
-export async function listApiKeys(userId: string): Promise<ApiKey[]> {
+export async function listApiKeys(userId: string, projectId?: string): Promise<ApiKey[]> {
     const pool = getPgPool();
-    const result = await pool.query('SELECT * FROM fluxbase_global.api_keys WHERE user_id = $1 ORDER BY created_at DESC', [userId]);
+    let query = 'SELECT * FROM fluxbase_global.api_keys WHERE user_id = $1';
+    const params: any[] = [userId];
+
+    if (projectId && projectId !== 'global') {
+        query += ' AND (project_id = $2 OR project_id IS NULL OR project_id = \'global\')';
+        params.push(projectId);
+    }
+
+    query += ' ORDER BY created_at DESC';
+    const result = await pool.query(query, params);
 
     return result.rows.map(row => ({
         id: row.id,
@@ -101,8 +110,8 @@ export async function listApiKeys(userId: string): Promise<ApiKey[]> {
         projectName: row.project_name,
         scopes: row.scopes || ['read'],
         preview: row.preview,
-        createdAt: row.created_at.toISOString(),
-        lastUsedAt: row.last_used_at ? row.last_used_at.toISOString() : undefined
+        createdAt: row.created_at ? new Date(row.created_at).toISOString() : new Date().toISOString(),
+        lastUsedAt: row.last_used_at ? new Date(row.last_used_at).toISOString() : undefined
     }));
 }
 
