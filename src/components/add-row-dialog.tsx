@@ -112,11 +112,23 @@ export function AddRowDialog({
         />
       )
     }
-    const inputType =
-      col.data_type === 'number' ? 'number' :
-        col.data_type === 'date' ? 'date' :
-          ['timestamp', 'timestamptz', 'datetime'].includes(col.data_type) ? 'datetime-local' :
-            'text';
+    const dt = (col.data_type || '').toLowerCase();
+    const colName = col.column_name.toLowerCase();
+    const isNum = ['int', 'integer', 'number', 'double', 'float', 'real', 'numeric', 'bigint', 'smallint'].some(t => dt.includes(t));
+    const isDate = dt === 'date';
+    const isDateTime = ['timestamp', 'timestamptz', 'datetime'].some(t => dt.includes(t));
+    const isTimestampCol = ['timestamp', 'created_at', 'updated_at', 'logged_at', 'tap_at_time'].includes(colName);
+    const inputType = isNum ? 'number' : isDate ? 'date' : (isDateTime ? 'datetime-local' : 'text');
+    const isRequired = !col.is_nullable && !col.default_value && !isTimestampCol;
+
+    let defaultVal: string | undefined = undefined;
+    if (isTimestampCol || isDateTime) {
+      if (inputType === 'datetime-local') {
+        defaultVal = new Date().toISOString().slice(0, 16);
+      } else {
+        defaultVal = new Date().toISOString().replace('T', ' ').slice(0, 19);
+      }
+    }
 
     return (
       <Input
@@ -124,13 +136,26 @@ export function AddRowDialog({
         name={col.column_name}
         className="col-span-3"
         type={inputType}
-        defaultValue={(col.data_type === 'timestamp' || (col.data_type as string) === 'timestamptz') && col.default_value === 'now()' ? '' : undefined}
+        step={isNum ? 'any' : undefined}
+        required={isRequired}
+        placeholder={isRequired ? 'Required' : 'Optional'}
+        defaultValue={defaultVal}
       />
-    )
-  }
+    );
+  };
+
+  const isAutoIncrement = (col: Column) => Boolean(
+    (col.default_value && (
+      col.default_value.toLowerCase().includes('nextval') ||
+      col.default_value.toLowerCase().includes('auto_increment') ||
+      col.default_value.toLowerCase().includes('gen_random_uuid') ||
+      col.default_value.toLowerCase().includes('current_timestamp')
+    )) ||
+    (col.column_name === 'id' && (Boolean(col.default_value) || col.is_primary_key))
+  );
 
   const visibleColumns = columns.filter(col =>
-    col.column_name !== 'id' &&
+    !isAutoIncrement(col) &&
     col.data_type !== 'gen_random_uuid()' &&
     col.default_value !== 'now()' &&
     col.data_type !== 'now_date()' &&
@@ -149,7 +174,7 @@ export function AddRowDialog({
         <DialogHeader>
           <DialogTitle>Add New Row</DialogTitle>
           <DialogDescription>
-            Fill in the details for the new row. The 'id' will be generated automatically.
+            Fill in the details for the new row. Fields marked with * are required.
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit}>
@@ -157,11 +182,14 @@ export function AddRowDialog({
           <input type="hidden" name="tableId" value={tableId} />
           <input type="hidden" name="tableName" value={tableName} />
 
-          <div className="grid gap-4 py-4">
+          <div className="grid gap-4 py-4 max-h-[60vh] overflow-y-auto pr-1">
             {visibleColumns.map((col) => (
               <div key={col.column_id} className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor={col.column_name} className="text-right">
-                  {col.column_name}
+                <Label htmlFor={col.column_name} className="text-right flex items-center justify-end gap-1">
+                  <span>{col.column_name}</span>
+                  {!col.is_nullable && !col.default_value && (
+                    <span className="text-destructive font-bold">*</span>
+                  )}
                 </Label>
                 {renderInput(col)}
               </div>

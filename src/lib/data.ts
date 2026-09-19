@@ -2420,19 +2420,57 @@ export async function insertRow(projectId: string, tableId: string, rowData: Rec
     const params: any[] = [];
     let i = 1;
 
-    for (const [key, value] of Object.entries(rowData)) {
-        if (key === 'id' || key === '_id') continue;
-        if (columns.some(c => c.column_name === key)) {
-            // MySQL uses ``, Postgres uses ""
-            cols.push(project.dialect?.toLowerCase() === 'mysql' ? `\`${key.replace(/[^a-zA-Z0-9_]/g, '')}\`` : `"${key.replace(/[^a-zA-Z0-9_]/g, '')}"`);
+    for (const col of columns) {
+        const colName = col.column_name;
+        let value = rowData[colName];
 
-            if (project.dialect?.toLowerCase() === 'mysql') {
-                vals.push(`?`);
-            } else {
-                vals.push(`$${i++}`);
+        const defVal = (col.default_value || '').toLowerCase();
+        const hasSeqOrAuto = defVal.includes('nextval') || defVal.includes('auto_increment') || defVal.includes('gen_random_uuid');
+        const hasDefault = Boolean(col.default_value);
+
+        // If value is empty / undefined / null
+        if (value === undefined || value === null || value === '') {
+            // If the column has a database default or sequence, omit it so DB applies default
+            if (hasDefault || hasSeqOrAuto) {
+                continue;
             }
-            params.push(value);
+            // If it's an auto-increment ID column without explicit default string in catalog, omit it
+            if ((colName.toLowerCase() === 'id' || colName.toLowerCase() === '_id') && col.is_primary_key) {
+                continue;
+            }
+            // Nullable column without default
+            if (col.is_nullable) {
+                value = null;
+            } else {
+                const colType = (col.data_type || '').toLowerCase();
+                const isString = ['varchar', 'text', 'char', 'string', 'character varying'].some(t => colType.includes(t));
+                if (isString) {
+                    value = '';
+                } else {
+                    value = null;
+                }
+            }
+        } else {
+            // Value is provided: parse types if needed
+            const colType = (col.data_type || '').toLowerCase();
+            const isNum = ['int', 'integer', 'number', 'double', 'float', 'real', 'numeric', 'bigint', 'smallint'].some(t => colType.includes(t));
+            if (isNum && typeof value === 'string') {
+                const num = Number(value);
+                if (!isNaN(num)) value = num;
+            } else if (colType === 'boolean' && typeof value === 'string') {
+                value = value.toLowerCase() === 'true' || value === '1';
+            }
         }
+
+        // MySQL uses ``, Postgres uses ""
+        cols.push(project.dialect?.toLowerCase() === 'mysql' ? `\`${colName.replace(/[^a-zA-Z0-9_]/g, '')}\`` : `"${colName.replace(/[^a-zA-Z0-9_]/g, '')}"`);
+
+        if (project.dialect?.toLowerCase() === 'mysql') {
+            vals.push(`?`);
+        } else {
+            vals.push(`$${i++}`);
+        }
+        params.push(value);
     }
 
     if (cols.length === 0) throw new FluxbaseError("No valid columns provided for insertion.", ERROR_CODES.BAD_REQUEST, 400);
@@ -2446,16 +2484,22 @@ export async function insertRow(projectId: string, tableId: string, rowData: Rec
             const targetDb = await resolveMysqlDbForTable(mysqlPool, dbName, safeTableName);
             const fromTable = targetDb ? `\`${targetDb}\`.\`${safeTableName}\`` : `\`${safeTableName}\``;
 
-            // MySQL does not naturally support RETURNING *. We do an INSERT then a SELECT of the last insert if needed, 
-            // but for simple webhook fire, we'll try to reconstruct the object locally since this is a basic interface.
             const ddl = `INSERT INTO ${fromTable} (${cols.join(', ')}) VALUES (${vals.join(', ')})`;
 
             try {
                 const [result]: any = await mysqlPool.query(ddl as any, params);
                 insertedRow = { ...rowData, _internal_last_id: result.insertId }; // Approximation
             } catch (mysqlError: any) {
-                if (mysqlError.code === 'ER_DUP_ENTRY') throw new FluxbaseError(`Duplicate entry for unique/primary key constraint.`, ERROR_CODES.BAD_REQUEST, 400);
-                throw mysqlError;
+                if (mysqlError.code === 'ER_DUP_ENTRY' || mysqlError.errno === 1062) {
+                    throw new FluxbaseError(`Duplicate entry: ${mysqlError.sqlMessage || 'violates unique constraint'}`, ERROR_CODES.BAD_REQUEST, 400);
+                }
+                if (mysqlError.code === 'ER_BAD_NULL_ERROR' || mysqlError.errno === 1048) {
+                    throw new FluxbaseError(`Missing required field: ${mysqlError.sqlMessage}`, ERROR_CODES.BAD_REQUEST, 400);
+                }
+                if (mysqlError.code === 'ER_NO_REFERENCED_ROW_2' || mysqlError.errno === 1452) {
+                    throw new FluxbaseError(`Foreign key violation: ${mysqlError.sqlMessage}`, ERROR_CODES.BAD_REQUEST, 400);
+                }
+                throw new FluxbaseError(mysqlError.sqlMessage || mysqlError.message || "Database insert failed.", ERROR_CODES.BAD_REQUEST, 400);
             }
 
         } else {
@@ -2468,8 +2512,19 @@ export async function insertRow(projectId: string, tableId: string, rowData: Rec
                 const result = await pool.query(ddl, params);
                 insertedRow = result.rows[0];
             } catch (pgError: any) {
-                if (pgError.code === '23505') throw new FluxbaseError(`Duplicate entry for unique/primary key constraint.`, ERROR_CODES.BAD_REQUEST, 400);
-                throw pgError;
+                if (pgError.code === '23505') {
+                    throw new FluxbaseError(`Duplicate entry: ${pgError.detail || 'violates unique constraint'}`, ERROR_CODES.BAD_REQUEST, 400);
+                }
+                if (pgError.code === '23502') {
+                    throw new FluxbaseError(`Missing required field: Column '${pgError.column || 'unknown'}' cannot be null.`, ERROR_CODES.BAD_REQUEST, 400);
+                }
+                if (pgError.code === '23503') {
+                    throw new FluxbaseError(`Foreign key violation: ${pgError.detail || pgError.message}`, ERROR_CODES.BAD_REQUEST, 400);
+                }
+                if (pgError.code === '22P02') {
+                    throw new FluxbaseError(`Invalid data format: ${pgError.message}`, ERROR_CODES.BAD_REQUEST, 400);
+                }
+                throw new FluxbaseError(pgError.message || "Database insert failed.", ERROR_CODES.BAD_REQUEST, 400);
             }
         }
 
@@ -2480,7 +2535,8 @@ export async function insertRow(projectId: string, tableId: string, rowData: Rec
             console.error(`[Webhook Fire Error] ${tableId} insert:`, err);
         });
     } catch (error: any) {
-        throw new FluxbaseError(`Insertion failed: ${error.message}`, ERROR_CODES.INTERNAL_ERROR, 500);
+        if (error instanceof FluxbaseError) throw error;
+        throw new FluxbaseError(error.message || "Insertion failed.", ERROR_CODES.BAD_REQUEST, 400);
     }
 }
 

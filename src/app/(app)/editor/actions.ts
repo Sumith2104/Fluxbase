@@ -142,7 +142,10 @@ export async function addRowAction(formData: FormData) {
             }
 
             // Logic to generate default values
-            if (col.default_value === 'now()' || (!value && ['created_at', 'updated_at'].includes(col.column_name.toLowerCase()))) {
+            const colNameLower = col.column_name.toLowerCase();
+            const isTimestampCol = ['created_at', 'updated_at', 'timestamp', 'logged_at', 'tap_at_time', 'tap_in_time'].includes(colNameLower);
+
+            if (col.default_value === 'now()' || (!value && isTimestampCol)) {
                 if (!value) {
                     value = getLocalTimestamp(project?.timezone);
                 }
@@ -153,13 +156,21 @@ export async function addRowAction(formData: FormData) {
                 value = getLocalTimestamp(project?.timezone);
             }
 
-            if (col.column_name === 'id' && !value) {
-                const isNumeric = ['INT', 'INTEGER', 'NUMBER', 'FLOAT'].includes(col.data_type.toUpperCase());
+            const defVal = (col.default_value || '').toLowerCase();
+            const hasDefault = Boolean(
+                col.default_value ||
+                defVal.includes('nextval') ||
+                defVal.includes('auto_increment') ||
+                defVal.includes('gen_random_uuid')
+            );
+
+            if (col.column_name === 'id' && !value && !hasDefault) {
+                const isNumeric = ['INT', 'INTEGER', 'NUMBER', 'FLOAT', 'BIGINT'].some(t => (col.data_type || '').toUpperCase().includes(t));
                 value = isNumeric ? Date.now().toString() : uuidv4();
             }
 
             if (value) {
-                const dataType = col.data_type.toUpperCase();
+                const dataType = (col.data_type || '').toUpperCase();
                 if (dataType === 'TIME') {
                     // Extract HH:mm:ss from ISO string if it is a full string
                     if (value.includes('T')) {
@@ -171,7 +182,7 @@ export async function addRowAction(formData: FormData) {
                     if (value.includes('T')) {
                         value = value.split('T')[0];
                     }
-                } else if (['TIMESTAMP', 'TIMESTAMPTZ', 'DATETIME'].includes(dataType)) {
+                } else if (['TIMESTAMP', 'TIMESTAMPTZ', 'DATETIME', 'TIMESTAMP WITH TIME ZONE', 'TIMESTAMP WITHOUT TIME ZONE'].some(t => dataType.includes(t))) {
                     try {
                         value = new Date(value).toISOString();
                     } catch {
@@ -180,31 +191,27 @@ export async function addRowAction(formData: FormData) {
                 }
             }
 
-            const isStringType = ['VARCHAR', 'TEXT', 'CHAR', 'STRING'].includes(col.data_type.toUpperCase());
-            if (value === null || value === '') {
-                newRowObject[col.column_name] = isStringType ? '' : null;
+            const colDataType = (col.data_type || '').toUpperCase();
+            const isStringType = ['VARCHAR', 'TEXT', 'CHAR', 'STRING', 'CHARACTER VARYING'].some(t => colDataType.includes(t));
+            const isNumericType = ['INT', 'INTEGER', 'NUMBER', 'FLOAT', 'DOUBLE', 'NUMERIC', 'REAL', 'BIGINT', 'SMALLINT'].some(t => colDataType.includes(t));
+
+            if (value === null || value === '' || value === undefined) {
+                newRowObject[col.column_name] = (isStringType && !col.is_nullable && !col.default_value) ? '' : null;
+            } else if (isNumericType) {
+                const num = Number(value);
+                newRowObject[col.column_name] = isNaN(num) ? value : num;
             } else {
                 newRowObject[col.column_name] = value;
             }
         }
 
-        // Ensure ID exists
-        if (!newRowObject['id']) {
-            newRowObject['id'] = uuidv4();
-        }
-
-        // 2. Validate
-        await validatePrimaryKey(projectId, tableId, newRowObject);
-        await validateForeignKey(projectId, tableId, newRowObject);
-
-        // 3. Insert
+        // Insert directly via database engine
         await insertRow(projectId, tableId, newRowObject);
 
-        // revalidatePath(`/editor?projectId=${projectId}&tableId=${tableId}&tableName=${tableName}`);
         return { success: true };
     } catch (error) {
         logger.error('Failed to add row:', error);
-        return { error: `An unexpected error occurred: ${(error as Error).message}` };
+        return { error: (error as Error).message || 'An unexpected error occurred while adding row.' };
     }
 }
 
@@ -328,23 +335,24 @@ export async function editRowAction(formData: FormData) {
                     }
                 }
 
-                const isStringType = ['VARCHAR', 'TEXT', 'CHAR', 'STRING'].includes(col.data_type.toUpperCase());
-                if (value === null || value === '') {
-                    newRowObject[col.column_name] = isStringType ? '' : null;
+                const colDataType = (col.data_type || '').toUpperCase();
+                const isStringType = ['VARCHAR', 'TEXT', 'CHAR', 'STRING', 'CHARACTER VARYING'].some(t => colDataType.includes(t));
+                const isNumericType = ['INT', 'INTEGER', 'NUMBER', 'FLOAT', 'DOUBLE', 'NUMERIC', 'REAL', 'BIGINT', 'SMALLINT'].some(t => colDataType.includes(t));
+
+                if (value === null || value === '' || value === undefined) {
+                    newRowObject[col.column_name] = (isStringType && !col.is_nullable) ? '' : null;
+                } else if (isNumericType) {
+                    const num = Number(value);
+                    newRowObject[col.column_name] = isNaN(num) ? value : num;
                 } else {
                     newRowObject[col.column_name] = value;
                 }
             }
         });
 
-        // Validate
-        await validatePrimaryKey(projectId, tableId, newRowObject, rowId);
-        await validateForeignKey(projectId, tableId, newRowObject);
-
         // Update
         await updateRow(projectId, tableId, rowId, newRowObject);
 
-        // revalidatePath(`/editor?projectId=${projectId}&tableId=${tableId}&tableName=${tableName}`);
         return { success: true };
     } catch (error) {
         logger.error('Failed to edit row:', error);
