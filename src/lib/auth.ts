@@ -50,14 +50,13 @@ export async function getCurrentUserId(): Promise<string | null> {
 }
 
 export async function getSessionContext(): Promise<{ uid: string; mfa?: boolean } | null> {
-    const sessionCookie = (await cookies()).get('session')?.value;
-    if (!sessionCookie) return null;
-
     try {
+        const sessionCookie = (await cookies()).get('session')?.value;
+        if (!sessionCookie) return null;
+
         const { payload } = await jwtVerify(sessionCookie, getJwtSecret());
         return { uid: payload.uid as string, mfa: payload.mfa as boolean | undefined };
-    } catch (error) {
-        logger.error("Failed to verify session cookie:", error);
+    } catch {
         return null;
     }
 }
