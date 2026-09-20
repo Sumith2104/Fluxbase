@@ -1,22 +1,8 @@
 import { NextResponse } from 'next/server';
 import { getCurrentUserId } from '@/lib/auth';
 import { getTablesForProject, getColumnsForTable, getProjectById } from '@/lib/data';
-import { ai } from '@/ai/genkit';
-import { z } from 'zod';
+import { AnalyticsAgent } from '@/lib/agent-core/analytics-agent';
 import logger from '@/lib/logger';
-
-const OutputSchema = z.object({
-    schema_analysis: z.string().describe("CRITICAL FIRST STEP: Explain step-by-step how you analyzed the schema to select valid tables, relations, and columns for this specific chart. You MUST write this before configuring widgets to ensure no hallucination."),
-    widgets: z.array(z.object({
-        title: z.string().describe("A short, descriptive title for the chart"),
-        query: z.string().describe("The raw SQL query to execute (must be read-only SELECT)"),
-        chart_type: z.string().describe("The best recharts type: 'bar', 'line', 'pie', 'area', 'scatter', 'radar', 'treemap', 'number', 'table'"),
-        config: z.object({
-            xAxisKey: z.string().describe("The column name to map to the X-axis (or nameKey for pie/treemap)"),
-            dataKeys: z.array(z.string()).describe("The column name(s) to map to the Y-axis (or dataKey for pie/treemap). Multiple for stacked/multi-line."),
-        })
-    })).describe("An array of 1 to 4 distinct analytical widgets that best answer the user's overall prompt.")
-});
 
 export async function POST(req: Request) {
     const userId = await getCurrentUserId();
@@ -38,36 +24,23 @@ export async function POST(req: Request) {
             schemaString += `Table: ${table.table_name}\nColumns: ${colDefs}\n\n`;
         }
 
-        const dialectPrompt = project.dialect?.toLowerCase() === 'mysql' ? 'MySQL' : 'PostgreSQL';
-
-        const fullPrompt = `You are an expert Data Analyst & BI Developer.
-The user wants to create an analytical dashboard widget for their database. You must generate the exact ${dialectPrompt} query to fetch this data, and determine the optimal Recharts visualization type.
-
-### Database Schema:
-${schemaString}
-
-### User Request:
-"${prompt}"
-
-### Rules:
-1. The query MUST be a valid, entirely read-only SELECT statement.
-2. Do NOT qualify table names with database/schema prefixes! For example, do NOT write \`project_123\`.\`users\`. Just use the raw table name (e.g., SELECT * FROM users). In postgres, do NOT use "public.users".
-3. If they ask for 'counts', use COUNT() and GROUP BY.
-4. Ensure alias names in the query EXACTLY match the xAxisKey and dataKeys in your config.`;
-
-        const response = await ai.generate({
-            model: model || 'glm',
-            prompt: fullPrompt,
-            output: { schema: OutputSchema }
+        const result = await AnalyticsAgent.generateWidgets({
+            projectId,
+            userId,
+            prompt,
+            schemaString,
+            dialect: project.dialect,
+            model,
+            project
         });
 
-        if (!response.output) {
-            throw new Error("AI failed to generate structural configuration.");
+        if (!result.success) {
+            throw new Error(result.error || 'Failed to generate analytical widgets');
         }
 
         return NextResponse.json({ 
             success: true, 
-            widgets: response.output.widgets
+            widgets: result.widgets
         });
 
     } catch (error: any) {

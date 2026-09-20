@@ -1,7 +1,6 @@
 'use server';
 
 import { getTablesForProject, getColumnsForTable } from '@/lib/data';
-import { generateSQL } from '@/ai/flows/generate-sql';
 import logger from '@/lib/logger';
 
 export async function generateSQLAction(projectId: string, userInput: string) {
@@ -68,12 +67,25 @@ export async function generateSQLAction(projectId: string, userInput: string) {
              schemaDescription = "Realtime Schema Inference is disabled for this project. Write standard SQL assuming standard structures, or request the user to enable inference for accurate code generation.";
         }
 
-        // 4. Call Genkit Flow
-        const result = await generateSQL({
+        // 4. Call Autonomous Self-Healing SQL Agent
+        const { SqlAgent } = await import('@/lib/agent-core/sql-agent');
+        const project = userId ? await getProjectById(projectId, userId) : undefined;
+        const result = await SqlAgent.generateAndValidateSQL({
+            projectId,
+            userId: userId || 'anonymous',
             userInput,
             tableSchema: schemaDescription,
-            dialect
+            dialect,
+            allowDestructive: aiAllowDestructive,
+            project
         });
+
+        if (!result.success) {
+            return {
+                success: false,
+                error: result.error || 'Failed to generate SQL query.'
+            };
+        }
 
         // 5. Destructive Query Trap Intercept
         if (result.isDangerous && !aiAllowDestructive) {
@@ -84,19 +96,11 @@ export async function generateSQLAction(projectId: string, userInput: string) {
             };
         }
 
-        // Ensure no markdown blocks snuck in
-        let finalQuery = result.sqlQuery || '';
-        if (finalQuery.startsWith('\`\`\`sql')) {
-            finalQuery = finalQuery.replace(/^\`\`\`sql\n?/, '').replace(/\n?\`\`\`$/, '');
-        } else if (finalQuery.startsWith('\`\`\`')) {
-            finalQuery = finalQuery.replace(/^\`\`\`\n?/, '').replace(/\n?\`\`\`$/, '');
-        }
-
         return { 
             success: true, 
-            query: finalQuery,
+            query: result.query,
             isDangerous: result.isDangerous,
-            warning: result.userMessage
+            warning: result.warning
         };
 
     } catch (error: any) {

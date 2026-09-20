@@ -1,19 +1,8 @@
 import { NextResponse } from 'next/server';
 import { getCurrentUserId } from '@/lib/auth';
 import { getTablesForProject, getColumnsForTable, getProjectById } from '@/lib/data';
-import { ai } from '@/ai/genkit';
-import { z } from 'zod';
-import { Redis } from '@upstash/redis';
+import { AnalyticsAgent } from '@/lib/agent-core/analytics-agent';
 import logger from '@/lib/logger';
-
-const redis = new Redis({
-  url: process.env.UPSTASH_REDIS_REST_URL || '',
-  token: process.env.UPSTASH_REDIS_REST_TOKEN || ''
-});
-
-const SuggestionSchema = z.object({
-    suggestions: z.array(z.string()).length(3).describe("Exactly 3 distinct analytical quick-prompt suggestions based entirely on the provided schema.")
-});
 
 export async function POST(req: Request) {
     const userId = await getCurrentUserId();
@@ -26,27 +15,16 @@ export async function POST(req: Request) {
         const project = await getProjectById(projectId, userId);
         if (!project) return NextResponse.json({ error: 'Project not found' }, { status: 404 });
 
-        // 1. Check Cache
-        const cacheKey = `ai_suggestions_${projectId}`;
-        try {
-            const cached = await redis.get(cacheKey);
-            if (cached) {
-                return NextResponse.json({ success: true, suggestions: cached });
-            }
-        } catch (e) {
-            logger.error('Cache read error:', e);
-        }
-
-        // 2. Introspect Schema
+        // Introspect Schema
         const tables = await getTablesForProject(projectId, userId);
         let schemaString = '';
-        
+
         if (tables.length === 0) {
             return NextResponse.json({ 
                 success: true, 
                 suggestions: [
                     "Create your first database table",
-                    "How to define table columns",
+                    "How to define table columns and relationships",
                     "Import an existing SQL schema"
                 ] 
             });
@@ -58,38 +36,15 @@ export async function POST(req: Request) {
             schemaString += `Table: ${table.table_name}\nColumns: ${colDefs}\n\n`;
         }
 
-        // 3. AI Generation
-        const prompt = `You are a strict Data Analyst. 
-The user needs "Quick Prompts" for their SQL dashboard.
-Read their exact database schema below:
-
-### Schema:
-${schemaString}
-
-Provide exactly 3 English questions that are fundamentally solvable using ONLY the tables and columns provided above.
-If the schema only has 'users', ask about user counts. 
-Do not suggest queries for tables that do not exist.`;
-
-        const response = await ai.generate({
-            model: model || 'glm',
-            prompt: prompt,
-            output: { schema: SuggestionSchema }
+        const suggestions = await AnalyticsAgent.generateSuggestions({
+            projectId,
+            schemaString,
+            model
         });
-
-        if (!response.output || !response.output.suggestions) {
-            throw new Error("AI failed to generate suggestions.");
-        }
-
-        // 4. Update Cache (60 seconds)
-        try {
-            await redis.set(cacheKey, JSON.stringify(response.output.suggestions), { ex: 60 });
-        } catch (e) {
-            logger.error('Cache write error:', e);
-        }
 
         return NextResponse.json({ 
             success: true, 
-            suggestions: response.output.suggestions
+            suggestions
         });
 
     } catch (error: any) {

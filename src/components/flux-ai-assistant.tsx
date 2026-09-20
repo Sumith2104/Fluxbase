@@ -13,12 +13,18 @@ import { FluxMarkdownRenderer } from "@/components/flux-markdown-renderer";
 import { BorderBeam } from "@/components/ui/border-beam";
 import { Button, LiquidButton } from "@/components/ui/button";
 import { FluxAiIcon } from "@/components/ui/flux-ai-icon";
+import { AgenticThinkBlock } from "@/components/ai/agentic-think-block";
+import { InChatChart } from "@/components/ai/in-chat-chart";
 
 // --- Types ---
 
 type Message = {
   role: "user" | "assistant";
   content: string;
+  thought?: string;
+  isThinking?: boolean;
+  thoughtDuration?: number;
+  chart?: any;
   pendingWorkflow?: { steps: WorkflowStep[] };
   approvalRequest?: ApprovalRequestData;
   sources?: string[];
@@ -55,20 +61,29 @@ const MAX_STORAGE_BYTES = 512 * 1024;
 
 // --- Workflow Parser ---
 
-const parseWorkflow = (text: string, currentProjectId?: string): { steps: WorkflowStep[]; cleanText: string; approvalRequest?: ApprovalRequestData } => {
+const parseWorkflow = (text: string, currentProjectId?: string): { steps: WorkflowStep[]; cleanText: string; approvalRequest?: ApprovalRequestData; chart?: any; thought?: string } => {
   const steps: WorkflowStep[] = [];
   let approvalRequest: ApprovalRequestData | undefined = undefined;
+  let chart: any = undefined;
+  let thought: string | undefined = undefined;
+
+  let workingText = text;
+  const thinkMatch = workingText.match(/<think>([\s\S]*?)<\/think>/i) || workingText.match(/<thought>([\s\S]*?)<\/thought>/i);
+  if (thinkMatch) {
+    thought = thinkMatch[1].trim();
+    workingText = workingText.replace(thinkMatch[0], '').trim();
+  }
 
   const codeBlockRanges: [number, number][] = [];
   const codeBlockRegex = /```[\s\S]*?```/g;
   let cbMatch;
-  while ((cbMatch = codeBlockRegex.exec(text)) !== null) {
+  while ((cbMatch = codeBlockRegex.exec(workingText)) !== null) {
     codeBlockRanges.push([cbMatch.index, cbMatch.index + cbMatch[0].length]);
   }
 
-  const tagRegex = /\[(NAVIGATE|CLICK|TYPE|CONFIRM_ACTION|EXECUTE_SQL|REQUEST_APPROVAL|CALL_MCP|GOAL_ACCOMPLISHED):([^\]]*?)]/g;
+  const tagRegex = /\[(NAVIGATE|CLICK|TYPE|CONFIRM_ACTION|EXECUTE_SQL|REQUEST_APPROVAL|CALL_MCP|GOAL_ACCOMPLISHED|RENDER_CHART):([^\]]*?)]/g;
   let match;
-  while ((match = tagRegex.exec(text)) !== null) {
+  while ((match = tagRegex.exec(workingText)) !== null) {
     const inCode = codeBlockRanges.some(([start, end]) => match!.index >= start && match!.index < end);
     if (inCode) continue;
 
@@ -89,12 +104,16 @@ const parseWorkflow = (text: string, currentProjectId?: string): { steps: Workfl
     } else if (type === 'EXECUTE_SQL') {
       let query = argsStr.trim();
       if (!query || query.toLowerCase().includes('rawsqlquery') || query.startsWith('<') || query.endsWith('>') || query === '<query>') {
-        const sqlBlock = text.match(/```(?:sql)?\s*([\s\S]*?)```/i);
+        const sqlBlock = workingText.match(/```(?:sql)?\s*([\s\S]*?)```/i);
         if (sqlBlock?.[1]?.trim()) query = sqlBlock[1].trim().replace(/;+$/, '');
       }
       if (query && !query.startsWith('<') && !query.toLowerCase().includes('rawsqlquery') && query !== '<query>') {
         steps.push({ type: 'EXECUTE_SQL', query });
       }
+    } else if (type === 'RENDER_CHART') {
+      try {
+        chart = JSON.parse(argsStr.trim());
+      } catch {}
     } else if (type === 'REQUEST_APPROVAL') {
       const parts = argsStr.split(':');
       const id = parts[0]?.trim() || `appr_${Date.now()}`;
@@ -128,7 +147,7 @@ const parseWorkflow = (text: string, currentProjectId?: string): { steps: Workfl
       } else if (actionType === 'INJECT_SQL') {
         let query = argsStr.substring(argsStr.indexOf(':') + 1).trim();
         if (!query || query.toLowerCase().includes('rawsqlquery') || query.startsWith('<') || query.endsWith('>') || query === '<query>') {
-          const sqlBlock = text.match(/```(?:sql)?\s*([\s\S]*?)```/i);
+          const sqlBlock = workingText.match(/```(?:sql)?\s*([\s\S]*?)```/i);
           if (sqlBlock?.[1]?.trim()) query = sqlBlock[1].trim().replace(/;+$/, '');
         }
         if (query && !query.startsWith('<') && !query.toLowerCase().includes('rawsqlquery') && query !== '<query>') {
@@ -138,8 +157,8 @@ const parseWorkflow = (text: string, currentProjectId?: string): { steps: Workfl
     }
   }
 
-  const cleanText = text.replace(/\[(?:NAVIGATE|CLICK|TYPE|CONFIRM_ACTION|EXECUTE_SQL|REQUEST_APPROVAL|CALL_MCP|GOAL_ACCOMPLISHED)[^\]]*?]/g, '').trim();
-  return { steps, cleanText, approvalRequest };
+  const cleanText = workingText.replace(/\[(?:NAVIGATE|CLICK|TYPE|CONFIRM_ACTION|EXECUTE_SQL|REQUEST_APPROVAL|CALL_MCP|GOAL_ACCOMPLISHED|RENDER_CHART)[^\]]*?]/g, '').trim();
+  return { steps, cleanText, approvalRequest, chart, thought };
 };
 
 // --- Helpers ---
@@ -188,7 +207,7 @@ export function FluxAiAssistant({ userId, isOpen, onOpenChange }: { userId: stri
 
   const [isTyping, setIsTyping] = useState(false);
   const [voiceEnabled, setVoiceEnabled] = useState(false);
-  const [selectedModel, setSelectedModel] = useState("glm");
+  const [selectedModel, setSelectedModel] = useState("flux-fast");
   const [activeWorkflow, setActiveWorkflow] = useState<ActiveWorkflow | null>(null);
   const [autoPilotActive, setAutoPilotActive] = useState(false);
   const [autoPilotGoal, setAutoPilotGoal] = useState("");
@@ -314,7 +333,10 @@ export function FluxAiAssistant({ userId, isOpen, onOpenChange }: { userId: stri
   useEffect(() => {
     if (typeof window === 'undefined') return;
     const saved = localStorage.getItem("flux_ai_selected_model");
-    if (saved) setSelectedModel(saved);
+    if (saved) {
+      if (saved === 'glm') setSelectedModel('flux-fast');
+      else setSelectedModel(saved);
+    }
   }, []);
 
   const handleModelChange = (model: string) => { setSelectedModel(model); localStorage.setItem("flux_ai_selected_model", model); };
@@ -355,6 +377,8 @@ export function FluxAiAssistant({ userId, isOpen, onOpenChange }: { userId: stri
   const streamAssistantResponse = useCallback((
     fullText: string,
     options?: {
+      thought?: string;
+      chart?: any;
       pendingWorkflow?: { steps: WorkflowStep[] };
       approvalRequest?: ApprovalRequestData;
       sources?: string[];
@@ -406,6 +430,8 @@ export function FluxAiAssistant({ userId, isOpen, onOpenChange }: { userId: stri
         updated[lastIdx] = {
           ...updated[lastIdx],
           content: clean,
+          thought: (options as any)?.thought,
+          chart: (options as any)?.chart,
           isStreaming: false,
           pendingWorkflow: options?.pendingWorkflow,
           approvalRequest: options?.approvalRequest,
@@ -782,45 +808,159 @@ export function FluxAiAssistant({ userId, isOpen, onOpenChange }: { userId: stri
     };
 
     try {
+      const startTime = Date.now();
       const res = await fetch("/api/ai-chat", {
-        method: "POST", headers: { "Content-Type": "application/json" }, signal: controller.signal,
-        body: JSON.stringify({ messages: currentMsgs, currentPath: pathname, model: selectedModel, activeProject: project ? { project_id: project.project_id, display_name: project.display_name, dialect: project.dialect, timezone: project.timezone } : null, screenContext: getScreenContext() }),
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Accept": "text/event-stream" },
+        signal: controller.signal,
+        body: JSON.stringify({
+          messages: currentMsgs,
+          currentPath: pathname,
+          model: selectedModel,
+          stream: true,
+          activeProject: project ? { project_id: project.project_id, display_name: project.display_name, dialect: project.dialect, timezone: project.timezone } : null,
+          screenContext: getScreenContext()
+        }),
       });
-      if (!res.ok) throw new Error('Request failed');
-      const data = await res.json();
 
-      if (data.success) {
-        const { steps, cleanText, approvalRequest } = parseWorkflow(data.text, project?.project_id);
-        const hasOnlyNavSteps = steps.length > 0 && steps.every(s => s.type === 'NAVIGATE') && !cleanText.trim();
-        if (autoPilotActive && hasOnlyNavSteps) {
-          setIsTyping(false);
-          setMessages(prev => [...prev, { role: "assistant", content: "Auto-Pilot stopped - AI is looping without making progress.", timestamp: Date.now() }]);
-          toggleAutoPilot();
-          return;
+      if (!res.ok) throw new Error('Request failed with status ' + res.status);
+
+      const contentType = res.headers.get('content-type') || '';
+
+      if (contentType.includes('text/event-stream') && res.body) {
+        // SSE Real-time Streaming Mode
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder();
+        let streamBuffer = '';
+        let accumulatedText = '';
+        let accumulatedThought = '';
+        let streamSources: string[] = [];
+
+        setIsTyping(false);
+        setIsStreamingActive(true);
+
+        // Add assistant placeholder with isThinking: true
+        setMessages(prev => [...prev, {
+          role: "assistant",
+          content: "",
+          thought: "",
+          isThinking: true,
+          isStreaming: true,
+          timestamp: Date.now()
+        }]);
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          streamBuffer += decoder.decode(value, { stream: true });
+          const lines = streamBuffer.split('\n');
+          streamBuffer = lines.pop() || '';
+
+          for (const line of lines) {
+            const trimmed = line.trim();
+            if (!trimmed.startsWith('data: ')) continue;
+            const jsonStr = trimmed.slice(6);
+            if (jsonStr === '[DONE]') continue;
+            try {
+              const event = JSON.parse(jsonStr);
+              if (event.type === 'thought') {
+                accumulatedThought += event.token;
+                setMessages(prev => {
+                  const lastIdx = prev.length - 1;
+                  if (lastIdx < 0) return prev;
+                  const updated = [...prev];
+                  updated[lastIdx] = {
+                    ...updated[lastIdx],
+                    thought: accumulatedThought,
+                    isThinking: true
+                  };
+                  return updated;
+                });
+              } else if (event.type === 'text') {
+                accumulatedText += event.token;
+                setMessages(prev => {
+                  const lastIdx = prev.length - 1;
+                  if (lastIdx < 0) return prev;
+                  const updated = [...prev];
+                  updated[lastIdx] = {
+                    ...updated[lastIdx],
+                    content: accumulatedText,
+                    isThinking: false
+                  };
+                  return updated;
+                });
+                scrollToBottom('auto');
+              } else if (event.type === 'sources') {
+                streamSources = event.sources || [];
+              } else if (event.type === 'done') {
+                if (event.fullText) accumulatedText = event.fullText;
+                if (event.thought) accumulatedThought = event.thought;
+              }
+            } catch {}
+          }
         }
 
-        setIsTyping(false);
+        const duration = Date.now() - startTime;
+        const { steps, cleanText, approvalRequest, chart } = parseWorkflow(accumulatedText, project?.project_id);
 
-        streamAssistantResponse(cleanText, {
-          pendingWorkflow: steps.length > 0 ? { steps } : undefined,
-          approvalRequest,
-          sources: data.sources,
-          onComplete: () => {
-            if (steps.length > 0) {
-              const wf: ActiveWorkflow = { steps, currentStepIndex: 0 };
-              localStorage.setItem('flux_active_workflow', JSON.stringify(wf));
-              setActiveWorkflow(wf);
-            }
-            speak(cleanText);
-          }
+        setMessages(prev => {
+          const lastIdx = prev.length - 1;
+          if (lastIdx < 0) return prev;
+          const updated = [...prev];
+          updated[lastIdx] = {
+            ...updated[lastIdx],
+            content: cleanText,
+            thought: accumulatedThought || undefined,
+            isThinking: false,
+            thoughtDuration: duration,
+            chart,
+            pendingWorkflow: steps.length > 0 ? { steps } : undefined,
+            approvalRequest,
+            sources: streamSources,
+            isStreaming: false
+          };
+          return updated;
         });
+
+        setIsStreamingActive(false);
+
+        if (steps.length > 0) {
+          const wf: ActiveWorkflow = { steps, currentStepIndex: 0 };
+          localStorage.setItem('flux_active_workflow', JSON.stringify(wf));
+          setActiveWorkflow(wf);
+        }
+        speak(cleanText);
+
       } else {
-        setIsTyping(false);
-        setMessages(prev => [...prev, { role: "assistant", content: data.error || 'Something went wrong. Try again.', timestamp: Date.now() }]);
+        // Fallback: Non-Streaming JSON Response
+        const data = await res.json();
+        if (data.success) {
+          const { steps, cleanText, approvalRequest, chart, thought } = parseWorkflow(data.text, project?.project_id);
+          setIsTyping(false);
+          streamAssistantResponse(cleanText, {
+            thought: data.thought || thought,
+            chart,
+            pendingWorkflow: steps.length > 0 ? { steps } : undefined,
+            approvalRequest,
+            sources: data.sources,
+            onComplete: () => {
+              if (steps.length > 0) {
+                const wf: ActiveWorkflow = { steps, currentStepIndex: 0 };
+                localStorage.setItem('flux_active_workflow', JSON.stringify(wf));
+                setActiveWorkflow(wf);
+              }
+              speak(cleanText);
+            }
+          });
+        } else {
+          setIsTyping(false);
+          setMessages(prev => [...prev, { role: "assistant", content: data.error || 'Something went wrong. Try again.', timestamp: Date.now() }]);
+        }
       }
     } catch (err: any) {
       if (err.name === 'AbortError') return;
       setIsTyping(false);
+      setIsStreamingActive(false);
       setMessages(prev => [...prev, { role: "assistant", content: 'Connection issue. Try again.', timestamp: Date.now() }]);
     }
   }, [input, isTyping, messages, pathname, selectedModel, project, autoPilotActive, speak, finalizeActiveStream, streamAssistantResponse]);
@@ -884,7 +1024,18 @@ export function FluxAiAssistant({ userId, isOpen, onOpenChange }: { userId: stri
                 <div><p className="text-sm font-semibold text-foreground leading-none">Flux AI</p><p className="text-[10.5px] text-muted-foreground mt-0.5">Autonomous agent</p></div>
               </div>
               <div className="flex items-center gap-0.5">
-                <select value={selectedModel} onChange={(e) => handleModelChange(e.target.value)} className="h-7 px-1.5 mr-1.5 rounded border border-border bg-background text-[10.5px] font-medium text-foreground/80 focus:outline-none focus:ring-1 focus:ring-border cursor-pointer max-w-[130px] truncate shadow-sm opacity-90" title="AI Model"><option value="glm">GLM 5.2</option></select>
+                <select
+                  value={selectedModel}
+                  onChange={(e) => handleModelChange(e.target.value)}
+                  className="h-7 px-1.5 mr-1.5 rounded border border-border bg-background text-[10.5px] font-medium text-foreground/80 focus:outline-none focus:ring-1 focus:ring-border cursor-pointer max-w-[145px] truncate shadow-sm opacity-90"
+                  title="AI Model"
+                >
+                  <option value="flux-fast">Flux Fast (GLM-4 Flash)</option>
+                  <option value="flux-pro">Flux Pro (GLM-4 Air)</option>
+                  <option value="flux-ultra">Flux Ultra (GLM-4 Plus)</option>
+                  <option value="groq-llama">Groq Llama 3.3 70B</option>
+                  <option value="gemini-2.0-flash">Gemini 2.0 Flash</option>
+                </select>
                 <button onClick={() => setVoiceEnabled(v => !v)} className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors" title={voiceEnabled ? 'Mute' : 'Unmute'}>{voiceEnabled ? <Volume2 size={15} /> : <VolumeX size={15} />}</button>
                 <button onClick={() => onOpenChange(false)} className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"><X size={15} /></button>
               </div>
@@ -937,12 +1088,24 @@ export function FluxAiAssistant({ userId, isOpen, onOpenChange }: { userId: stri
                           )}
                           title={msg.isStreaming ? 'Click to show full response' : undefined}
                         >
+                          {(msg.thought || msg.isThinking) && (
+                            <AgenticThinkBlock
+                              thought={msg.thought || ''}
+                              isThinking={Boolean(msg.isThinking)}
+                              durationMs={msg.thoughtDuration}
+                            />
+                          )}
+
                           <FluxMarkdownRenderer
                             content={msg.content}
                             onInjectSql={handleInjectSql}
                             projectId={project?.project_id}
                             isStreaming={msg.isStreaming}
                           />
+
+                          {msg.chart && (
+                            <InChatChart chart={msg.chart} projectId={project?.project_id} />
+                          )}
 
                         {msg.sources && msg.sources.length > 0 && (
                           <div className="mt-3 pt-2.5 border-t border-border/40 flex flex-wrap gap-1 items-center">

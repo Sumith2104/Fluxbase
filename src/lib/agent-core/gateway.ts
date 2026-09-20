@@ -1,0 +1,321 @@
+import logger from '@/lib/logger';
+
+export interface ModelMessage {
+  role: 'system' | 'user' | 'assistant' | 'tool';
+  content: string;
+  name?: string;
+  tool_call_id?: string;
+  tool_calls?: any[];
+}
+
+export interface ModelGatewayOptions {
+  model?: string;
+  messages: ModelMessage[];
+  temperature?: number;
+  top_p?: number;
+  max_tokens?: number;
+  stream?: boolean;
+  response_format?: { type: 'json_object' | 'text' };
+  tools?: any[];
+  tool_choice?: any;
+}
+
+export interface ModelGatewayResult {
+  text: string;
+  thought?: string;
+  output?: any;
+  tool_calls?: any[];
+  usage?: {
+    prompt_tokens: number;
+    completion_tokens: number;
+    total_tokens: number;
+  };
+  provider: string;
+  model: string;
+}
+
+// Model alias mapper
+export const MODEL_CATALOG: Record<string, { provider: 'glm' | 'groq' | 'gemini' | 'openai'; upstreamModel: string; label: string; description: string }> = {
+  // Flux Fast Tier (Default - Ultra Fast & Cost-Free)
+  'glm': { provider: 'glm', upstreamModel: 'glm-4-flash', label: 'Flux Fast (GLM-4 Flash)', description: 'Ultra-fast general reasoning & SQL' },
+  'flux-fast': { provider: 'glm', upstreamModel: 'glm-4-flash', label: 'Flux Fast (GLM-4 Flash)', description: 'Ultra-fast general reasoning & SQL' },
+  'glm-4-flash': { provider: 'glm', upstreamModel: 'glm-4-flash', label: 'Flux Fast (GLM-4 Flash)', description: 'Ultra-fast general reasoning & SQL' },
+
+  // Flux Pro Tier (Balanced deep reasoning)
+  'flux-pro': { provider: 'glm', upstreamModel: 'glm-4-air', label: 'Flux Pro (GLM-4 Air)', description: 'High precision schema & BI analysis' },
+  'glm-4-air': { provider: 'glm', upstreamModel: 'glm-4-air', label: 'Flux Pro (GLM-4 Air)', description: 'High precision schema & BI analysis' },
+
+  // Flux Ultra Tier (Deep reasoning & complex migrations)
+  'flux-ultra': { provider: 'glm', upstreamModel: 'glm-4-plus', label: 'Flux Ultra (GLM-4 Plus)', description: 'Maximum intelligence for complex databases' },
+  'glm-4-plus': { provider: 'glm', upstreamModel: 'glm-4-plus', label: 'Flux Ultra (GLM-4 Plus)', description: 'Maximum intelligence for complex databases' },
+  'glm-5.2': { provider: 'glm', upstreamModel: 'glm-4-plus', label: 'Flux Ultra (GLM 5.2)', description: 'Maximum intelligence for complex databases' },
+
+  // Groq Tier (300+ tokens/sec)
+  'groq': { provider: 'groq', upstreamModel: 'llama-3.3-70b-versatile', label: 'Groq Llama 3.3 70B', description: 'Hyper-speed 300 tps inference' },
+  'groq-llama': { provider: 'groq', upstreamModel: 'llama-3.3-70b-versatile', label: 'Groq Llama 3.3 70B', description: 'Hyper-speed 300 tps inference' },
+
+  // Google Gemini Tier
+  'gemini': { provider: 'gemini', upstreamModel: 'gemini-2.0-flash', label: 'Gemini 2.0 Flash', description: 'Google Multimodal Agentic AI' },
+  'gemini-2.0-flash': { provider: 'gemini', upstreamModel: 'gemini-2.0-flash', label: 'Gemini 2.0 Flash', description: 'Google Multimodal Agentic AI' },
+  'gemini-1.5-flash': { provider: 'gemini', upstreamModel: 'gemini-1.5-flash', label: 'Gemini 1.5 Flash', description: 'Google Gemini 1.5' },
+
+  // OpenAI Tier
+  'openai': { provider: 'openai', upstreamModel: 'gpt-4o-mini', label: 'OpenAI GPT-4o Mini', description: 'OpenAI Fast Reasoning' },
+  'gpt-4o-mini': { provider: 'openai', upstreamModel: 'gpt-4o-mini', label: 'OpenAI GPT-4o Mini', description: 'OpenAI Fast Reasoning' },
+  'gpt-4o': { provider: 'openai', upstreamModel: 'gpt-4o', label: 'OpenAI GPT-4o', description: 'OpenAI Flagship' }
+};
+
+/**
+ * Universal Resilient Multi-Provider Model Gateway
+ */
+export class ModelGateway {
+  /**
+   * Dispatches a non-streaming chat completion with automatic tiered fallback.
+   */
+  public static async generate(options: ModelGatewayOptions): Promise<ModelGatewayResult> {
+    const requestedKey = (options.model || 'flux-fast').toLowerCase();
+    const primarySpec = MODEL_CATALOG[requestedKey] || MODEL_CATALOG['flux-fast'];
+
+    // Assemble prioritized execution chain
+    const chain = this.buildFallbackChain(primarySpec);
+    let lastError: any = null;
+
+    for (const step of chain) {
+      try {
+        logger.info(`[ModelGateway] Attempting tier: ${step.provider} (${step.upstreamModel})`);
+        const result = await this.executeProvider(step.provider, step.upstreamModel, options);
+        logger.info(`[ModelGateway] Succeeded with tier: ${step.provider} (${step.upstreamModel})`);
+        return result;
+      } catch (err: any) {
+        logger.warn(`[ModelGateway] Tier ${step.provider} (${step.upstreamModel}) failed: ${err?.message || err}`);
+        lastError = err;
+      }
+    }
+
+    throw lastError || new Error('All model providers in the fallback cascade failed.');
+  }
+
+  /**
+   * Dispatches a streaming chat completion with automatic tiered fallback.
+   * Returns a standard Response with text/event-stream or a ReadableStream.
+   */
+  public static async stream(options: ModelGatewayOptions): Promise<{ stream: ReadableStream<Uint8Array>; provider: string; model: string }> {
+    const requestedKey = (options.model || 'flux-fast').toLowerCase();
+    const primarySpec = MODEL_CATALOG[requestedKey] || MODEL_CATALOG['flux-fast'];
+
+    const chain = this.buildFallbackChain(primarySpec);
+    let lastError: any = null;
+
+    for (const step of chain) {
+      try {
+        logger.info(`[ModelGateway] Attempting streaming tier: ${step.provider} (${step.upstreamModel})`);
+        const stream = await this.executeProviderStream(step.provider, step.upstreamModel, options);
+        return { stream, provider: step.provider, model: step.upstreamModel };
+      } catch (err: any) {
+        logger.warn(`[ModelGateway] Streaming tier ${step.provider} (${step.upstreamModel}) failed: ${err?.message || err}`);
+        lastError = err;
+      }
+    }
+
+    throw lastError || new Error('All streaming providers in the fallback cascade failed.');
+  }
+
+  /**
+   * Constructs the ordered provider fallback chain based on active environment keys.
+   */
+  private static buildFallbackChain(primary: { provider: string; upstreamModel: string }): Array<{ provider: string; upstreamModel: string }> {
+    const chain: Array<{ provider: string; upstreamModel: string }> = [];
+    const seen = new Set<string>();
+
+    const add = (provider: string, upstreamModel: string) => {
+      const key = `${provider}:${upstreamModel}`;
+      if (!seen.has(key)) {
+        seen.add(key);
+        chain.push({ provider, upstreamModel });
+      }
+    };
+
+    // 1. Primary requested provider
+    add(primary.provider, primary.upstreamModel);
+
+    // 2. GLM flash fallback if primary is not GLM-flash
+    if (process.env.GLM_API_KEY) {
+      add('glm', 'glm-4-flash');
+      add('glm', 'glm-4-air');
+      add('glm', 'glm-4-plus');
+    }
+
+    // 3. Groq fallback
+    if (process.env.GROQ_API_KEY) {
+      add('groq', 'llama-3.3-70b-versatile');
+    }
+
+    // 4. Gemini fallback
+    if (process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY) {
+      add('gemini', 'gemini-2.0-flash');
+      add('gemini', 'gemini-1.5-flash');
+    }
+
+    // 5. OpenAI fallback
+    if (process.env.OPENAI_API_KEY) {
+      add('openai', 'gpt-4o-mini');
+    }
+
+    return chain;
+  }
+
+  /**
+   * Dispatches request to the specific provider using OpenAI-compatible payload schema.
+   */
+  private static async executeProvider(
+    provider: string,
+    model: string,
+    options: ModelGatewayOptions
+  ): Promise<ModelGatewayResult> {
+    const config = this.getProviderEndpointAndKey(provider);
+    if (!config.apiKey) {
+      throw new Error(`API key for provider '${provider}' is not configured`);
+    }
+
+    const payload: Record<string, any> = {
+      model,
+      messages: options.messages,
+      temperature: options.temperature ?? 0.2,
+      stream: false
+    };
+
+    if (options.top_p !== undefined) payload.top_p = options.top_p;
+    if (options.max_tokens !== undefined) payload.max_tokens = options.max_tokens;
+    if (options.response_format) payload.response_format = options.response_format;
+    if (options.tools && options.tools.length > 0) payload.tools = options.tools;
+    if (options.tool_choice) payload.tool_choice = options.tool_choice;
+
+    const response = await fetch(config.url, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${config.apiKey}`,
+        'Content-Type': 'application/json'
+      },
+      signal: AbortSignal.timeout(30000),
+      body: JSON.stringify(payload)
+    });
+
+    if (!response.ok) {
+      const errBody = await response.text();
+      throw new Error(`${provider} returned HTTP ${response.status}: ${errBody}`);
+    }
+
+    const json = await response.json();
+    const choice = json.choices?.[0];
+    const rawContent = choice?.message?.content || '';
+    const toolCalls = choice?.message?.tool_calls || [];
+
+    // Parse <think>...</think> if present in the model's raw text
+    let thought: string | undefined = undefined;
+    let cleanText = rawContent;
+    const thinkMatch = rawContent.match(/<think>([\s\S]*?)<\/think>/i) || rawContent.match(/<thought>([\s\S]*?)<\/thought>/i);
+    if (thinkMatch) {
+      thought = thinkMatch[1].trim();
+      cleanText = rawContent.replace(thinkMatch[0], '').trim();
+    }
+
+    // Parse JSON output if structured response was requested
+    let output: any = null;
+    if (options.response_format?.type === 'json_object' || cleanText.trim().startsWith('{') || cleanText.trim().startsWith('[')) {
+      try {
+        const cleaned = cleanText.trim().replace(/^```json\s*/i, '').replace(/```$/, '').trim();
+        output = JSON.parse(cleaned);
+      } catch {
+        output = null;
+      }
+    }
+
+    return {
+      text: cleanText,
+      thought,
+      output,
+      tool_calls: toolCalls,
+      usage: json.usage,
+      provider,
+      model
+    };
+  }
+
+  /**
+   * Dispatches a streaming request to upstream provider returning a live ReadableStream.
+   */
+  private static async executeProviderStream(
+    provider: string,
+    model: string,
+    options: ModelGatewayOptions
+  ): Promise<ReadableStream<Uint8Array>> {
+    const config = this.getProviderEndpointAndKey(provider);
+    if (!config.apiKey) {
+      throw new Error(`API key for provider '${provider}' is not configured`);
+    }
+
+    const payload: Record<string, any> = {
+      model,
+      messages: options.messages,
+      temperature: options.temperature ?? 0.2,
+      stream: true
+    };
+
+    if (options.top_p !== undefined) payload.top_p = options.top_p;
+    if (options.max_tokens !== undefined) payload.max_tokens = options.max_tokens;
+    if (options.tools && options.tools.length > 0) payload.tools = options.tools;
+    if (options.tool_choice) payload.tool_choice = options.tool_choice;
+
+    const response = await fetch(config.url, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${config.apiKey}`,
+        'Content-Type': 'application/json'
+      },
+      signal: AbortSignal.timeout(45000),
+      body: JSON.stringify(payload)
+    });
+
+    if (!response.ok) {
+      const errBody = await response.text();
+      throw new Error(`${provider} streaming returned HTTP ${response.status}: ${errBody}`);
+    }
+
+    if (!response.body) {
+      throw new Error(`No response body received from ${provider} streaming endpoint`);
+    }
+
+    return response.body;
+  }
+
+  /**
+   * Resolves endpoint URL and API key by provider.
+   */
+  private static getProviderEndpointAndKey(provider: string): { url: string; apiKey: string } {
+    switch (provider) {
+      case 'glm':
+        return {
+          url: 'https://open.bigmodel.cn/api/paas/v4/chat/completions',
+          apiKey: process.env.GLM_API_KEY || ''
+        };
+      case 'groq':
+        return {
+          url: 'https://api.groq.com/openai/v1/chat/completions',
+          apiKey: process.env.GROQ_API_KEY || ''
+        };
+      case 'gemini':
+        // Google Generative Language OpenAI compatibility endpoint
+        return {
+          url: 'https://generativelanguage.googleapis.com/v1beta/openai/chat/completions',
+          apiKey: process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || ''
+        };
+      case 'openai':
+        return {
+          url: 'https://api.openai.com/v1/chat/completions',
+          apiKey: process.env.OPENAI_API_KEY || ''
+        };
+      default:
+        throw new Error(`Unknown provider: ${provider}`);
+    }
+  }
+}
