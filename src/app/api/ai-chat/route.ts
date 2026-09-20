@@ -135,7 +135,15 @@ export async function POST(req: Request) {
         }
 
         const body = await req.json();
-        const { messages, currentPath, model, activeProject, screenContext, stream = false } = body;
+        const { currentPath = '/', model, activeProject, screenContext, stream = false } = body;
+
+        let messages: Array<{ role: string; content: string; hidden?: boolean }> = [];
+        if (Array.isArray(body.messages)) {
+            messages = body.messages;
+        } else if (typeof body.message === 'string' && body.message.trim()) {
+            messages = [{ role: 'user', content: body.message.trim() }];
+        }
+
         const userLastMsg = messages[messages.length - 1]?.content || '';
         const dialect = activeProject?.dialect || 'postgresql';
 
