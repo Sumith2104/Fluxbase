@@ -159,17 +159,38 @@ const parseWorkflow = (text: string, currentProjectId?: string): { steps: Workfl
 
   // Fallback: If no explicit action tags were found, but the model provided a SQL block AND stated intent to execute it:
   if (steps.length === 0 && !approvalRequest) {
-    const hasExecuteIntent = /\b(will now execute|executing (?:this|the) (?:sql|query|statement)|execute (?:this|the) (?:sql|query|statement)|running (?:this|the) (?:sql|query))\b/i.test(workingText);
+    const isAutoPilot = typeof window !== 'undefined' && localStorage.getItem('flux_autopilot_active') === 'true';
+    const hasExecuteIntent = isAutoPilot || /\b(will now execute|executing|execute (?:this|the|corrected)|running (?:this|the)|to execute|run (?:this|the)|corrected (?:sql|query|insert|update|statement)|action tag|here is the (?:fixed|corrected)|here is the query|ACTIONS:)/i.test(workingText);
     const sqlBlock = workingText.match(/```(?:sql)?\s*([\s\S]*?)```/i);
     if (hasExecuteIntent && sqlBlock?.[1]?.trim()) {
       const extractedQuery = sqlBlock[1].trim().replace(/;+$/, '');
-      if (extractedQuery) {
+      if (extractedQuery && !extractedQuery.toLowerCase().includes('rawsqlquery')) {
         steps.push({ type: 'EXECUTE_SQL', query: extractedQuery });
+      }
+    } else if (isAutoPilot) {
+      // Check for raw SQL query line after ACTIONS: or Action Tag:
+      const actionMatch = workingText.match(/(?:ACTIONS:|Action Tag:?)\s*(?:[•\-*]|\>)?\s*(INSERT\s+INTO|SELECT|UPDATE|DELETE\s+FROM|CREATE\s+TABLE|ALTER\s+TABLE)\b([\s\S]+?)(?:(?:\n\s*\n)|$)/i);
+      if (actionMatch) {
+        const extracted = (actionMatch[1] + actionMatch[2]).trim().replace(/;+$/, '');
+        if (extracted && extracted.length > 10 && !extracted.toLowerCase().includes('rawsqlquery')) {
+          steps.push({ type: 'EXECUTE_SQL', query: extracted });
+        }
+      }
+    }
+
+    // Trailing unbracketed or unclosed [EXECUTE_SQL:...
+    if (steps.length === 0) {
+      const trailingSqlMatch = workingText.match(/\[EXECUTE_SQL:\s*([\s\S]+?)(?:\]|$)/i);
+      if (trailingSqlMatch?.[1]?.trim()) {
+        const q = trailingSqlMatch[1].trim().replace(/;+$/, '');
+        if (q && !q.toLowerCase().includes('rawsqlquery')) {
+          steps.push({ type: 'EXECUTE_SQL', query: q });
+        }
       }
     }
   }
 
-  const cleanText = workingText.replace(/\[(?:NAVIGATE|CLICK|TYPE|CONFIRM_ACTION|EXECUTE_SQL|REQUEST_APPROVAL|CALL_MCP|GOAL_ACCOMPLISHED|RENDER_CHART)[^\]]*?]/g, '').trim();
+  const cleanText = workingText.replace(/\[(?:NAVIGATE|CLICK|TYPE|CONFIRM_ACTION|EXECUTE_SQL|REQUEST_APPROVAL|CALL_MCP|GOAL_ACCOMPLISHED|RENDER_CHART)[^\]]*?(?:\]|$)/g, '').trim();
   return { steps, cleanText, approvalRequest, chart, thought };
 };
 
@@ -666,7 +687,23 @@ export function FluxAiAssistant({ userId, isOpen, onOpenChange }: { userId: stri
           streamAssistantResponse(`Query error: ${data.error}`, {
             onComplete: () => {
               if (autoPilotActive) {
-                requestAutopilotCheckin(`System: Observation - SQL Query failed: "${data.error}". Please self-correct the query and retry.`);
+                let diagnosticHint = '';
+                const errStr = data.error || '';
+                const fkMatch = errStr.match(/violates foreign key constraint ["']?([^"'\s]+)["']?/i) || errStr.match(/foreign key constraint/i);
+                if (fkMatch) {
+                  diagnosticHint = `\n[ROOT CAUSE]: Foreign Key violation (${fkMatch[1] || 'constraint'}). The referenced foreign ID does not exist in the parent table.\n[AUTOPILOT AUTO-FIX MANDATE]: DO NOT ask the user or dump schemas. Autonomously fix the query NOW: either set the foreign key column to NULL (e.g., col = NULL), OR use a subquery like (SELECT id FROM <parent_table> LIMIT 1), OR insert the parent record first. Emit [EXECUTE_SQL:<corrected_query>] immediately.`;
+                } else if (/column ["']?([^"'\s]+)["']? (?:of relation [^ ]+ )?does not exist/i.test(errStr)) {
+                  const colMatch = errStr.match(/column ["']?([^"'\s]+)["']?/i);
+                  diagnosticHint = `\n[ROOT CAUSE]: Column "${colMatch?.[1] || 'unknown'}" does not exist in the table.\n[AUTOPILOT AUTO-FIX MANDATE]: Remove the hallucinated column or rename it to match the live schema. Emit [EXECUTE_SQL:<corrected_query>] immediately.`;
+                } else if (/null value in column ["']?([^"'\s]+)["']? .*violates not-null constraint/i.test(errStr)) {
+                  const colMatch = errStr.match(/column ["']?([^"'\s]+)["']?/i);
+                  diagnosticHint = `\n[ROOT CAUSE]: Column "${colMatch?.[1] || 'unknown'}" violates NOT NULL constraint.\n[AUTOPILOT AUTO-FIX MANDATE]: Provide a valid default value for the column. Emit [EXECUTE_SQL:<corrected_query>] immediately.`;
+                } else if (/duplicate key value violates unique constraint/i.test(errStr)) {
+                  diagnosticHint = `\n[ROOT CAUSE]: Unique constraint violation on primary or unique key.\n[AUTOPILOT AUTO-FIX MANDATE]: Use ON CONFLICT DO NOTHING / UPDATE or a new distinct key. Emit [EXECUTE_SQL:<corrected_query>] immediately.`;
+                } else {
+                  diagnosticHint = `\n[AUTOPILOT AUTO-FIX MANDATE]: Autonomously diagnose root cause, fix the SQL query, and emit [EXECUTE_SQL:<corrected_query>] immediately. DO NOT ask the user to fix it.`;
+                }
+                requestAutopilotCheckin(`System: Observation - SQL Query failed: "${data.error}".${diagnosticHint}`);
               }
               advanceWorkflow();
             }
@@ -896,58 +933,84 @@ export function FluxAiAssistant({ userId, isOpen, onOpenChange }: { userId: stri
           timestamp: Date.now()
         }]);
 
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-          streamBuffer += decoder.decode(value, { stream: true });
-          const lines = streamBuffer.split('\n');
-          streamBuffer = lines.pop() || '';
+        let streamAborted = false;
+        try {
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            streamBuffer += decoder.decode(value, { stream: true });
+            const lines = streamBuffer.split('\n');
+            streamBuffer = lines.pop() || '';
 
-          for (const line of lines) {
-            const trimmed = line.trim();
-            if (!trimmed.startsWith('data: ')) continue;
-            const jsonStr = trimmed.slice(6);
-            if (jsonStr === '[DONE]') continue;
-            try {
-              const event = JSON.parse(jsonStr);
-              if (event.type === 'thought') {
-                accumulatedThought += event.token;
-                setMessages(prev => {
-                  const lastIdx = prev.length - 1;
-                  if (lastIdx < 0) return prev;
-                  const updated = [...prev];
-                  updated[lastIdx] = {
-                    ...updated[lastIdx],
-                    thought: accumulatedThought,
-                    isThinking: true
-                  };
-                  return updated;
-                });
-              } else if (event.type === 'text') {
-                accumulatedText += event.token;
-                setMessages(prev => {
-                  const lastIdx = prev.length - 1;
-                  if (lastIdx < 0) return prev;
-                  const updated = [...prev];
-                  updated[lastIdx] = {
-                    ...updated[lastIdx],
-                    content: accumulatedText,
-                    isThinking: false
-                  };
-                  return updated;
-                });
-                scrollToBottom('auto');
-              } else if (event.type === 'sources') {
-                streamSources = event.sources || [];
-              } else if (event.type === 'done') {
-                if (event.fullText) accumulatedText = event.fullText;
-                if (event.thought) accumulatedThought = event.thought;
-              }
-            } catch {}
+            for (const line of lines) {
+              const trimmed = line.trim();
+              if (!trimmed.startsWith('data: ')) continue;
+              const jsonStr = trimmed.slice(6);
+              if (jsonStr === '[DONE]') continue;
+              try {
+                const event = JSON.parse(jsonStr);
+                if (event.type === 'thought') {
+                  accumulatedThought += event.token;
+                  setMessages(prev => {
+                    const lastIdx = prev.length - 1;
+                    if (lastIdx < 0) return prev;
+                    const updated = [...prev];
+                    updated[lastIdx] = {
+                      ...updated[lastIdx],
+                      thought: accumulatedThought,
+                      isThinking: true
+                    };
+                    return updated;
+                  });
+                } else if (event.type === 'text') {
+                  accumulatedText += event.token;
+                  setMessages(prev => {
+                    const lastIdx = prev.length - 1;
+                    if (lastIdx < 0) return prev;
+                    const updated = [...prev];
+                    updated[lastIdx] = {
+                      ...updated[lastIdx],
+                      content: accumulatedText,
+                      isThinking: false
+                    };
+                    return updated;
+                  });
+                  scrollToBottom('auto');
+                } else if (event.type === 'sources') {
+                  streamSources = event.sources || [];
+                } else if (event.type === 'done') {
+                  if (event.fullText) accumulatedText = event.fullText;
+                  if (event.thought) accumulatedThought = event.thought;
+                }
+              } catch {}
+            }
           }
+        } catch (streamErr: any) {
+          if (streamErr.name === 'AbortError') return;
+          console.warn('[Flux AI] SSE stream read disconnected/interrupted:', streamErr);
+          streamAborted = true;
         }
 
         const duration = Date.now() - startTime;
+
+        // If the stream was interrupted and zero content was accumulated, then show connection issue
+        if (streamAborted && !accumulatedText.trim() && !accumulatedThought.trim()) {
+          setIsStreamingActive(false);
+          setMessages(prev => {
+            const lastIdx = prev.length - 1;
+            if (lastIdx < 0) return prev;
+            const updated = [...prev];
+            updated[lastIdx] = {
+              ...updated[lastIdx],
+              content: 'Connection issue. Try again.',
+              isThinking: false,
+              isStreaming: false
+            };
+            return updated;
+          });
+          return;
+        }
+
         const { steps, cleanText, approvalRequest, chart } = parseWorkflow(accumulatedText, project?.project_id);
 
         setMessages(prev => {
@@ -956,7 +1019,7 @@ export function FluxAiAssistant({ userId, isOpen, onOpenChange }: { userId: stri
           const updated = [...prev];
           updated[lastIdx] = {
             ...updated[lastIdx],
-            content: cleanText,
+            content: cleanText || (accumulatedThought ? 'Done.' : ''),
             thought: accumulatedThought || undefined,
             isThinking: false,
             thoughtDuration: duration,
@@ -975,6 +1038,12 @@ export function FluxAiAssistant({ userId, isOpen, onOpenChange }: { userId: stri
           const wf: ActiveWorkflow = { steps, currentStepIndex: 0 };
           localStorage.setItem('flux_active_workflow', JSON.stringify(wf));
           setActiveWorkflow(wf);
+        } else if (typeof window !== 'undefined' && localStorage.getItem('flux_autopilot_active') === 'true' && !approvalRequest) {
+          const goal = localStorage.getItem('flux_autopilot_goal') || autoPilotGoal;
+          const isAccomplished = /\[GOAL_ACCOMPLISHED/i.test(accumulatedText);
+          if (!isAccomplished && goal) {
+            requestAutopilotCheckin(`System: Auto-Pilot is active for goal: "${goal}". You did not execute a database action or mark the goal complete. Diagnose the root cause, repair any query, and emit [EXECUTE_SQL:<query>] or [GOAL_ACCOMPLISHED:<summary>]. Continue autonomously now.`);
+          }
         }
         speak(cleanText);
 
@@ -995,6 +1064,12 @@ export function FluxAiAssistant({ userId, isOpen, onOpenChange }: { userId: stri
                 const wf: ActiveWorkflow = { steps, currentStepIndex: 0 };
                 localStorage.setItem('flux_active_workflow', JSON.stringify(wf));
                 setActiveWorkflow(wf);
+              } else if (typeof window !== 'undefined' && localStorage.getItem('flux_autopilot_active') === 'true' && !approvalRequest) {
+                const goal = localStorage.getItem('flux_autopilot_goal') || autoPilotGoal;
+                const isAccomplished = /\[GOAL_ACCOMPLISHED/i.test(data.text);
+                if (!isAccomplished && goal) {
+                  requestAutopilotCheckin(`System: Auto-Pilot is active for goal: "${goal}". You did not execute a database action or mark the goal complete. Diagnose the root cause, repair any query, and emit [EXECUTE_SQL:<query>] or [GOAL_ACCOMPLISHED:<summary>]. Continue autonomously now.`);
+                }
               }
               speak(cleanText);
             }

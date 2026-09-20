@@ -27,8 +27,19 @@ export function createAgentSseTransformStream(sources: string[] = []): Transform
   let inThinkTag = false;
   let accumulatedThought = '';
   let accumulatedText = '';
+  let keepAliveTimer: any = null;
 
   return new TransformStream({
+    start(controller) {
+      // Send SSE keep-alive ping every 10 seconds to prevent proxy/browser timeout disconnects
+      keepAliveTimer = setInterval(() => {
+        try {
+          controller.enqueue(textEncoder.encode(': keepalive\n\n'));
+        } catch {
+          if (keepAliveTimer) clearInterval(keepAliveTimer);
+        }
+      }, 10000);
+    },
     transform(chunk, controller) {
       buffer += textDecoder.decode(chunk, { stream: true });
       const lines = buffer.split('\n');
@@ -95,6 +106,7 @@ export function createAgentSseTransformStream(sources: string[] = []): Transform
       }
     },
     flush(controller) {
+      if (keepAliveTimer) clearInterval(keepAliveTimer);
       if (sources.length > 0) {
         controller.enqueue(textEncoder.encode(formatSseEvent({ type: 'sources', sources })));
       }
