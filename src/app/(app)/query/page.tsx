@@ -4,7 +4,7 @@ import { useGlobalAlert } from '@/components/global-alert-provider';
 
 import { useState, useContext, useEffect, useCallback } from 'react';
 
-import { Play, Trash2, History as HistoryIcon, Sparkles, ChevronRight, Table2, ListRestart, Info, Database, AlertCircle, CheckCircle2, TerminalSquare, MoreHorizontal, FileJson, FileType, Copy as CopyIcon, AlignLeft, Upload, Check } from 'lucide-react';
+import { Play, Trash2, History as HistoryIcon, ChevronRight, Table2, ListRestart, Info, Database, AlertCircle, CheckCircle2, TerminalSquare, MoreHorizontal, FileJson, FileType, Copy as CopyIcon, AlignLeft, Upload, Check } from 'lucide-react';
 import { FluxAiIcon } from '@/components/ui/flux-ai-icon';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -667,19 +667,16 @@ export default function QueryPage() {
                   size="sm"
                   onClick={handleFixWithAI}
                   disabled={isFixingWithAI}
-                  className="h-8 px-3 text-xs bg-gradient-to-r from-purple-600 via-indigo-600 to-blue-600 hover:from-purple-500 hover:to-indigo-500 text-white font-medium shadow-sm transition-all flex items-center gap-1.5 cursor-pointer"
+                  className="h-8 px-3 text-xs bg-foreground text-background hover:bg-foreground/90 font-medium rounded-md shadow-xs transition-colors flex items-center justify-center cursor-pointer disabled:opacity-50"
                   title="Diagnose error against schema and generate working SQL"
                 >
                   {isFixingWithAI ? (
-                    <>
+                    <span className="flex items-center gap-1.5">
                       <MoreHorizontal className="h-3.5 w-3.5 animate-pulse" />
-                      <span>Fixing with AI...</span>
-                    </>
+                      <span>Fixing...</span>
+                    </span>
                   ) : (
-                    <>
-                      <Sparkles className="h-3.5 w-3.5 text-amber-300" />
-                      <span>Fix with AI</span>
-                    </>
+                    <span>Fix with AI</span>
                   )}
                 </Button>
 
@@ -687,10 +684,9 @@ export default function QueryPage() {
                   variant="outline"
                   size="sm"
                   onClick={handleAskFluxAI}
-                  className="h-8 px-2.5 text-xs text-muted-foreground hover:text-foreground border-border flex items-center gap-1.5 cursor-pointer"
+                  className="h-8 px-3 text-xs font-medium rounded-md border border-border/80 bg-background hover:bg-muted text-foreground/85 hover:text-foreground transition-colors cursor-pointer"
                   title="Open Flux AI assistant with error preloaded"
                 >
-                  <FluxAiIcon size={13} />
                   <span>Ask Flux AI</span>
                 </Button>
 
@@ -698,7 +694,7 @@ export default function QueryPage() {
                   variant="outline"
                   size="sm"
                   onClick={handleCopyError}
-                  className="h-8 px-2.5 text-xs text-muted-foreground hover:text-foreground border-border flex items-center gap-1.5 cursor-pointer"
+                  className="h-8 px-3 text-xs font-medium rounded-md border border-border/80 bg-background hover:bg-muted text-foreground/85 hover:text-foreground transition-colors cursor-pointer flex items-center gap-1.5"
                   title="Copy error message to clipboard"
                 >
                   {hasCopiedError ? <Check className="h-3.5 w-3.5 text-emerald-400" /> : <CopyIcon className="h-3.5 w-3.5" />}
@@ -729,38 +725,40 @@ export default function QueryPage() {
 
           {/* AI Fix Proposal Box (when generated) */}
           {aiFixResult && (
-            <div className="rounded-xl border border-purple-500/40 bg-purple-950/20 dark:bg-purple-950/30 p-4 shadow-md animate-in fade-in-50 duration-300">
-              <div className="flex items-center justify-between pb-2.5 border-b border-purple-500/20">
+            <div className="rounded-xl border border-border/70 bg-muted/30 p-4 shadow-xs animate-in fade-in-50 duration-200">
+              <div className="flex items-center justify-between pb-2.5 border-b border-border/60">
                 <div className="flex items-center gap-2">
-                  <Sparkles className="h-4 w-4 text-purple-400" />
-                  <span className="font-semibold text-sm text-purple-200">AI Suggested Repair</span>
+                  <span className="font-semibold text-sm text-foreground">Suggested Fix</span>
+                  <span className="text-[10px] font-mono uppercase px-2 py-0.5 rounded-md bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 font-medium">
+                    Ready to Apply
+                  </span>
                 </div>
                 <div className="flex items-center gap-2">
                   <Button
                     size="sm"
                     variant="outline"
                     onClick={() => handleApplyFix(false)}
-                    className="h-7 px-2.5 text-xs border-purple-500/30 hover:bg-purple-500/20 text-purple-200"
+                    className="h-7 px-2.5 text-xs font-medium rounded-md border-border hover:bg-muted text-foreground/85"
                   >
                     Apply to Editor
                   </Button>
                   <Button
                     size="sm"
                     onClick={() => handleApplyFix(true)}
-                    className="h-7 px-3 text-xs bg-purple-600 hover:bg-purple-500 text-white font-medium flex items-center gap-1"
+                    className="h-7 px-3 text-xs bg-foreground text-background hover:bg-foreground/90 font-medium rounded-md flex items-center gap-1.5 shadow-xs"
                   >
                     <Play className="h-3 w-3 fill-current" />
-                    Apply & Run
+                    <span>Apply & Run</span>
                   </Button>
                 </div>
               </div>
 
-              <p className="mt-2.5 text-xs text-purple-200/90 leading-relaxed font-sans">
-                💡 {aiFixResult.explanation}
+              <p className="mt-2.5 text-xs text-muted-foreground leading-relaxed font-sans">
+                {aiFixResult.explanation}
               </p>
 
-              <div className="mt-2.5 rounded-lg border border-purple-500/30 bg-neutral-950 p-3 overflow-x-auto">
-                <pre className="font-mono text-xs text-purple-100 selection:bg-purple-900 leading-relaxed">
+              <div className="mt-2.5 rounded-lg border border-border/60 bg-neutral-950 p-3 overflow-x-auto shadow-inner">
+                <pre className="font-mono text-xs text-emerald-300 selection:bg-emerald-950 leading-relaxed">
                   {aiFixResult.fixedQuery}
                 </pre>
               </div>
@@ -1088,9 +1086,8 @@ export default function QueryPage() {
                           size="sm"
                           onClick={handleFixWithAI}
                           disabled={isFixingWithAI}
-                          className="h-6 px-2 text-[10px] shrink-0 bg-red-600 hover:bg-red-500 text-white font-medium flex items-center gap-1 cursor-pointer"
+                          className="h-6 px-2.5 text-[10px] shrink-0 font-medium rounded-md bg-foreground text-background hover:bg-foreground/90 transition-colors cursor-pointer"
                         >
-                          <Sparkles className="h-2.5 w-2.5" />
                           <span>{isFixingWithAI ? 'Fixing...' : 'Auto-Fix'}</span>
                         </Button>
                       </div>
