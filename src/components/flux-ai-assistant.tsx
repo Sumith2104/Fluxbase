@@ -109,6 +109,14 @@ type ActiveWorkflow = {
 const MAX_MESSAGES = 50;
 const MAX_STORAGE_BYTES = 512 * 1024;
 
+const isValidSql = (q: string): boolean => {
+  if (!q) return false;
+  const cleaned = q
+    .replace(/^(\s*(--[^\n]*\n|\/\*[\s\S]*?\*\/))+/g, '')
+    .trim();
+  return /^(SELECT|INSERT\s+INTO|UPDATE|DELETE\s+FROM|CREATE|ALTER|DROP|TRUNCATE|WITH|EXPLAIN|SHOW|BEGIN|COMMIT|ROLLBACK|GRANT|REVOKE|SET)\b/i.test(cleaned);
+};
+
 // --- Workflow Parser ---
 
 const parseWorkflow = (text: string, currentProjectId?: string): { steps: WorkflowStep[]; cleanText: string; approvalRequest?: ApprovalRequestData; chart?: any; thought?: string } => {
@@ -154,10 +162,10 @@ const parseWorkflow = (text: string, currentProjectId?: string): { steps: Workfl
     } else if (type === 'EXECUTE_SQL') {
       let query = argsStr.trim();
       if (!query || query.toLowerCase().includes('rawsqlquery') || query.startsWith('<') || query.endsWith('>') || query === '<query>') {
-        const sqlBlock = workingText.match(/```(?:sql)?\s*([\s\S]*?)```/i);
+        const sqlBlock = workingText.match(/```(?:sql|pgsql)\s*([\s\S]*?)```/i);
         if (sqlBlock?.[1]?.trim()) query = sqlBlock[1].trim().replace(/;+$/, '');
       }
-      if (query && !query.startsWith('<') && !query.toLowerCase().includes('rawsqlquery') && query !== '<query>') {
+      if (query && !query.startsWith('<') && !query.toLowerCase().includes('rawsqlquery') && query !== '<query>' && isValidSql(query)) {
         steps.push({ type: 'EXECUTE_SQL', query });
       }
     } else if (type === 'RENDER_CHART') {
@@ -197,33 +205,35 @@ const parseWorkflow = (text: string, currentProjectId?: string): { steps: Workfl
       } else if (actionType === 'INJECT_SQL') {
         let query = argsStr.substring(argsStr.indexOf(':') + 1).trim();
         if (!query || query.toLowerCase().includes('rawsqlquery') || query.startsWith('<') || query.endsWith('>') || query === '<query>') {
-          const sqlBlock = workingText.match(/```(?:sql)?\s*([\s\S]*?)```/i);
+          const sqlBlock = workingText.match(/```(?:sql|pgsql)\s*([\s\S]*?)```/i);
           if (sqlBlock?.[1]?.trim()) query = sqlBlock[1].trim().replace(/;+$/, '');
         }
-        if (query && !query.startsWith('<') && !query.toLowerCase().includes('rawsqlquery') && query !== '<query>') {
+        if (query && !query.startsWith('<') && !query.toLowerCase().includes('rawsqlquery') && query !== '<query>' && isValidSql(query)) {
           steps.push({ type: 'CONFIRM_ACTION', actionType: 'INJECT_SQL', query });
         }
       }
     }
   }
 
-  // Fallback: If no explicit action tags were found, but the model provided a SQL block AND stated intent to execute it:
+  // Fallback: ONLY when in AutoPilot mode (never in normal conversational chat)
   if (steps.length === 0 && !approvalRequest) {
     const isAutoPilot = typeof window !== 'undefined' && localStorage.getItem('flux_autopilot_active') === 'true';
-    const hasExecuteIntent = isAutoPilot || /\b(will now execute|executing|execute (?:this|the|corrected)|running (?:this|the)|to execute|run (?:this|the)|corrected (?:sql|query|insert|update|statement)|action tag|here is the (?:fixed|corrected)|here is the query|ACTIONS:)/i.test(workingText);
-    const sqlBlock = workingText.match(/```(?:sql)?\s*([\s\S]*?)```/i);
-    if (hasExecuteIntent && sqlBlock?.[1]?.trim()) {
-      const extractedQuery = sqlBlock[1].trim().replace(/;+$/, '');
-      if (extractedQuery && !extractedQuery.toLowerCase().includes('rawsqlquery')) {
-        steps.push({ type: 'EXECUTE_SQL', query: extractedQuery });
-      }
-    } else if (isAutoPilot) {
-      // Check for raw SQL query line after ACTIONS: or Action Tag:
-      const actionMatch = workingText.match(/(?:ACTIONS:|Action Tag:?)\s*(?:[•\-*]|\>)?\s*(INSERT\s+INTO|SELECT|UPDATE|DELETE\s+FROM|CREATE\s+TABLE|ALTER\s+TABLE)\b([\s\S]+?)(?:(?:\n\s*\n)|$)/i);
-      if (actionMatch) {
-        const extracted = (actionMatch[1] + actionMatch[2]).trim().replace(/;+$/, '');
-        if (extracted && extracted.length > 10 && !extracted.toLowerCase().includes('rawsqlquery')) {
-          steps.push({ type: 'EXECUTE_SQL', query: extracted });
+    if (isAutoPilot) {
+      const hasExecuteIntent = /\b(will now execute|executing|execute (?:this|the|corrected)|running (?:this|the)|run (?:this|the)|corrected (?:sql|query|insert|update|statement)|action tag|here is the (?:fixed|corrected)|here is the query|ACTIONS:)/i.test(workingText);
+      const sqlBlock = workingText.match(/```(?:sql|pgsql)\s*([\s\S]*?)```/i);
+      if (hasExecuteIntent && sqlBlock?.[1]?.trim()) {
+        const extractedQuery = sqlBlock[1].trim().replace(/;+$/, '');
+        if (extractedQuery && !extractedQuery.toLowerCase().includes('rawsqlquery') && isValidSql(extractedQuery)) {
+          steps.push({ type: 'EXECUTE_SQL', query: extractedQuery });
+        }
+      } else {
+        // Check for raw SQL query line after ACTIONS: or Action Tag:
+        const actionMatch = workingText.match(/(?:ACTIONS:|Action Tag:?)\s*(?:[•\-*]|\>)?\s*(INSERT\s+INTO|SELECT|UPDATE|DELETE\s+FROM|CREATE\s+TABLE|ALTER\s+TABLE)\b([\s\S]+?)(?:(?:\n\s*\n)|$)/i);
+        if (actionMatch) {
+          const extracted = (actionMatch[1] + actionMatch[2]).trim().replace(/;+$/, '');
+          if (extracted && extracted.length > 10 && !extracted.toLowerCase().includes('rawsqlquery') && isValidSql(extracted)) {
+            steps.push({ type: 'EXECUTE_SQL', query: extracted });
+          }
         }
       }
     }
@@ -233,7 +243,7 @@ const parseWorkflow = (text: string, currentProjectId?: string): { steps: Workfl
       const trailingSqlMatch = workingText.match(/\[EXECUTE_SQL:\s*([\s\S]+?)(?:\]|$)/i);
       if (trailingSqlMatch?.[1]?.trim()) {
         const q = trailingSqlMatch[1].trim().replace(/;+$/, '');
-        if (q && !q.toLowerCase().includes('rawsqlquery')) {
+        if (q && !q.toLowerCase().includes('rawsqlquery') && isValidSql(q)) {
           steps.push({ type: 'EXECUTE_SQL', query: q });
         }
       }

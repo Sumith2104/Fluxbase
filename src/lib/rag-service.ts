@@ -22,6 +22,56 @@ export interface RagContextResult {
 
 const STATIC_DOC_CHUNKS: RagDocChunk[] = [
     {
+        id: 'app_connection_guide',
+        source: 'Developer Guide',
+        title: 'How to Connect and Use Fluxbase in Your Application',
+        content: `Fluxbase provides 3 primary integration options for any backend or web/mobile application:
+
+1. DIRECT POSTGRESQL CONNECTION (Best for ORMs & Server Backends):
+   - Standard PostgreSQL Connection URI:
+     postgresql://postgres:<PASSWORD>@fluxbasedb.me:5432/<DATABASE_NAME>
+   - Fully compatible with any ORM or database driver:
+     * Node.js / Bun: Prisma, Drizzle ORM, TypeORM, 'pg', 'postgres'
+     * Python: SQLAlchemy, asyncpg, psycopg2, Django ORM
+     * Go: pgx, GORM
+     * Java, C#, PHP, Ruby, Rust, etc.
+   - Example with Prisma (schema.prisma):
+     datasource db {
+       provider = "postgresql"
+       url      = env("DATABASE_URL")
+     }
+
+2. REST SQL API (Best for Serverless, Edge, & Webhooks):
+   - Query execution via simple HTTP POST:
+     POST https://fluxbasedb.me/api/v1/sql
+     Headers:
+       Authorization: Bearer <YOUR_API_KEY>
+       Content-Type: application/json
+     Body:
+       {
+         "projectId": "<PROJECT_ID>",
+         "query": "SELECT * FROM users WHERE status = 'active' LIMIT 50;"
+       }
+   - Returns instant structured JSON: { "success": true, "rows": [...], "rowCount": 50 }
+
+3. FLUXBASE CLIENT SDK (@fluxbase/client):
+   - Type-safe, Supabase-compatible client:
+     import { createClient } from '@fluxbase/client';
+     const flux = createClient({
+       apiKey: process.env.FLUX_API_KEY,
+       projectId: process.env.FLUX_PROJECT_ID
+     });
+     const { data, error } = await flux.from('users').select('*').limit(20);
+
+4. REAL-TIME SUBSCRIPTIONS & STORAGE:
+   - Live updates: Server-Sent Events (GET /api/realtime/subscribe?projectId=...&table=...) or WebSocket (/ws)
+   - S3-compatible file storage: POST /api/storage/upload
+
+5. FLUX AI API (/api/v1/chat/completions):
+   - OpenAI SDK drop-in replacement with baseURL 'https://fluxbasedb.me/api/v1'.`,
+        keywords: ['app', 'application', 'connect', 'how to use', 'integration', 'use fluxbase', 'backend', 'frontend', 'connect to app', 'connect to my app', 'use fluxbase to my app', 'prisma', 'drizzle', 'database url', 'connection string', 'how can i use', 'integrate']
+    },
+    {
         id: 'sql_execution_api',
         source: 'API Reference',
         title: 'SQL Execution Endpoint',
@@ -192,7 +242,7 @@ Standard Tools:
 3. get_schema: { projectId }
 4. run_sql: { projectId, query }
 MCP Guard intercepts incoming connection requests and requires explicit user review.`,
-        keywords: ['mcp', 'tools', 'model context protocol', 'call_mcp', 'json-rpc', 'agent', 'gateway']
+        keywords: ['mcp', 'model context protocol', 'cursor mcp', 'claude desktop mcp', 'mcp server', 'mcp tools', 'call_mcp']
     }
 ];
 
