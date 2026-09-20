@@ -31,7 +31,57 @@ type Message = {
   hidden?: boolean;
   timestamp?: number;
   isStreaming?: boolean;
+  taskLabel?: string;
 };
+
+export function getTaskLabel(prompt?: string): string {
+  if (!prompt) return "Thinking...";
+  const p = prompt.toLowerCase().trim();
+
+  // SQL Generation
+  if (/generate (?:sql|query)|draft (?:sql|query)|write (?:sql|query)|create table|alter table|insert into|select /i.test(p)) {
+    return "Generating SQL...";
+  }
+  // Schema analysis
+  if (/analyz|schema|relationships|foreign key|inspect|structure|database model/i.test(p)) {
+    return "Analyzing schema...";
+  }
+  // Error fixing / diagnosis
+  if (/fix|repair|error|fail|violat|exception|debug|issue|broke/i.test(p)) {
+    return "Diagnosing error...";
+  }
+  // Row counts / table inspection
+  if (/row count|how many rows|list tables|show tables|tables/i.test(p)) {
+    return "Querying tables...";
+  }
+  // Performance / Optimization
+  if (/perf|slow|speed|optimi|index|explain|latency|cache/i.test(p)) {
+    return "Analyzing performance...";
+  }
+  // Mock / Bulk Data Generation
+  if (/mock|seed|populate|dummy|generate \d+|insert \d+/i.test(p)) {
+    return "Generating data...";
+  }
+  // Charts & Visualizations
+  if (/chart|graph|plot|visualiz|trend|breakdown|pie|bar/i.test(p)) {
+    return "Synthesizing chart...";
+  }
+  // Auto-Pilot observations
+  if (/system: observation/i.test(p)) {
+    if (/failed/i.test(p)) return "Auto-fixing query...";
+    return "Executing next action...";
+  }
+  // General Query Execution
+  if (/run|execute|select|query|fetch/i.test(p)) {
+    return "Executing query...";
+  }
+  // Navigation
+  if (/navigate|go to|open page|view/i.test(p)) {
+    return "Navigating...";
+  }
+
+  return "Thinking...";
+}
 
 type WorkflowStep = {
   type: "NAVIGATE" | "CLICK" | "TYPE" | "CONFIRM_ACTION" | "EXECUTE_SQL" | "REQUEST_APPROVAL" | "CALL_MCP" | "GOAL_ACCOMPLISHED";
@@ -415,6 +465,7 @@ export function FluxAiAssistant({ userId, isOpen, onOpenChange }: { userId: stri
       pendingWorkflow?: { steps: WorkflowStep[] };
       approvalRequest?: ApprovalRequestData;
       sources?: string[];
+      taskLabel?: string;
       onComplete?: () => void;
     }
   ) => {
@@ -422,40 +473,74 @@ export function FluxAiAssistant({ userId, isOpen, onOpenChange }: { userId: stri
 
     const clean = (fullText || '').trim();
     if (!clean) {
-      setMessages(prev => [...prev, {
-        role: "assistant",
-        content: "",
-        pendingWorkflow: options?.pendingWorkflow,
-        approvalRequest: options?.approvalRequest,
-        sources: options?.sources,
-        timestamp: Date.now()
-      }]);
+      setMessages(prev => {
+        const last = prev[prev.length - 1];
+        if (last && last.role === 'assistant' && !last.content) {
+          const updated = [...prev];
+          updated[updated.length - 1] = {
+            ...updated[updated.length - 1],
+            content: "",
+            isThinking: false,
+            isStreaming: false,
+            pendingWorkflow: options?.pendingWorkflow,
+            approvalRequest: options?.approvalRequest,
+            sources: options?.sources,
+            taskLabel: options?.taskLabel || last.taskLabel
+          };
+          return updated;
+        }
+        return [...prev, {
+          role: "assistant",
+          content: "",
+          isThinking: false,
+          isStreaming: false,
+          pendingWorkflow: options?.pendingWorkflow,
+          approvalRequest: options?.approvalRequest,
+          sources: options?.sources,
+          taskLabel: options?.taskLabel,
+          timestamp: Date.now()
+        }];
+      });
       options?.onComplete?.();
       return;
     }
 
-    // Split text into tokens preserving words and whitespace/line breaks
+    // Split text into tokens preserving words, whitespace, and punctuation
     const tokens = clean.match(/\S+|\s+/g) || [clean];
 
     setIsStreamingActive(true);
 
-    // Initial empty assistant message with isStreaming: true
-    setMessages(prev => [...prev, {
-      role: "assistant",
-      content: "",
-      isStreaming: true,
-      timestamp: Date.now()
-    }]);
+    // Ensure the last assistant placeholder is ready
+    setMessages(prev => {
+      const last = prev[prev.length - 1];
+      if (last && last.role === 'assistant' && !last.content) {
+        const updated = [...prev];
+        updated[updated.length - 1] = {
+          ...updated[updated.length - 1],
+          isStreaming: true,
+          isThinking: false,
+          taskLabel: options?.taskLabel || last.taskLabel
+        };
+        return updated;
+      }
+      return [...prev, {
+        role: "assistant",
+        content: "",
+        isStreaming: true,
+        isThinking: false,
+        taskLabel: options?.taskLabel,
+        timestamp: Date.now()
+      }];
+    });
 
     let currentIndex = 0;
-    // Word-by-word live writing cadence:
-    // Short: 1 token every 20ms (~50 tokens/sec)
-    // Medium: 2 tokens every 16ms
-    // Long: 4 tokens every 12ms
-    const chunkSize = tokens.length > 200 ? 4 : tokens.length > 60 ? 2 : 1;
-    const intervalMs = tokens.length > 200 ? 12 : tokens.length > 60 ? 16 : 20;
 
     const finalize = () => {
+      if (streamingTimerRef.current) {
+        clearTimeout(streamingTimerRef.current);
+        streamingTimerRef.current = null;
+      }
+      activeStreamFinalizeRef.current = null;
       setMessages(prev => {
         const lastIdx = prev.length - 1;
         if (lastIdx < 0) return prev;
@@ -466,9 +551,11 @@ export function FluxAiAssistant({ userId, isOpen, onOpenChange }: { userId: stri
           thought: (options as any)?.thought,
           chart: (options as any)?.chart,
           isStreaming: false,
+          isThinking: false,
           pendingWorkflow: options?.pendingWorkflow,
           approvalRequest: options?.approvalRequest,
-          sources: options?.sources
+          sources: options?.sources,
+          taskLabel: options?.taskLabel || updated[lastIdx].taskLabel
         };
         return updated;
       });
@@ -479,32 +566,52 @@ export function FluxAiAssistant({ userId, isOpen, onOpenChange }: { userId: stri
 
     activeStreamFinalizeRef.current = finalize;
 
-    const timer = setInterval(() => {
-      currentIndex += chunkSize;
+    const streamNextBurst = () => {
       if (currentIndex >= tokens.length) {
-        clearInterval(timer);
-        streamingTimerRef.current = null;
-        activeStreamFinalizeRef.current = null;
         finalize();
-      } else {
-        const partial = tokens.slice(0, currentIndex).join('');
-        setMessages(prev => {
-          const lastIdx = prev.length - 1;
-          if (lastIdx < 0) return prev;
-          const updated = [...prev];
-          updated[lastIdx] = {
-            ...updated[lastIdx],
-            content: partial,
-            isStreaming: true
-          };
-          return updated;
-        });
-        scrollToBottom('auto');
+        return;
       }
-    }, intervalMs);
 
-    streamingTimerRef.current = timer;
-  }, [finalizeActiveStream]);
+      // Dynamic burst generation:
+      // Randomly output 3 to 9 words per burst, and grab whole sentences if boundary (. ? ! \n ;) is nearby
+      let burstSize = Math.floor(Math.random() * 7) + 3;
+
+      const lookaheadMax = Math.min(tokens.length, currentIndex + 22);
+      for (let i = currentIndex + 2; i < lookaheadMax; i++) {
+        const t = tokens[i];
+        if (/[.!?;\n]/.test(t)) {
+          burstSize = (i - currentIndex) + 1;
+          break;
+        }
+      }
+
+      currentIndex = Math.min(tokens.length, currentIndex + burstSize);
+      const partial = tokens.slice(0, currentIndex).join('');
+
+      setMessages(prev => {
+        const lastIdx = prev.length - 1;
+        if (lastIdx < 0) return prev;
+        const updated = [...prev];
+        updated[lastIdx] = {
+          ...updated[lastIdx],
+          content: partial,
+          isStreaming: true,
+          isThinking: false
+        };
+        return updated;
+      });
+      scrollToBottom('auto');
+
+      if (currentIndex < tokens.length) {
+        const delayMs = Math.floor(Math.random() * 16) + 16;
+        streamingTimerRef.current = setTimeout(streamNextBurst, delayMs);
+      } else {
+        finalize();
+      }
+    };
+
+    streamNextBurst();
+  }, [finalizeActiveStream, scrollToBottom]);
 
   // --- Schema cache invalidation ---
 
@@ -852,8 +959,22 @@ export function FluxAiAssistant({ userId, isOpen, onOpenChange }: { userId: stri
     }
 
     const isHidden = !!overrideMsg && msg.startsWith("System:");
-    setMessages(prev => [...prev, { role: "user", content: msg, hidden: isHidden, timestamp: Date.now() }]);
+    const taskLabel = getTaskLabel(msg);
+    setMessages(prev => [
+      ...prev,
+      { role: "user", content: msg, hidden: isHidden, timestamp: Date.now() },
+      {
+        role: "assistant",
+        content: "",
+        thought: "",
+        isThinking: true,
+        isStreaming: true,
+        taskLabel,
+        timestamp: Date.now()
+      }
+    ]);
     setIsTyping(true);
+    setIsStreamingActive(true);
     setTimeout(() => scrollToBottom('smooth'), 20);
 
     const currentMsgs = [...messages, { role: "user" as const, content: msg, hidden: isHidden }];
@@ -923,15 +1044,22 @@ export function FluxAiAssistant({ userId, isOpen, onOpenChange }: { userId: stri
         setIsTyping(false);
         setIsStreamingActive(true);
 
-        // Add assistant placeholder with isThinking: true
-        setMessages(prev => [...prev, {
-          role: "assistant",
-          content: "",
-          thought: "",
-          isThinking: true,
-          isStreaming: true,
-          timestamp: Date.now()
-        }]);
+        // Ensure assistant message placeholder is ready
+        setMessages(prev => {
+          const last = prev[prev.length - 1];
+          if (last && last.role === 'assistant') {
+            return prev;
+          }
+          return [...prev, {
+            role: "assistant",
+            content: "",
+            thought: "",
+            isThinking: true,
+            isStreaming: true,
+            taskLabel,
+            timestamp: Date.now()
+          }];
+        });
 
         let streamAborted = false;
         try {
@@ -1207,134 +1335,188 @@ export function FluxAiAssistant({ userId, isOpen, onOpenChange }: { userId: stri
                     </div>
                   ) : (
                     <div className="flex flex-col gap-1.5 w-full pr-1">
-                      <div className="flex items-center gap-2 px-1">
-                        <div className="flex items-center justify-center w-5.5 h-5.5 rounded-md bg-white/[0.08] border border-white/[0.14] shadow-xs shrink-0">
-                          <FluxAiIcon size={13} />
-                        </div>
-                        <span className="text-[11px] font-semibold text-foreground/80 tracking-tight">Flux AI</span>
-                        {msg.isStreaming && (
-                          <span className="inline-flex items-center gap-1 px-1.5 py-0.2 rounded text-[9.5px] font-mono text-cyan-400 bg-cyan-500/10 border border-cyan-500/20 animate-pulse">
-                            Generating
-                          </span>
-                        )}
-                      </div>
-                      <BorderBeam
-                        size="md"
-                        colorVariant="ocean"
-                        borderRadius={12}
-                        active={Boolean(msg.isStreaming)}
-                        className="w-full rounded-xl"
-                      >
-                        <div
-                          onClick={() => { if (msg.isStreaming) finalizeActiveStream(); }}
-                          className={cn(
-                            "w-full rounded-xl bg-card/75 border border-border/70 text-foreground p-3.5 shadow-2xs transition-all",
-                            msg.isStreaming && "cursor-pointer hover:border-primary/40"
-                          )}
-                          title={msg.isStreaming ? 'Click to show full response' : undefined}
-                        >
-                          {(msg.thought || msg.isThinking) && (
-                            <AgenticThinkBlock
-                              thought={msg.thought || ''}
-                              isThinking={Boolean(msg.isThinking)}
-                              durationMs={msg.thoughtDuration}
-                            />
-                          )}
+                      {(() => {
+                        const isPill = (msg.isThinking || msg.isStreaming) && (!msg.content || msg.content.trim().length === 0) && (!msg.thought || msg.thought.trim().length === 0);
 
-                          <FluxMarkdownRenderer
-                            content={msg.content}
-                            onInjectSql={handleInjectSql}
-                            projectId={project?.project_id}
-                            isStreaming={msg.isStreaming}
-                          />
-
-                          {msg.chart && (
-                            <InChatChart chart={msg.chart} projectId={project?.project_id} />
-                          )}
-
-                        {msg.sources && msg.sources.length > 0 && (
-                          <div className="mt-3 pt-2.5 border-t border-border/40 flex flex-wrap gap-1 items-center">
-                            <span className="text-[10px] text-muted-foreground/80 font-mono tracking-wider uppercase font-semibold">RAG:</span>
-                            {msg.sources.map((src, si) => (
-                              <span key={si} className="text-[9.5px] px-1.5 py-0.5 rounded bg-muted/70 text-muted-foreground border border-border/50 font-mono">
-                                {src}
-                              </span>
-                            ))}
-                          </div>
-                        )}
-
-                        {msg.approvalRequest && (
-                          <FluxAiApprovalCard
-                            data={msg.approvalRequest}
-                            onDecision={(decision, res) => {
-                              if (decision === 'approved') {
-                                advanceWorkflow();
-                                if (autoPilotActive) {
-                                  const goal = localStorage.getItem("flux_autopilot_goal") || autoPilotGoal;
-                                  requestAutopilotCheckin(`System: Observation - User approved and executed ${msg.approvalRequest?.actionType}. Result: ${res?.message || 'Done'}. Proceeding with goal: "${goal}".`);
-                                }
-                              } else {
-                                advanceWorkflow();
-                                if (autoPilotActive) {
-                                  requestAutopilotCheckin(`System: Observation - User rejected this action. Do not run it. Propose an alternative or ask what to do next.`);
-                                }
-                              }
-                            }}
-                          />
-                        )}
-
-                        {msg.pendingWorkflow && (
-                          <div className="mt-3 pt-3 border-t border-border/40 space-y-2">
-                            <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider font-mono">Actions:</p>
-                            <div className="space-y-1 pl-1">
-                              {msg.pendingWorkflow.steps.map((s, si) => (
-                                <div key={si} className="text-xs flex items-center gap-1.5 text-foreground/85">
-                                  <span className="w-1.5 h-1.5 rounded-full bg-primary shrink-0" />
-                                  <span className="leading-tight">
-                                    {s.type === 'NAVIGATE' && `Go to ${s.path}`}
-                                    {s.type === 'CLICK' && `Click "${s.elementId}"`}
-                                    {s.type === 'TYPE' && `Type into "${s.locator}"`}
-                                    {s.type === 'CONFIRM_ACTION' && s.actionType === 'CREATE_PROJECT' && `Create project "${s.projectName}"`}
-                                    {s.type === 'CONFIRM_ACTION' && s.actionType === 'INJECT_SQL' && (
-                                      <span className={isDestructiveSql(s.query || '') ? 'text-red-400' : ''}>
-                                        {isDestructiveSql(s.query || '') ? '⚠ ' : ''}Load into editor: {(s.query || '').slice(0, 50)}{(s.query || '').length > 50 ? '...' : ''}
-                                      </span>
-                                    )}
-                                    {s.type === 'EXECUTE_SQL' && (
-                                      <span className="text-emerald-400 font-mono text-[11.5px]">▸ {(s.query || '').slice(0, 55)}{(s.query || '').length > 55 ? '...' : ''}</span>
-                                    )}
-                                    {s.type === 'REQUEST_APPROVAL' && (
-                                      <span className="text-amber-400">⚠ Review: {s.approvalData?.summary?.slice(0, 45)}</span>
-                                    )}
-                                    {s.type === 'CALL_MCP' && (
-                                      <span className="text-cyan-400 font-mono text-[11.5px]">⚡ MCP: {s.mcpTool}</span>
-                                    )}
-                                    {s.type === 'GOAL_ACCOMPLISHED' && (
-                                      <span className="text-emerald-400 font-semibold">✓ Goal Accomplished</span>
-                                    )}
-                                  </span>
-                                </div>
-                              ))}
+                        return (
+                          <div className="flex items-start gap-2 w-full">
+                            {/* Avatar */}
+                            <div className="flex items-center justify-center w-6 h-6 rounded-md bg-white/[0.08] border border-white/[0.14] shadow-xs shrink-0 mt-0.5">
+                              <FluxAiIcon size={14} />
                             </div>
+
+                            {/* The Box: starts as the exact pill from user's image, then smoothly expands (smooth like iPhone) */}
+                            <motion.div
+                              layout
+                              initial={{ opacity: 0, scale: 0.94 }}
+                              animate={{ opacity: 1, scale: 1 }}
+                              transition={{
+                                layout: { type: "spring", stiffness: 320, damping: 28, mass: 0.8 },
+                                opacity: { duration: 0.2 }
+                              }}
+                              className={cn(
+                                "relative overflow-hidden transition-[border-radius,background-color,border-color] duration-300",
+                                isPill ? "max-w-fit cursor-default" : "w-full"
+                              )}
+                            >
+                              <BorderBeam
+                                size={isPill ? "sm" : "md"}
+                                colorVariant="ocean"
+                                borderRadius={isPill ? 9999 : 16}
+                                active={Boolean(msg.isStreaming)}
+                                className={cn(isPill ? "rounded-full" : "w-full rounded-2xl")}
+                              >
+                                <div
+                                  className={cn(
+                                    "transition-[border-radius,background-color,border-color] duration-300",
+                                    isPill
+                                      ? "flex items-center gap-1.5 py-1 px-3 rounded-full bg-secondary/80 border border-border/70 backdrop-blur-md shadow-xs"
+                                      : "w-full rounded-2xl bg-card/85 border border-border/75 text-foreground p-3.5 shadow-sm"
+                                  )}
+                                >
+                                  {isPill ? (
+                                    /* Compact Thinking / Task Pill (Exact visual match from user's image) */
+                                    <div className="flex items-center gap-1.5 py-0.5">
+                                      <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse" style={{ animationDelay: '0ms' }} />
+                                      <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 animate-pulse" style={{ animationDelay: '150ms' }} />
+                                      <span className="w-1.5 h-1.5 rounded-full bg-violet-400 animate-pulse" style={{ animationDelay: '300ms' }} />
+                                      <span className="text-[11px] font-mono text-muted-foreground font-medium ml-1 select-none">
+                                        {msg.taskLabel || "Thinking..."}
+                                      </span>
+                                    </div>
+                                  ) : (
+                                    /* Expanded Full Response Card */
+                                    <motion.div
+                                      initial={{ opacity: 0 }}
+                                      animate={{ opacity: 1 }}
+                                      transition={{ duration: 0.25 }}
+                                      onClick={() => { if (msg.isStreaming) finalizeActiveStream(); }}
+                                      className={cn("w-full space-y-2", msg.isStreaming && "cursor-pointer")}
+                                      title={msg.isStreaming ? 'Click to show full response' : undefined}
+                                    >
+                                      {/* Task Status Header */}
+                                      <div className="flex items-center justify-between pb-2 border-b border-border/40 text-[11px] text-muted-foreground font-mono">
+                                        <div className="flex items-center gap-1.5">
+                                          <span className="w-1.5 h-1.5 rounded-full bg-primary shrink-0" />
+                                          <span className="font-semibold text-foreground/85 tracking-tight">
+                                            {msg.taskLabel?.replace(/\.\.\.$/, '') || "Flux AI"}
+                                          </span>
+                                        </div>
+                                        {msg.isStreaming && (
+                                          <span className="inline-flex items-center gap-1 px-1.5 py-0.2 rounded text-[9.5px] font-mono text-cyan-400 bg-cyan-500/10 border border-cyan-500/20 animate-pulse">
+                                            Generating
+                                          </span>
+                                        )}
+                                      </div>
+
+                                      {(msg.thought || msg.isThinking) && (
+                                        <AgenticThinkBlock
+                                          thought={msg.thought || ''}
+                                          isThinking={Boolean(msg.isThinking)}
+                                          durationMs={msg.thoughtDuration}
+                                        />
+                                      )}
+
+                                      <FluxMarkdownRenderer
+                                        content={msg.content}
+                                        onInjectSql={handleInjectSql}
+                                        projectId={project?.project_id}
+                                        isStreaming={msg.isStreaming}
+                                      />
+
+                                      {msg.chart && (
+                                        <InChatChart chart={msg.chart} projectId={project?.project_id} />
+                                      )}
+
+                                      {msg.sources && msg.sources.length > 0 && (
+                                        <div className="mt-3 pt-2.5 border-t border-border/40 flex flex-wrap gap-1 items-center">
+                                          <span className="text-[10px] text-muted-foreground/80 font-mono tracking-wider uppercase font-semibold">RAG:</span>
+                                          {msg.sources.map((src, si) => (
+                                            <span key={si} className="text-[9.5px] px-1.5 py-0.5 rounded bg-muted/70 text-muted-foreground border border-border/50 font-mono">
+                                              {src}
+                                            </span>
+                                          ))}
+                                        </div>
+                                      )}
+
+                                      {msg.approvalRequest && (
+                                        <FluxAiApprovalCard
+                                          data={msg.approvalRequest}
+                                          onDecision={(decision, res) => {
+                                            if (decision === 'approved') {
+                                              advanceWorkflow();
+                                              if (autoPilotActive) {
+                                                const goal = localStorage.getItem("flux_autopilot_goal") || autoPilotGoal;
+                                                requestAutopilotCheckin(`System: Observation - User approved and executed ${msg.approvalRequest?.actionType}. Result: ${res?.message || 'Done'}. Proceeding with goal: "${goal}".`);
+                                              }
+                                            } else {
+                                              advanceWorkflow();
+                                              if (autoPilotActive) {
+                                                requestAutopilotCheckin(`System: Observation - User rejected this action. Do not run it. Propose an alternative or ask what to do next.`);
+                                              }
+                                            }
+                                          }}
+                                        />
+                                      )}
+
+                                      {msg.pendingWorkflow && (
+                                        <div className="mt-3 pt-3 border-t border-border/40 space-y-2">
+                                          <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider font-mono">Actions:</p>
+                                          <div className="space-y-1 pl-1">
+                                            {msg.pendingWorkflow.steps.map((s, si) => (
+                                              <div key={si} className="text-xs flex items-center gap-1.5 text-foreground/85">
+                                                <span className="w-1.5 h-1.5 rounded-full bg-primary shrink-0" />
+                                                <span className="leading-tight">
+                                                  {s.type === 'NAVIGATE' && `Go to ${s.path}`}
+                                                  {s.type === 'CLICK' && `Click "${s.elementId}"`}
+                                                  {s.type === 'TYPE' && `Type into "${s.locator}"`}
+                                                  {s.type === 'CONFIRM_ACTION' && s.actionType === 'CREATE_PROJECT' && `Create project "${s.projectName}"`}
+                                                  {s.type === 'CONFIRM_ACTION' && s.actionType === 'INJECT_SQL' && (
+                                                    <span className={isDestructiveSql(s.query || '') ? 'text-red-400' : ''}>
+                                                      {isDestructiveSql(s.query || '') ? '⚠ ' : ''}Load into editor: {(s.query || '').slice(0, 50)}{(s.query || '').length > 50 ? '...' : ''}
+                                                    </span>
+                                                  )}
+                                                  {s.type === 'EXECUTE_SQL' && (
+                                                    <span className="text-emerald-400 font-mono text-[11.5px]">▸ {(s.query || '').slice(0, 55)}{(s.query || '').length > 55 ? '...' : ''}</span>
+                                                  )}
+                                                  {s.type === 'REQUEST_APPROVAL' && (
+                                                    <span className="text-amber-400">⚠ Review: {s.approvalData?.summary?.slice(0, 45)}</span>
+                                                  )}
+                                                  {s.type === 'CALL_MCP' && (
+                                                    <span className="text-cyan-400 font-mono text-[11.5px]">⚡ MCP: {s.mcpTool}</span>
+                                                  )}
+                                                  {s.type === 'GOAL_ACCOMPLISHED' && (
+                                                    <span className="text-emerald-400 font-semibold">✓ Goal Accomplished</span>
+                                                  )}
+                                                </span>
+                                              </div>
+                                            ))}
+                                          </div>
+                                        </div>
+                                      )}
+                                    </motion.div>
+                                  )}
+                                </div>
+                              </BorderBeam>
+                            </motion.div>
                           </div>
-                        )}
-                        </div>
-                      </BorderBeam>
+                        );
+                      })()}
                     </div>
                   )}
                 </motion.div>
               ))}
-              {isTyping && (
+              {isTyping && !messages.some(m => m.role === 'assistant' && (m.isThinking || m.isStreaming)) && (
                 <motion.div initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} className="flex items-center gap-2 px-1 text-xs text-muted-foreground">
-                  <div className="flex items-center justify-center w-5.5 h-5.5 rounded-md bg-white/[0.08] border border-white/[0.14] shadow-xs shrink-0">
-                    <FluxAiIcon size={13} />
+                  <div className="flex items-center justify-center w-6 h-6 rounded-md bg-white/[0.08] border border-white/[0.14] shadow-xs shrink-0">
+                    <FluxAiIcon size={14} />
                   </div>
-                  <BorderBeam size="sm" colorVariant="ocean" borderRadius={8} className="rounded-lg">
-                    <div className="flex items-center gap-1.5 py-1 px-2.5 rounded-lg bg-secondary/60 border border-border/50">
-                      <span className="w-1.5 h-1.5 rounded-full bg-cyan-400/90 animate-pulse" style={{ animationDelay: '0ms' }} />
-                      <span className="w-1.5 h-1.5 rounded-full bg-indigo-400/90 animate-pulse" style={{ animationDelay: '150ms' }} />
-                      <span className="w-1.5 h-1.5 rounded-full bg-violet-400/90 animate-pulse" style={{ animationDelay: '300ms' }} />
-                      <span className="text-[10.5px] font-mono text-muted-foreground ml-1">Thinking...</span>
+                  <BorderBeam size="sm" colorVariant="ocean" borderRadius={9999} className="rounded-full">
+                    <div className="flex items-center gap-1.5 py-1 px-3 rounded-full bg-secondary/80 border border-border/70 backdrop-blur-md shadow-xs">
+                      <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse" style={{ animationDelay: '0ms' }} />
+                      <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 animate-pulse" style={{ animationDelay: '150ms' }} />
+                      <span className="w-1.5 h-1.5 rounded-full bg-violet-400 animate-pulse" style={{ animationDelay: '300ms' }} />
+                      <span className="text-[11px] font-mono text-muted-foreground font-medium ml-1">Thinking...</span>
                     </div>
                   </BorderBeam>
                 </motion.div>
