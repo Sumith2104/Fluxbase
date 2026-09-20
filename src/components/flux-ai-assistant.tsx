@@ -157,6 +157,18 @@ const parseWorkflow = (text: string, currentProjectId?: string): { steps: Workfl
     }
   }
 
+  // Fallback: If no explicit action tags were found, but the model provided a SQL block AND stated intent to execute it:
+  if (steps.length === 0 && !approvalRequest) {
+    const hasExecuteIntent = /\b(will now execute|executing (?:this|the) (?:sql|query|statement)|execute (?:this|the) (?:sql|query|statement)|running (?:this|the) (?:sql|query))\b/i.test(workingText);
+    const sqlBlock = workingText.match(/```(?:sql)?\s*([\s\S]*?)```/i);
+    if (hasExecuteIntent && sqlBlock?.[1]?.trim()) {
+      const extractedQuery = sqlBlock[1].trim().replace(/;+$/, '');
+      if (extractedQuery) {
+        steps.push({ type: 'EXECUTE_SQL', query: extractedQuery });
+      }
+    }
+  }
+
   const cleanText = workingText.replace(/\[(?:NAVIGATE|CLICK|TYPE|CONFIRM_ACTION|EXECUTE_SQL|REQUEST_APPROVAL|CALL_MCP|GOAL_ACCOMPLISHED|RENDER_CHART)[^\]]*?]/g, '').trim();
   return { steps, cleanText, approvalRequest, chart, thought };
 };
@@ -612,7 +624,7 @@ export function FluxAiAssistant({ userId, isOpen, onOpenChange }: { userId: stri
       .then(res => res.json())
       .then(data => {
         if (data.success) {
-          const { columns, rows, rowCount, truncated } = data;
+          const { columns, rows, rowCount, rowsAffected, message, truncated } = data;
           let tableMd = '';
           if (columns && columns.length > 0 && rows && rows.length > 0) {
             const header = '| ' + columns.join(' | ') + ' |';
@@ -620,7 +632,24 @@ export function FluxAiAssistant({ userId, isOpen, onOpenChange }: { userId: stri
             const bodyRows = rows.slice(0, 15).map((r: any) => '| ' + columns.map((c: string) => String(r[c] ?? 'NULL')).join(' | ') + ' |');
             tableMd = header + '\n' + sep + '\n' + bodyRows.join('\n');
           }
-          const resultMsg = `**Query results** (${rowCount} row${rowCount === 1 ? '' : 's'}${truncated ? ', showing first 50' : ''}):\n\n${tableMd || 'No rows returned.'}`;
+
+          let summaryMsg = '';
+          if (rowsAffected !== undefined && rowsAffected > 0) {
+            summaryMsg = `**Query executed successfully:** ${rowsAffected.toLocaleString()} row${rowsAffected === 1 ? '' : 's'} affected.`;
+          } else if (rowCount !== undefined && rowCount > 0) {
+            summaryMsg = `**Query returned ${rowCount.toLocaleString()} row${rowCount === 1 ? '' : 's'}**${truncated ? ' (showing first 50)' : ''}:`;
+          } else if (message) {
+            summaryMsg = `**${message}**`;
+          } else {
+            summaryMsg = `**Query executed successfully.**`;
+          }
+
+          const resultMsg = `${summaryMsg}${tableMd ? '\n\n' + tableMd : ''}`;
+
+          if (typeof window !== 'undefined') {
+            window.dispatchEvent(new CustomEvent('flux:schema-change'));
+            window.dispatchEvent(new CustomEvent('flux:table-data-updated'));
+          }
           streamAssistantResponse(resultMsg, {
             onComplete: () => {
               // Feed observation back to Auto-Pilot so agent can take next action towards goal
