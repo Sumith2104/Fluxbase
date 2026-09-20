@@ -9,7 +9,9 @@ export async function POST(req: Request) {
       return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { query, projectId } = await req.json();
+    const body = await req.json();
+    const query = body.query || body.sql;
+    const projectId = body.projectId;
     if (!query || !projectId) {
       return NextResponse.json({ success: false, error: 'Missing query or projectId' }, { status: 400 });
     }
