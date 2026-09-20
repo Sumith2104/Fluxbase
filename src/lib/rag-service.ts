@@ -25,16 +25,15 @@ const STATIC_DOC_CHUNKS: RagDocChunk[] = [
         id: 'app_connection_guide',
         source: 'Developer Guide',
         title: 'How to Connect and Use Fluxbase in Your Application',
-        content: `Fluxbase provides 3 primary integration options for any backend or web/mobile application:
+        content: `Fluxbase provides 4 primary integration options for any backend, web, or mobile application:
+
+CANONICAL DOMAIN & LINKS:
+All Fluxbase API endpoints and web console URLs strictly use: https://fluxbasedb.me
 
 1. DIRECT POSTGRESQL CONNECTION (Best for ORMs & Server Backends):
-   - Standard PostgreSQL Connection URI:
+   - Connection URI:
      postgresql://postgres:<PASSWORD>@fluxbasedb.me:5432/<DATABASE_NAME>
-   - Fully compatible with any ORM or database driver:
-     * Node.js / Bun: Prisma, Drizzle ORM, TypeORM, 'pg', 'postgres'
-     * Python: SQLAlchemy, asyncpg, psycopg2, Django ORM
-     * Go: pgx, GORM
-     * Java, C#, PHP, Ruby, Rust, etc.
+   - Compatible with Prisma, Drizzle ORM, TypeORM, 'pg' (Node.js), asyncpg/SQLAlchemy (Python), Go pgx/GORM, etc.
    - Example with Prisma (schema.prisma):
      datasource db {
        provider = "postgresql"
@@ -42,19 +41,25 @@ const STATIC_DOC_CHUNKS: RagDocChunk[] = [
      }
 
 2. REST SQL API (Best for Serverless, Edge, & Webhooks):
-   - Query execution via simple HTTP POST:
-     POST https://fluxbasedb.me/api/v1/sql
-     Headers:
-       Authorization: Bearer <YOUR_API_KEY>
-       Content-Type: application/json
-     Body:
-       {
-         "projectId": "<PROJECT_ID>",
-         "query": "SELECT * FROM users WHERE status = 'active' LIMIT 50;"
-       }
-   - Returns instant structured JSON: { "success": true, "rows": [...], "rowCount": 50 }
+   - POST https://fluxbasedb.me/api/v1/sql (or https://fluxbasedb.me/api/execute-sql)
+   - Headers:
+     Authorization: Bearer <YOUR_API_KEY>
+     Content-Type: application/json
+   - Body:
+     {
+       "projectId": "<PROJECT_ID>",
+       "query": "SELECT * FROM users WHERE status = 'active' LIMIT 50;"
+     }
+   - Response: { "success": true, "rows": [...], "rowCount": 50 }
 
-3. FLUXBASE CLIENT SDK (@fluxbase/client):
+3. REST TABLE CRUD API (Instant Auto-generated Table Endpoints):
+   - List rows: GET https://fluxbasedb.me/api/v1/rest/<projectId>/<table>?page=1&limit=50
+   - Insert row: POST https://fluxbasedb.me/api/v1/rest/<projectId>/<table>
+   - Update row: PUT https://fluxbasedb.me/api/v1/rest/<projectId>/<table>
+   - Delete row: DELETE https://fluxbasedb.me/api/v1/rest/<projectId>/<table>?id=<row_id>
+   - Headers: Authorization: Bearer <YOUR_API_KEY>
+
+4. FLUXBASE CLIENT SDK (@fluxbase/client):
    - Type-safe, Supabase-compatible client:
      import { createClient } from '@fluxbase/client';
      const flux = createClient({
@@ -63,21 +68,32 @@ const STATIC_DOC_CHUNKS: RagDocChunk[] = [
      });
      const { data, error } = await flux.from('users').select('*').limit(20);
 
-4. REAL-TIME SUBSCRIPTIONS & STORAGE:
-   - Live updates: Server-Sent Events (GET /api/realtime/subscribe?projectId=...&table=...) or WebSocket (/ws)
-   - S3-compatible file storage: POST /api/storage/upload
-
 5. FLUX AI API (/api/v1/chat/completions):
-   - OpenAI SDK drop-in replacement with baseURL 'https://fluxbasedb.me/api/v1'.`,
-        keywords: ['app', 'application', 'connect', 'how to use', 'integration', 'use fluxbase', 'backend', 'frontend', 'connect to app', 'connect to my app', 'use fluxbase to my app', 'prisma', 'drizzle', 'database url', 'connection string', 'how can i use', 'integrate']
+   - OpenAI SDK drop-in replacement with baseURL 'https://fluxbasedb.me/api/v1':
+     client = OpenAI(base_url="https://fluxbasedb.me/api/v1", api_key="<KEY>")
+
+6. REAL-TIME SUBSCRIPTIONS & STORAGE:
+   - Real-time SSE: GET https://fluxbasedb.me/api/realtime/subscribe?projectId=<projectId>&table=<table>
+   - S3-compatible file storage: POST https://fluxbasedb.me/api/storage/upload
+   - Presigned download URL: GET https://fluxbasedb.me/api/storage/url?projectId=<projectId>&key=<key>
+
+KEY WEB CONSOLE LINKS:
+- Documentation: [Fluxbase Documentation](https://fluxbasedb.me/docs)
+- Query Editor: [SQL Query Editor](https://fluxbasedb.me/query)
+- Interactive Data Grid: [Data Grid Editor](https://fluxbasedb.me/editor)
+- Schema Explorer: [Database Explorer](https://fluxbasedb.me/database)
+- Dashboard: [Analytics Dashboard](https://fluxbasedb.me/dashboard)
+- Storage: [S3 Storage Browser](https://fluxbasedb.me/storage)
+- API Keys & Settings: [Project Settings](https://fluxbasedb.me/settings)`,
+        keywords: ['app', 'application', 'connect', 'how to use', 'integration', 'use fluxbase', 'backend', 'frontend', 'connect to app', 'connect to my app', 'use fluxbase to my app', 'prisma', 'drizzle', 'database url', 'connection string', 'how can i use', 'integrate', 'endpoint', 'endpoints', 'api url', 'links']
     },
     {
         id: 'sql_execution_api',
         source: 'API Reference',
         title: 'SQL Execution Endpoint',
-        content: `POST /api/execute-sql (or /api/ai-chat/execute-sql)
-Headers: Content-Type: application/json, Authorization: Bearer <API_KEY> or active session
-Body: { "query": "SELECT * FROM users LIMIT 10;", "projectId": "<PROJECT_UUID>" }
+        content: `POST https://fluxbasedb.me/api/v1/sql (or https://fluxbasedb.me/api/execute-sql)
+Headers: Content-Type: application/json, Authorization: Bearer <API_KEY>
+Body: { "projectId": "<PROJECT_UUID>", "query": "SELECT * FROM users LIMIT 10;" }
 Response: { "success": true, "columns": ["id", "name"], "rows": [...], "rowCount": 10 }
 Note: Safe queries (SELECT, SHOW, EXPLAIN, WITH) execute directly. Destructive operations (DROP, DELETE, TRUNCATE) require approval.`,
         keywords: ['sql', 'query', 'execute', 'select', 'api', 'endpoint', 'rows', 'columns', 'read']
@@ -86,10 +102,10 @@ Note: Safe queries (SELECT, SHOW, EXPLAIN, WITH) execute directly. Destructive o
         id: 'storage_api',
         source: 'Storage Guide',
         title: 'S3-Compatible Storage Upload & Presigned URLs',
-        content: `POST /api/storage/upload
+        content: `Upload file: POST https://fluxbasedb.me/api/storage/upload
 Multipart form data: file (binary), projectId (<UUID>), bucket (optional)
-GET /api/storage/download?projectId=<UUID>&key=<file_key> -> returns presigned download URL
-POST /api/storage/delete { projectId, key }
+Get presigned URL: GET https://fluxbasedb.me/api/storage/url?projectId=<UUID>&key=<file_key>
+List files: GET https://fluxbasedb.me/api/storage/files?projectId=<UUID>
 Storage handles AWS S3 backend, presigned URLs, MIME detection, and multi-tenant bucket prefixes.`,
         keywords: ['storage', 's3', 'upload', 'file', 'presigned', 'download', 'bucket', 'asset', 'image']
     },
@@ -97,7 +113,7 @@ Storage handles AWS S3 backend, presigned URLs, MIME detection, and multi-tenant
         id: 'realtime_api',
         source: 'Realtime Guide',
         title: 'Server-Sent Events (SSE) Realtime Subscriptions',
-        content: `SSE Endpoint: GET /api/realtime/subscribe?projectId=<UUID>&table=<TABLE_NAME>
+        content: `SSE Endpoint: GET https://fluxbasedb.me/api/realtime/subscribe?projectId=<UUID>&table=<TABLE_NAME>
 Headers: Accept: text/event-stream
 Events:
 - event: INSERT -> data: { "type": "INSERT", "table": "...", "record": {...} }
@@ -235,7 +251,7 @@ SYNTAX RULES:
         id: 'mcp_integration',
         source: 'MCP Protocol Reference',
         title: 'Fluxbase Model Context Protocol (MCP) Server',
-        content: `Fluxbase exposes an MCP compliant JSON-RPC 2.0 gateway at /api/mcp.
+        content: `Fluxbase exposes an MCP compliant JSON-RPC 2.0 gateway at https://fluxbasedb.me/api/mcp.
 Standard Tools:
 1. create_project: { projectName, dialect: "postgresql"|"mysql", userRole?, description? }
 2. list_projects: {}
@@ -262,7 +278,11 @@ function loadExternalDocChunks(): RagDocChunk[] {
     for (const filePath of possiblePaths) {
         try {
             if (fs.existsSync(filePath)) {
-                const text = fs.readFileSync(filePath, 'utf-8');
+                let text = fs.readFileSync(filePath, 'utf-8');
+                // Enforce canonical domain across all ingested markdown documentation
+                text = text.replace(/https?:\/\/(?:localhost(?::\d+)?|127\.0\.0\.1(?::\d+)?|api\.fluxbase\.dev|www\.fluxbasedb\.me)/gi, 'https://fluxbasedb.me');
+
+                const isFluxPayDoc = filePath.includes('gateway');
                 // Split by H2 or H3 headers
                 const sections = text.split(/(?=^##\s+)/m);
                 sections.forEach((sec, idx) => {
@@ -270,7 +290,10 @@ function loadExternalDocChunks(): RagDocChunk[] {
                     const title = firstLine.replace(/^#+\s*/, '').trim() || `Section ${idx + 1}`;
                     const content = sec.slice(0, 1500).trim();
                     if (content.length > 50) {
-                        const keywords = title.toLowerCase().replace(/[^a-z0-9\s]/g, ' ').split(/\s+/).filter(w => w.length > 3);
+                        // For payment gateway docs, strictly scope keywords to payments so it does not hijack general database integration
+                        const keywords = isFluxPayDoc
+                            ? ['fluxpay', 'payment', 'upi', 'checkout', 'merchant', 'order', 'vpa', 'refund']
+                            : title.toLowerCase().replace(/[^a-z0-9\s]/g, ' ').split(/\s+/).filter(w => w.length > 3);
                         chunks.push({
                             id: `file_${path.basename(filePath)}_${idx}`,
                             source: path.basename(filePath),

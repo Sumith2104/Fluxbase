@@ -388,7 +388,7 @@ Content-Type: application/json`} />
                                     <CodeBlock title="main.py" code={`from openai import OpenAI
 
 client = OpenAI(
-    base_url="https://www.fluxbasedb.me/api/v1",  # or http://localhost:3000/api/v1
+    base_url="https://fluxbasedb.me/api/v1",
     api_key="flx_live_your_fluxbase_key"        # Scoped with 'ai' or 'admin'
 )
 
@@ -507,7 +507,7 @@ curl -N -X POST https://www.fluxbasedb.me/api/v1/chat/completions \\
                                     <CodeBlock title=".agents/mcp_config.json" language="json" code={`{
   "mcpServers": {
     "fluxbase": {
-      "serverUrl": "http://localhost:3000/api/mcp",
+      "serverUrl": "https://fluxbasedb.me/api/mcp",
       "headers": {
         "Authorization": "Bearer <YOUR_FLUXBASE_API_TOKEN>"
       }
@@ -519,7 +519,7 @@ curl -N -X POST https://www.fluxbasedb.me/api/v1/chat/completions \\
                                 <div className="space-y-2">
                                     <h4 className="text-xs uppercase tracking-wider font-bold text-orange-400">Method 2: Global Configuration (Machine-wide)</h4>
                                     <p className="text-xs text-muted-foreground">
-                                        Add the entry to your user Antigravity configuration file:
+                                         Add the entry to your user Antigravity configuration file:
                                     </p>
                                     <ul className="text-xs text-muted-foreground list-disc list-inside space-y-1 pl-1">
                                         <li><strong>Windows:</strong> <code className="text-[11px] font-mono">%USERPROFILE%\.gemini\config\mcp_config.json</code></li>
@@ -532,7 +532,7 @@ curl -N -X POST https://www.fluxbasedb.me/api/v1/chat/completions \\
                                     <ol className="text-xs text-muted-foreground list-decimal list-inside space-y-1 pl-1">
                                         <li>Open Antigravity IDE and click <strong>Additional Options (...) → MCP Servers</strong>.</li>
                                         <li>Click <strong>Add MCP Server</strong> and choose <strong>Remote HTTP / SSE</strong>.</li>
-                                        <li>Enter Server URL: <code className="text-[11px] font-mono text-foreground/90">http://localhost:3000/api/mcp</code></li>
+                                        <li>Enter Server URL: <code className="text-[11px] font-mono text-foreground/90">https://fluxbasedb.me/api/mcp</code></li>
                                         <li>Add Header: <code className="text-[11px] font-mono text-foreground/90">Authorization: Bearer &lt;YOUR_API_TOKEN&gt;</code> and save.</li>
                                     </ol>
                                 </div>
@@ -545,7 +545,7 @@ curl -N -X POST https://www.fluxbasedb.me/api/v1/chat/completions \\
                             <CodeBlock title="Cursor / Windsurf MCP Configuration" language="json" code={`{
   "mcpServers": {
     "fluxbase": {
-      "url": "http://localhost:3000/api/mcp",
+      "url": "https://fluxbasedb.me/api/mcp",
       "headers": {
         "Authorization": "Bearer <YOUR_FLUXBASE_API_TOKEN>"
       }
@@ -560,7 +560,7 @@ curl -N -X POST https://www.fluxbasedb.me/api/v1/chat/completions \\
                             <CodeBlock title="claude_desktop_config.json" language="json" code={`{
   "mcpServers": {
     "fluxbase": {
-      "url": "http://localhost:3000/api/mcp",
+      "url": "https://fluxbasedb.me/api/mcp",
       "headers": {
         "Authorization": "Bearer <YOUR_FLUXBASE_API_TOKEN>"
       }
@@ -572,7 +572,7 @@ curl -N -X POST https://www.fluxbasedb.me/api/v1/chat/completions \\
                             <p className="text-sm">
                                 You can test the JSON-RPC interface directly in your terminal using Node.js or curl:
                             </p>
-                            <CodeBlock title="Test MCP Tool Discovery (tools/list)" language="bash" code={`node -e "fetch('http://localhost:3000/api/mcp',{method:'POST',headers:{'Authorization':'Bearer <YOUR_API_TOKEN>','Content-Type':'application/json'},body:JSON.stringify({jsonrpc:'2.0',id:1,method:'tools/list'})}).then(r=>r.json()).then(d=>console.log(JSON.stringify(d,null,2)))"`} />
+                            <CodeBlock title="Test MCP Tool Discovery (tools/list)" language="bash" code={`node -e "fetch('https://fluxbasedb.me/api/mcp',{method:'POST',headers:{'Authorization':'Bearer <YOUR_API_TOKEN>','Content-Type':'application/json'},body:JSON.stringify({jsonrpc:'2.0',id:1,method:'tools/list'})}).then(r=>r.json()).then(d=>console.log(JSON.stringify(d,null,2)))"`} />
 
                             <Callout type="info">
                                 <strong>Zero Extra Context Needed:</strong> AI agents discover the tools, argument schemas, and type definitions automatically via standard JSON-RPC <code className="text-xs font-mono">tools/list</code> upon connecting.

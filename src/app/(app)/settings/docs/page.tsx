@@ -338,7 +338,7 @@ Content-Type: application/json`} />
                                     <CodeBlock title="main.py" code={`from openai import OpenAI
 
 client = OpenAI(
-    base_url="https://www.fluxbasedb.me/api/v1",  # or http://localhost:3000/api/v1
+    base_url="https://fluxbasedb.me/api/v1",
     api_key="flx_live_your_fluxbase_key"        # Scoped with 'ai' or 'admin'
 )
 
@@ -455,7 +455,7 @@ curl -N -X POST https://www.fluxbasedb.me/api/v1/chat/completions \\
                                     <CodeBlock title=".agents/mcp_config.json" code={`{
   "mcpServers": {
     "fluxbase": {
-      "serverUrl": "http://localhost:3000/api/mcp",
+      "serverUrl": "https://fluxbasedb.me/api/mcp",
       "headers": {
         "Authorization": "Bearer <YOUR_FLUXBASE_API_TOKEN>"
       }
@@ -485,7 +485,7 @@ curl -N -X POST https://www.fluxbasedb.me/api/v1/chat/completions \\
                             <CodeBlock title="Cursor / Windsurf MCP Configuration" code={`{
   "mcpServers": {
     "fluxbase": {
-      "url": "http://localhost:3000/api/mcp",
+      "url": "https://fluxbasedb.me/api/mcp",
       "headers": {
         "Authorization": "Bearer <YOUR_FLUXBASE_API_TOKEN>"
       }
@@ -498,7 +498,7 @@ curl -N -X POST https://www.fluxbasedb.me/api/v1/chat/completions \\
                             <CodeBlock title="claude_desktop_config.json" code={`{
   "mcpServers": {
     "fluxbase": {
-      "url": "http://localhost:3000/api/mcp",
+      "url": "https://fluxbasedb.me/api/mcp",
       "headers": {
         "Authorization": "Bearer <YOUR_FLUXBASE_API_TOKEN>"
       }

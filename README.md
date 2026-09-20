@@ -75,7 +75,7 @@ All requests require a **project-scoped API key** passed via the `Authorization`
 Authorization: Bearer <your-api-key>
 ```
 
-> **Base URL:** `https://api.fluxbase.dev`
+> **Base URL:** `https://fluxbasedb.me`
 
 ---
 
@@ -217,17 +217,17 @@ Fluxbase implements low-latency SSE subscriptions with built-in connection resil
 
 ```typescript
 async function executeQuery<T>(sql: string): Promise<T[]> {
-  const response = await fetch("https://api.fluxbase.dev/api/execute-sql", {
+  const response = await fetch("https://fluxbasedb.me/api/v1/sql", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
       "Authorization": "Bearer <API_KEY>"
     },
-    body: JSON.stringify({ query: sql })
+    body: JSON.stringify({ projectId: "<PROJECT_ID>", query: sql })
   });
   const data = await response.json();
   if (!data.success) throw new Error(data.error.message);
-  return data.result.rows;
+  return data.rows;
 }
 ```
 
@@ -236,19 +236,19 @@ async function executeQuery<T>(sql: string): Promise<T[]> {
 ```python
 import requests
 
-BASE_URL = "https://api.fluxbase.dev"
-HEADERS  = {"Authorization": "Bearer <API_KEY>"}
+BASE_URL = "https://fluxbasedb.me"
+HEADERS  = {"Authorization": "Bearer <API_KEY>", "Content-Type": "application/json"}
 
-def execute_query(sql: str) -> list[dict]:
+def execute_query(project_id: str, sql: str) -> list[dict]:
     response = requests.post(
-        f"{BASE_URL}/api/execute-sql",
+        f"{BASE_URL}/api/v1/sql",
         headers=HEADERS,
-        json={"query": sql}
+        json={"projectId": project_id, "query": sql}
     )
     data = response.json()
     if not data["success"]:
         raise RuntimeError(data["error"]["message"])
-    return data["result"]["rows"]
+    return data["rows"]
 
 def ingest_rows(table: str, rows: list[dict]) -> dict:
     response = requests.post(
@@ -263,13 +263,12 @@ def ingest_rows(table: str, rows: list[dict]) -> dict:
 
 ```javascript
 const source = new EventSource(
-  `https://api.fluxbase.dev/api/realtime?projectId=${PROJECT_ID}`,
-  { headers: { Authorization: "Bearer <API_KEY>" } }
+  `https://fluxbasedb.me/api/realtime/subscribe?projectId=${PROJECT_ID}&table=orders`
 );
 
 source.onmessage = (event) => {
-  const { table, eventType, row } = JSON.parse(event.data);
-  console.log(`[${eventType}] on ${table}:`, row);
+  const { table, eventType, record } = JSON.parse(event.data);
+  console.log(`[${eventType}] on ${table}:`, record);
 };
 
 source.onerror = () => {

@@ -3,7 +3,7 @@
  */
 
 export function generateOpenAPISpec(): Record<string, any> {
-    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://fluxbasedb.me';
 
     const unauthorized = {
         description: 'Unauthorized',
@@ -111,6 +111,18 @@ export function generateOpenAPISpec(): Record<string, any> {
                         '429': { description: 'Rate limit exceeded (60 req/min)' },
                         '500': serverError,
                     },
+                },
+            },
+            '/api/v1/sql': {
+                post: {
+                    summary: 'Execute SQL Query (v1 REST API)',
+                    tags: ['SQL'],
+                    security: [{ bearerAuth: [] }, { apiKeyAuth: [] }],
+                    requestBody: {
+                        required: true,
+                        content: { 'application/json': { schema: { type: 'object', required: ['projectId', 'query'], properties: { projectId: { type: 'string' }, query: { type: 'string' }, params: { type: 'array', items: {} } } } } },
+                    },
+                    responses: { '200': { description: 'Query result' }, '401': unauthorized, '500': serverError },
                 },
             },
             '/api/execute-sql': {

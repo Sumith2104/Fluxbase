@@ -156,10 +156,64 @@ function ThinkingBlock({ thought }: { thought: string }) {
   );
 }
 
+function normalizeFluxUrl(rawUrl: string): string {
+  if (!rawUrl) return '';
+  let url = rawUrl.trim();
+  // Strip trailing punctuation if accidentally captured
+  url = url.replace(/[.,;!)]+$/, '');
+
+  // Rewrite any dev/test/legacy domains to canonical https://fluxbasedb.me
+  url = url.replace(
+    /^https?:\/\/(?:localhost(?::\d+)?|127\.0\.0\.1(?::\d+)?|www\.fluxbasedb\.me|api\.fluxbasedb\.me|api\.fluxbase\.dev|fluxbase\.com|fluxbase\.dev|payments\.fluxbasedb\.me)/i,
+    'https://fluxbasedb.me'
+  );
+
+  // If it's a relative path starting with /
+  if (url.startsWith('/')) {
+    url = `https://fluxbasedb.me${url}`;
+  }
+
+  return url;
+}
+
+function RenderPlainTextWithUrls({ text }: { text: string }) {
+  // Matches raw URLs or CommonMark <http...> autolinks
+  const urlRegex = /(<https?:\/\/[^>]+>|https?:\/\/[^\s<)"]+)/g;
+  const parts = text.split(urlRegex).filter(Boolean);
+
+  return (
+    <>
+      {parts.map((segment, idx) => {
+        const autolinkMatch = segment.match(/^<(https?:\/\/[^>]+)>$/);
+        const rawUrl = autolinkMatch ? autolinkMatch[1] : (segment.startsWith('http://') || segment.startsWith('https://') ? segment : null);
+
+        if (rawUrl) {
+          const cleanUrl = normalizeFluxUrl(rawUrl);
+          const displayLabel = cleanUrl.replace(/^https?:\/\//, '');
+          return (
+            <a
+              key={idx}
+              href={cleanUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-primary underline underline-offset-2 hover:text-primary/80 inline-flex items-center gap-1 mx-0.5 font-medium break-all"
+            >
+              <span>{displayLabel}</span>
+              <ExternalLink size={10} className="inline opacity-70 shrink-0" />
+            </a>
+          );
+        }
+
+        return <span key={idx}>{segment}</span>;
+      })}
+    </>
+  );
+}
+
 function InlineFormatted({ text }: { text: string }) {
   if (!text) return null;
 
-  // Split on inline code, bold, italic, and links
+  // Split on inline code, bold, italic, and markdown links [text](url)
   const parts = text.split(/(`[^`]+`|\*\*[^*]+\*\*|\*[^*]+\*|\[[^\]]+\]\([^)]+\))/g).filter(Boolean);
 
   return (
@@ -192,20 +246,21 @@ function InlineFormatted({ text }: { text: string }) {
         }
         const linkMatch = part.match(/^\[([^\]]+)\]\(([^)]+)\)$/);
         if (linkMatch) {
+          const cleanUrl = normalizeFluxUrl(linkMatch[2]);
           return (
             <a
               key={i}
-              href={linkMatch[2]}
+              href={cleanUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="text-primary underline underline-offset-2 hover:text-primary/80 inline-flex items-center gap-0.5 mx-0.5 font-medium"
+              className="text-primary underline underline-offset-2 hover:text-primary/80 inline-flex items-center gap-1 mx-0.5 font-medium"
             >
-              {linkMatch[1]}
-              <ExternalLink size={10} className="inline opacity-70" />
+              <span>{linkMatch[1]}</span>
+              <ExternalLink size={10} className="inline opacity-70 shrink-0" />
             </a>
           );
         }
-        return <span key={i}>{part}</span>;
+        return <RenderPlainTextWithUrls key={i} text={part} />;
       })}
     </>
   );
