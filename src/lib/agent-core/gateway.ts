@@ -37,32 +37,36 @@ export interface ModelGatewayResult {
 // Model alias mapper
 export const MODEL_CATALOG: Record<string, { provider: 'glm' | 'groq' | 'gemini' | 'openai'; upstreamModel: string; label: string; description: string }> = {
   // Flux Fast Tier (Default - Ultra Fast & Cost-Free)
-  'glm': { provider: 'glm', upstreamModel: 'glm-4-flash', label: 'Flux Fast (GLM-4 Flash)', description: 'Ultra-fast general reasoning & SQL' },
-  'flux-fast': { provider: 'glm', upstreamModel: 'glm-4-flash', label: 'Flux Fast (GLM-4 Flash)', description: 'Ultra-fast general reasoning & SQL' },
-  'glm-4-flash': { provider: 'glm', upstreamModel: 'glm-4-flash', label: 'Flux Fast (GLM-4 Flash)', description: 'Ultra-fast general reasoning & SQL' },
+  'flux-fast': { provider: 'glm', upstreamModel: 'glm-4-flash', label: 'Flux Fast', description: 'Ultra-fast general reasoning & SQL' },
+  'flux': { provider: 'glm', upstreamModel: 'glm-4-flash', label: 'Flux Fast', description: 'Ultra-fast general reasoning & SQL' },
+  'glm': { provider: 'glm', upstreamModel: 'glm-4-flash', label: 'Flux Fast', description: 'Ultra-fast general reasoning & SQL' },
+  'glm-4-flash': { provider: 'glm', upstreamModel: 'glm-4-flash', label: 'Flux Fast', description: 'Ultra-fast general reasoning & SQL' },
 
   // Flux Pro Tier (Balanced deep reasoning)
-  'flux-pro': { provider: 'glm', upstreamModel: 'glm-4-air', label: 'Flux Pro (GLM-4 Air)', description: 'High precision schema & BI analysis' },
-  'glm-4-air': { provider: 'glm', upstreamModel: 'glm-4-air', label: 'Flux Pro (GLM-4 Air)', description: 'High precision schema & BI analysis' },
+  'flux-pro': { provider: 'glm', upstreamModel: 'glm-4-air', label: 'Flux Pro', description: 'High precision schema & BI analysis' },
+  'glm-4-air': { provider: 'glm', upstreamModel: 'glm-4-air', label: 'Flux Pro', description: 'High precision schema & BI analysis' },
 
   // Flux Ultra Tier (Deep reasoning & complex migrations)
-  'flux-ultra': { provider: 'glm', upstreamModel: 'glm-4-plus', label: 'Flux Ultra (GLM-4 Plus)', description: 'Maximum intelligence for complex databases' },
-  'glm-4-plus': { provider: 'glm', upstreamModel: 'glm-4-plus', label: 'Flux Ultra (GLM-4 Plus)', description: 'Maximum intelligence for complex databases' },
-  'glm-5.2': { provider: 'glm', upstreamModel: 'glm-4-plus', label: 'Flux Ultra (GLM 5.2)', description: 'Maximum intelligence for complex databases' },
+  'flux-ultra': { provider: 'glm', upstreamModel: 'glm-4-plus', label: 'Flux Ultra', description: 'Maximum intelligence for complex databases' },
+  'glm-4-plus': { provider: 'glm', upstreamModel: 'glm-4-plus', label: 'Flux Ultra', description: 'Maximum intelligence for complex databases' },
+  'glm-5.2': { provider: 'glm', upstreamModel: 'glm-4-plus', label: 'Flux Ultra', description: 'Maximum intelligence for complex databases' },
 
-  // Groq Tier (300+ tokens/sec)
-  'groq': { provider: 'groq', upstreamModel: 'llama-3.3-70b-versatile', label: 'Groq Llama 3.3 70B', description: 'Hyper-speed 300 tps inference' },
-  'groq-llama': { provider: 'groq', upstreamModel: 'llama-3.3-70b-versatile', label: 'Groq Llama 3.3 70B', description: 'Hyper-speed 300 tps inference' },
+  // Flux Turbo Tier (Hyper-speed 300+ tokens/sec)
+  'flux-turbo': { provider: 'groq', upstreamModel: 'llama-3.3-70b-versatile', label: 'Flux Turbo', description: 'Hyper-speed 300 tps inference' },
+  'groq': { provider: 'groq', upstreamModel: 'llama-3.3-70b-versatile', label: 'Flux Turbo', description: 'Hyper-speed 300 tps inference' },
+  'groq-llama': { provider: 'groq', upstreamModel: 'llama-3.3-70b-versatile', label: 'Flux Turbo', description: 'Hyper-speed 300 tps inference' },
 
-  // Google Gemini Tier
-  'gemini': { provider: 'gemini', upstreamModel: 'gemini-2.0-flash', label: 'Gemini 2.0 Flash', description: 'Google Multimodal Agentic AI' },
-  'gemini-2.0-flash': { provider: 'gemini', upstreamModel: 'gemini-2.0-flash', label: 'Gemini 2.0 Flash', description: 'Google Multimodal Agentic AI' },
-  'gemini-1.5-flash': { provider: 'gemini', upstreamModel: 'gemini-1.5-flash', label: 'Gemini 1.5 Flash', description: 'Google Gemini 1.5' },
+  // Flux Omni Tier (Multimodal Agentic AI)
+  'flux-omni': { provider: 'gemini', upstreamModel: 'gemini-2.0-flash', label: 'Flux Omni', description: 'Multimodal Agentic AI' },
+  'gemini': { provider: 'gemini', upstreamModel: 'gemini-2.0-flash', label: 'Flux Omni', description: 'Multimodal Agentic AI' },
+  'gemini-2.0-flash': { provider: 'gemini', upstreamModel: 'gemini-2.0-flash', label: 'Flux Omni', description: 'Multimodal Agentic AI' },
+  'gemini-1.5-flash': { provider: 'gemini', upstreamModel: 'gemini-1.5-flash', label: 'Flux Omni', description: 'Multimodal Agentic AI' },
 
-  // OpenAI Tier
-  'openai': { provider: 'openai', upstreamModel: 'gpt-4o-mini', label: 'OpenAI GPT-4o Mini', description: 'OpenAI Fast Reasoning' },
-  'gpt-4o-mini': { provider: 'openai', upstreamModel: 'gpt-4o-mini', label: 'OpenAI GPT-4o Mini', description: 'OpenAI Fast Reasoning' },
-  'gpt-4o': { provider: 'openai', upstreamModel: 'gpt-4o', label: 'OpenAI GPT-4o', description: 'OpenAI Flagship' }
+  // Flux Max Tier (Flagship Intelligence)
+  'flux-max': { provider: 'openai', upstreamModel: 'gpt-4o-mini', label: 'Flux Max', description: 'Flagship Intelligence' },
+  'openai': { provider: 'openai', upstreamModel: 'gpt-4o-mini', label: 'Flux Max', description: 'Flagship Intelligence' },
+  'gpt-4o-mini': { provider: 'openai', upstreamModel: 'gpt-4o-mini', label: 'Flux Max', description: 'Flagship Intelligence' },
+  'gpt-4o': { provider: 'openai', upstreamModel: 'gpt-4o', label: 'Flux Max', description: 'Flagship Intelligence' }
 };
 
 /**

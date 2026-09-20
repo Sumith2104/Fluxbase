@@ -417,7 +417,11 @@ export function FluxAiAssistant({ userId, isOpen, onOpenChange }: { userId: stri
     if (typeof window === 'undefined') return;
     const saved = localStorage.getItem("flux_ai_selected_model");
     if (saved) {
-      if (saved === 'glm') setSelectedModel('flux-fast');
+      if (saved === 'glm' || saved === 'glm-4-flash' || saved === 'flux') setSelectedModel('flux-fast');
+      else if (saved === 'glm-4-air') setSelectedModel('flux-pro');
+      else if (saved === 'glm-4-plus' || saved === 'glm-5.2') setSelectedModel('flux-ultra');
+      else if (saved === 'groq' || saved === 'groq-llama') setSelectedModel('flux-turbo');
+      else if (saved === 'gemini' || saved === 'gemini-2.0-flash' || saved === 'gemini-1.5-flash') setSelectedModel('flux-omni');
       else setSelectedModel(saved);
     }
   }, []);
@@ -1300,14 +1304,14 @@ export function FluxAiAssistant({ userId, isOpen, onOpenChange }: { userId: stri
                 <select
                   value={selectedModel}
                   onChange={(e) => handleModelChange(e.target.value)}
-                  className="h-7 px-1.5 mr-1.5 rounded border border-border bg-background text-[10.5px] font-medium text-foreground/80 focus:outline-none focus:ring-1 focus:ring-border cursor-pointer max-w-[145px] truncate shadow-sm opacity-90"
+                  className="h-7 px-2 mr-1.5 rounded border border-border bg-background text-[11px] font-medium text-foreground/85 focus:outline-none focus:ring-1 focus:ring-border cursor-pointer max-w-[125px] truncate shadow-xs opacity-95"
                   title="AI Model"
                 >
-                  <option value="flux-fast">Flux Fast (GLM-4 Flash)</option>
-                  <option value="flux-pro">Flux Pro (GLM-4 Air)</option>
-                  <option value="flux-ultra">Flux Ultra (GLM-4 Plus)</option>
-                  <option value="groq-llama">Groq Llama 3.3 70B</option>
-                  <option value="gemini-2.0-flash">Gemini 2.0 Flash</option>
+                  <option value="flux-fast">Flux Fast</option>
+                  <option value="flux-pro">Flux Pro</option>
+                  <option value="flux-ultra">Flux Ultra</option>
+                  <option value="flux-turbo">Flux Turbo</option>
+                  <option value="flux-omni">Flux Omni</option>
                 </select>
                 <button onClick={() => setVoiceEnabled(v => !v)} className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors" title={voiceEnabled ? 'Mute' : 'Unmute'}>{voiceEnabled ? <Volume2 size={15} /> : <VolumeX size={15} />}</button>
                 <button onClick={() => onOpenChange(false)} className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"><X size={15} /></button>

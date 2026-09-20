@@ -522,13 +522,13 @@ Provide your response in Markdown formatting. Do NOT use HTML. Keep code snippet
 
                     if (!response.ok) {
                         const errText = await response.text();
-                        ws.send(JSON.stringify({ type: 'chat_error', message: `GLM API returned status ${response.status}: ${errText}` }));
+                        ws.send(JSON.stringify({ type: 'chat_error', message: `Flux AI returned status ${response.status}: ${errText}` }));
                         return;
                     }
 
                     const body = response.body;
                     if (!body) {
-                        ws.send(JSON.stringify({ type: 'chat_error', message: 'No response body from GLM' }));
+                        ws.send(JSON.stringify({ type: 'chat_error', message: 'No response body from Flux AI' }));
                         return;
                     }
 
