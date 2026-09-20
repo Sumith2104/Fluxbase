@@ -167,9 +167,13 @@ export async function POST(req: Request) {
             ? `\nPROJECT: "${activeProject.display_name || ''}" (ID: ${activeProject.project_id}) | Dialect: ${activeProject.dialect || 'postgresql'} | TZ: ${activeProject.timezone || 'UTC'}\n`
             : '\nNo active project. Ask user to select/create one first for SQL operations.\n';
 
-        const screenContextStr = screenContext
-            ? `\nSCREEN: Table="${screenContext.activeTable || 'none'}" Cols=${JSON.stringify(screenContext.visibleColumns?.slice(0, 15) || [])} Rows=${screenContext.rowCount || 0}${screenContext.activeError ? ` Error="${screenContext.activeError.slice(0, 100)}"` : ''}\n`
-            : '';
+        let screenContextStr = '';
+        if (screenContext) {
+            screenContextStr = `\nSCREEN: Table="${screenContext.activeTable || 'none'}" Cols=${JSON.stringify(screenContext.visibleColumns?.slice(0, 15) || [])} Rows=${screenContext.rowCount || 0}${screenContext.activeError ? ` Error="${screenContext.activeError.slice(0, 300)}"` : ''}\n`;
+            if (screenContext.lastSqlError && screenContext.lastSqlError.error) {
+                screenContextStr += `\nEDITOR LAST FAILED SQL QUERY:\n\`\`\`sql\n${screenContext.lastSqlError.query || ''}\n\`\`\`\nDATABASE EXECUTION ERROR:\n${screenContext.lastSqlError.error}\n(CRITICAL: The user has an active SQL failure in the Query Editor. If they ask to fix the error or why the query failed, diagnose this exact query and error, explain the cause, and provide the corrected query wrapped in [EXECUTE_SQL:...])\n`;
+            }
+        }
 
         const systemPrompt = isGreeting
             ? `You are Flux AI, an autonomous Staff Database Engineer and BI Architect inside Fluxbase. Greet the user warmly and concisely explain what you can do (query databases, generate charts, inspect schemas, create tables, run Auto-Pilot workflows, and navigate the app). Keep your response concise.`

@@ -100,6 +100,12 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
     const { project: selectedProject, setProject, loading: projectContextLoading, isSuspended, setIsSuspended } = useContext(ProjectContext);
     const [isAiOpen, setIsAiOpen] = useState(false);
 
+    useEffect(() => {
+        const handleOpenAi = () => setIsAiOpen(true);
+        window.addEventListener('flux:open-ai', handleOpenAi);
+        return () => window.removeEventListener('flux:open-ai', handleOpenAi);
+    }, []);
+
     // Maintain persistent global/project realtime WebSocket subscription across the app without forcing layout re-renders
     useRealtimeSubscription(selectedProject?.project_id || 'global', { trackLastEvent: false });
 

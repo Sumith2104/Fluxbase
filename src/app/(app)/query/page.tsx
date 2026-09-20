@@ -4,7 +4,7 @@ import { useGlobalAlert } from '@/components/global-alert-provider';
 
 import { useState, useContext, useEffect, useCallback } from 'react';
 
-import { Play, Trash2, History as HistoryIcon, Sparkles,  ChevronRight,  Table2, ListRestart, Info, Database, AlertCircle, CheckCircle2, TerminalSquare,  MoreHorizontal, FileJson, FileType, Copy as CopyIcon, AlignLeft, Upload } from 'lucide-react';
+import { Play, Trash2, History as HistoryIcon, Sparkles, ChevronRight, Table2, ListRestart, Info, Database, AlertCircle, CheckCircle2, TerminalSquare, MoreHorizontal, FileJson, FileType, Copy as CopyIcon, AlignLeft, Upload, Check } from 'lucide-react';
 import { FluxAiIcon } from '@/components/ui/flux-ai-icon';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -45,7 +45,7 @@ import { QueryHistory, HistoryItem } from '@/components/query-history';
 import { SchemaExplorer } from '@/components/schema-explorer';
 import { ProjectContext } from '@/contexts/project-context';
 import { useToast } from '@/hooks/use-toast';
-import { generateSQLAction } from '@/actions/ai-sql-actions';
+import { generateSQLAction, fixSQLErrorAction } from '@/actions/ai-sql-actions';
 import { useKeyboardShortcuts } from '@/hooks/use-keyboard-shortcuts';
 import { useRealtimeSubscription } from '@/hooks/use-realtime-subscription';
 
@@ -70,6 +70,11 @@ export default function QueryPage() {
   const [aiInput, setAiInput] = useState('');
   const [isGeneratingSQL, setIsGeneratingSQL] = useState(false);
   const [isExecutingAI, setIsExecutingAI] = useState(false);
+
+  // AI Error Auto-Fix State
+  const [isFixingWithAI, setIsFixingWithAI] = useState(false);
+  const [aiFixResult, setAiFixResult] = useState<{ fixedQuery: string; explanation: string; isDangerous?: boolean } | null>(null);
+  const [hasCopiedError, setHasCopiedError] = useState(false);
 
   const { project } = useContext(ProjectContext);
   const { toast } = useToast();
@@ -243,6 +248,7 @@ export default function QueryPage() {
 
     setIsExecuting(true);
     setQueryResponse(null);
+    setAiFixResult(null);
     setActiveResultsTab('results');
     setPage(0);
     setHasMore(false);
@@ -270,7 +276,18 @@ export default function QueryPage() {
 
       if (!data.success) {
         setActiveResultsTab('messages');
+        try {
+          localStorage.setItem('flux_last_sql_error', JSON.stringify({
+            projectId: project?.project_id,
+            query: queryToExecute,
+            error: data.error?.message || 'Query execution failed',
+            timestamp: Date.now()
+          }));
+        } catch {}
       } else {
+        try {
+          localStorage.removeItem('flux_last_sql_error');
+        } catch {}
         // Dispatch local event on schema change to refresh explorer immediately
         const uppercaseQuery = queryToExecute.trim().toUpperCase();
         const isSchemaChange = uppercaseQuery.includes('CREATE ') || 
@@ -287,6 +304,14 @@ export default function QueryPage() {
         success: false,
         error: { message: e.message, code: 'NETWORK_ERROR' }
       });
+      try {
+        localStorage.setItem('flux_last_sql_error', JSON.stringify({
+          projectId: project?.project_id,
+          query: queryToExecute,
+          error: e.message,
+          timestamp: Date.now()
+        }));
+      } catch {}
       addToHistory(queryToExecute, false);
       setActiveResultsTab('messages');
     }
@@ -573,6 +598,215 @@ export default function QueryPage() {
     URL.revokeObjectURL(url);
   };
 
+  const handleFixWithAI = async () => {
+    const errorMsg = queryResponse?.error?.message;
+    if (!errorMsg || !project?.project_id) return;
+    setIsFixingWithAI(true);
+    try {
+      const res = await fixSQLErrorAction(project.project_id, executedQuery || query, errorMsg);
+      if (res.success && res.fixedQuery) {
+        setAiFixResult({ fixedQuery: res.fixedQuery, explanation: res.explanation || '', isDangerous: res.isDangerous });
+        toast({ title: 'AI Fix Ready', description: res.explanation || 'Review the suggested fix.' });
+      } else {
+        toast({ variant: 'destructive', title: 'Auto-Fix Failed', description: res.error || 'Could not auto-fix this error.' });
+      }
+    } catch (err: any) {
+      toast({ variant: 'destructive', title: 'Error', description: err.message || 'Failed to auto-fix query.' });
+    } finally {
+      setIsFixingWithAI(false);
+    }
+  };
+
+  const handleApplyFix = (runImmediately = false) => {
+    if (!aiFixResult?.fixedQuery) return;
+    const fixed = aiFixResult.fixedQuery;
+    setQuery(fixed);
+    toast({ title: 'Query Updated', description: 'Fixed SQL applied to the editor.' });
+    if (runImmediately) {
+      handleRunQuery(fixed);
+    }
+  };
+
+  const handleAskFluxAI = () => {
+    const errorMsg = queryResponse?.error?.message || '';
+    const q = executedQuery || query;
+    const prompt = `My SQL query failed with this database error:\n\`\`\`sql\n${q}\n\`\`\`\nError:\n\`\`\`\n${errorMsg}\n\`\`\`\nPlease explain what caused this error and provide the corrected SQL query to fix it.`;
+    window.dispatchEvent(new CustomEvent('flux:open-ai', { detail: { prompt, autoSend: true } }));
+  };
+
+  const handleCopyError = () => {
+    if (!queryResponse?.error?.message) return;
+    navigator.clipboard.writeText(queryResponse.error.message);
+    setHasCopiedError(true);
+    setTimeout(() => setHasCopiedError(false), 2000);
+    toast({ title: 'Copied', description: 'Error message copied to clipboard.' });
+  };
+
+  const renderMessagesContent = () => {
+    if (queryResponse?.error) {
+      return (
+        <div className="w-full max-w-4xl mx-auto space-y-4 my-2">
+          {/* High Contrast Error Card */}
+          <div className="rounded-xl border border-red-500/40 bg-card/95 p-4 shadow-lg backdrop-blur-sm">
+            <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-border/50">
+              <div className="flex items-center gap-2.5">
+                <div className="p-1.5 rounded-lg bg-red-500/15 text-red-400 border border-red-500/30">
+                  <AlertCircle className="h-4 w-4" />
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="font-semibold text-sm text-foreground">Execution Failed</span>
+                  <span className="text-[10px] font-mono uppercase px-2 py-0.5 rounded-full bg-red-500/15 text-red-300 border border-red-500/30 font-medium">
+                    Database Exception
+                  </span>
+                </div>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex items-center gap-2 flex-wrap">
+                <Button
+                  size="sm"
+                  onClick={handleFixWithAI}
+                  disabled={isFixingWithAI}
+                  className="h-8 px-3 text-xs bg-gradient-to-r from-purple-600 via-indigo-600 to-blue-600 hover:from-purple-500 hover:to-indigo-500 text-white font-medium shadow-sm transition-all flex items-center gap-1.5 cursor-pointer"
+                  title="Diagnose error against schema and generate working SQL"
+                >
+                  {isFixingWithAI ? (
+                    <>
+                      <MoreHorizontal className="h-3.5 w-3.5 animate-pulse" />
+                      <span>Fixing with AI...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="h-3.5 w-3.5 text-amber-300" />
+                      <span>Fix with AI</span>
+                    </>
+                  )}
+                </Button>
+
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleAskFluxAI}
+                  className="h-8 px-2.5 text-xs text-muted-foreground hover:text-foreground border-border flex items-center gap-1.5 cursor-pointer"
+                  title="Open Flux AI assistant with error preloaded"
+                >
+                  <FluxAiIcon size={13} />
+                  <span>Ask Flux AI</span>
+                </Button>
+
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleCopyError}
+                  className="h-8 px-2.5 text-xs text-muted-foreground hover:text-foreground border-border flex items-center gap-1.5 cursor-pointer"
+                  title="Copy error message to clipboard"
+                >
+                  {hasCopiedError ? <Check className="h-3.5 w-3.5 text-emerald-400" /> : <CopyIcon className="h-3.5 w-3.5" />}
+                  <span>{hasCopiedError ? 'Copied' : 'Copy'}</span>
+                </Button>
+              </div>
+            </div>
+
+            {/* High-Contrast Error Body */}
+            <div className="mt-3.5 space-y-2.5">
+              <div className="relative rounded-lg border border-red-500/30 bg-neutral-950 p-3.5 shadow-inner">
+                <p className="font-mono text-xs sm:text-sm text-red-200 dark:text-red-200 selection:bg-red-800 leading-relaxed break-all select-text font-normal">
+                  {queryResponse.error.message}
+                </p>
+              </div>
+
+              {queryResponse.error.hint && (
+                <div className="rounded-lg border border-amber-500/30 bg-amber-950/20 p-3 text-xs text-amber-200 flex gap-2 items-start">
+                  <Info className="h-4 w-4 shrink-0 text-amber-400 mt-0.5" />
+                  <div>
+                    <span className="font-semibold text-amber-300 uppercase tracking-wider text-[10px] block mb-0.5">Suggestion:</span>
+                    <span className="font-mono">{queryResponse.error.hint}</span>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* AI Fix Proposal Box (when generated) */}
+          {aiFixResult && (
+            <div className="rounded-xl border border-purple-500/40 bg-purple-950/20 dark:bg-purple-950/30 p-4 shadow-md animate-in fade-in-50 duration-300">
+              <div className="flex items-center justify-between pb-2.5 border-b border-purple-500/20">
+                <div className="flex items-center gap-2">
+                  <Sparkles className="h-4 w-4 text-purple-400" />
+                  <span className="font-semibold text-sm text-purple-200">AI Suggested Repair</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => handleApplyFix(false)}
+                    className="h-7 px-2.5 text-xs border-purple-500/30 hover:bg-purple-500/20 text-purple-200"
+                  >
+                    Apply to Editor
+                  </Button>
+                  <Button
+                    size="sm"
+                    onClick={() => handleApplyFix(true)}
+                    className="h-7 px-3 text-xs bg-purple-600 hover:bg-purple-500 text-white font-medium flex items-center gap-1"
+                  >
+                    <Play className="h-3 w-3 fill-current" />
+                    Apply & Run
+                  </Button>
+                </div>
+              </div>
+
+              <p className="mt-2.5 text-xs text-purple-200/90 leading-relaxed font-sans">
+                💡 {aiFixResult.explanation}
+              </p>
+
+              <div className="mt-2.5 rounded-lg border border-purple-500/30 bg-neutral-950 p-3 overflow-x-auto">
+                <pre className="font-mono text-xs text-purple-100 selection:bg-purple-900 leading-relaxed">
+                  {aiFixResult.fixedQuery}
+                </pre>
+              </div>
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    if (queryResponse?.result?.message) {
+      return (
+        <div className="w-full max-w-4xl mx-auto my-2">
+          <div className="rounded-xl border border-emerald-500/40 bg-card/95 p-4 shadow-lg backdrop-blur-sm">
+            <div className="flex items-center justify-between pb-3 border-b border-border/50">
+              <div className="flex items-center gap-2.5">
+                <div className="p-1.5 rounded-lg bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
+                  <CheckCircle2 className="h-4 w-4" />
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="font-semibold text-sm text-foreground">Execution Successful</span>
+                  {queryResponse?.executionInfo?.rowCount !== undefined && (
+                    <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 font-medium">
+                      {queryResponse.executionInfo.rowCount} rows affected
+                    </span>
+                  )}
+                </div>
+              </div>
+            </div>
+            <div className="mt-3.5 rounded-lg border border-emerald-500/30 bg-neutral-950 p-3.5 shadow-inner">
+              <p className="font-mono text-xs sm:text-sm text-emerald-200 dark:text-emerald-200 selection:bg-emerald-800 leading-relaxed select-text font-normal">
+                {queryResponse.result.message}
+              </p>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    return (
+      <div className="h-full flex flex-col items-center justify-center text-muted-foreground text-sm opacity-60">
+        <TerminalSquare className="h-8 w-8 mb-2 opacity-20" />
+        No active messages
+      </div>
+    );
+  };
+
   if (isMobile) {
     return (
       <div key={project?.project_id || 'no-project'} className="min-h-[calc(100dvh-57px)] w-full overflow-x-hidden bg-background p-2 pb-24">
@@ -708,22 +942,7 @@ export default function QueryPage() {
                   )}
                 </TabsContent>
                 <TabsContent value="messages" className="absolute inset-0 m-0 overflow-auto p-3">
-                  {queryResponse?.error ? (
-                    <Alert variant="destructive" className="border-red-900/50 bg-red-900/10 text-red-500 shadow-sm">
-                      <AlertCircle className="h-5 w-5" />
-                      <AlertTitle className="font-mono text-sm font-bold">Execution Failed</AlertTitle>
-                      <AlertDescription className="mt-3">
-                        <div className="break-anywhere rounded border border-red-900/30 bg-red-950/30 p-3 font-mono text-sm">
-                          {queryResponse.error.message}
-                        </div>
-                      </AlertDescription>
-                    </Alert>
-                  ) : (
-                    <div className="flex h-full flex-col items-center justify-center text-sm text-muted-foreground opacity-60">
-                      <TerminalSquare className="mb-2 h-8 w-8 opacity-20" />
-                      No active messages
-                    </div>
-                  )}
+                  {renderMessagesContent()}
                 </TabsContent>
               </div>
             </Tabs>
@@ -859,6 +1078,24 @@ export default function QueryPage() {
                   className="flex-1 min-h-0 p-4"
                 >
                   <div className="h-full flex flex-col gap-4">
+                    {queryResponse?.error && (
+                      <div className="rounded-lg border border-red-500/30 bg-red-950/20 p-2.5 text-xs flex items-center justify-between gap-2 shadow-sm">
+                        <div className="min-w-0 flex-1">
+                          <span className="font-semibold text-red-400 block text-[11px]">Query Failed</span>
+                          <span className="text-red-200 font-mono text-[10px] block truncate">{queryResponse.error.message}</span>
+                        </div>
+                        <Button
+                          size="sm"
+                          onClick={handleFixWithAI}
+                          disabled={isFixingWithAI}
+                          className="h-6 px-2 text-[10px] shrink-0 bg-red-600 hover:bg-red-500 text-white font-medium flex items-center gap-1 cursor-pointer"
+                        >
+                          <Sparkles className="h-2.5 w-2.5" />
+                          <span>{isFixingWithAI ? 'Fixing...' : 'Auto-Fix'}</span>
+                        </Button>
+                      </div>
+                    )}
+
                     <Textarea
                       placeholder="Describe your query..."
                       className="flex-1 resize-none"
@@ -971,42 +1208,7 @@ export default function QueryPage() {
               </TabsContent>
 
               <TabsContent value="messages" className="h-full m-0 p-4 overflow-auto absolute inset-0">
-                {queryResponse?.error ? (
-                  <div className="w-full mt-4">
-                    <Alert variant="destructive" className="border-red-900/50 bg-red-900/10 shadow-sm text-red-500">
-                      <AlertCircle className="h-5 w-5" />
-                      <AlertTitle className="font-mono text-sm font-bold flex items-center gap-2">
-                        Execution Failed
-                      </AlertTitle>
-                      <AlertDescription className="mt-3">
-                        <div className="font-mono text-sm p-3 bg-red-950/30 rounded border border-red-900/30">
-                          {queryResponse.error.message}
-                        </div>
-                        {queryResponse.error.hint && (
-                          <div className="mt-4 flex gap-2 text-xs opacity-90">
-                            <span className="font-bold uppercase tracking-wider shrink-0">Suggestion:</span>
-                            <span>{queryResponse.error.hint}</span>
-                          </div>
-                        )}
-                      </AlertDescription>
-                    </Alert>
-                  </div>
-                ) : queryResponse?.result?.message ? (
-                  <Alert className="bg-green-500/10 border-green-500/20 text-emerald-400 w-full mt-4">
-                    <div className="flex items-center gap-2">
-                      <CheckCircle2 className="h-4 w-4 text-green-500" />
-                      <AlertTitle className="font-medium">Success</AlertTitle>
-                    </div>
-                    <AlertDescription className="mt-2 font-mono text-sm pl-6 opacity-90">
-                      {queryResponse.result.message}
-                    </AlertDescription>
-                  </Alert>
-                ) : (
-                  <div className="h-full flex flex-col items-center justify-center text-muted-foreground text-sm opacity-60">
-                    <TerminalSquare className="h-8 w-8 mb-2 opacity-20" />
-                    No active messages
-                  </div>
-                )}
+                {renderMessagesContent()}
               </TabsContent>
             </div>
           </Tabs>

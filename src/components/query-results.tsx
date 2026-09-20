@@ -162,11 +162,22 @@ export function QueryResults({ results, error, isGenerating, isLiveUpdating, has
 
     if (error) {
         return (
-            <div className="p-4 flex items-center gap-4 text-destructive h-full">
-                <AlertCircle className="h-6 w-6" />
-                <div className='font-mono text-sm'>
-                    <p className='font-semibold'>Execution Failed</p>
-                    <p>{error}</p>
+            <div className="p-6 flex flex-col justify-center max-w-3xl mx-auto h-full w-full">
+                <div className="rounded-xl border border-red-500/40 bg-card/95 p-4 shadow-lg backdrop-blur-sm">
+                    <div className="flex items-center gap-2.5 pb-3 border-b border-border/50">
+                        <div className="p-1.5 rounded-lg bg-red-500/15 text-red-400 border border-red-500/30">
+                            <AlertCircle className="h-4 w-4" />
+                        </div>
+                        <span className="font-semibold text-sm text-foreground">Execution Failed</span>
+                        <span className="text-[10px] font-mono uppercase px-2 py-0.5 rounded-full bg-red-500/15 text-red-300 border border-red-500/30 font-medium">
+                            Database Error
+                        </span>
+                    </div>
+                    <div className="mt-3.5 rounded-lg border border-red-500/30 bg-neutral-950 p-3.5 shadow-inner">
+                        <p className="font-mono text-xs sm:text-sm text-red-200 selection:bg-red-800 leading-relaxed break-all select-text font-normal">
+                            {error}
+                        </p>
+                    </div>
                 </div>
             </div>
         );

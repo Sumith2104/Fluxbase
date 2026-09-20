@@ -832,7 +832,25 @@ export function FluxAiAssistant({ userId, isOpen, onOpenChange }: { userId: stri
         const cols = Array.from(document.querySelectorAll('th, [role="columnheader"]')).map(el => el.textContent?.trim() || '').filter(Boolean).slice(0, 20);
         const rowCount = document.querySelector('[data-total-rows]')?.getAttribute('data-total-rows');
         const activeError = document.querySelector('[role="alert"]')?.textContent?.trim() || undefined;
-        return { activeTable, visibleColumns: cols, rowCount: rowCount ? parseInt(rowCount, 10) : undefined, activeError: activeError?.slice(0, 150) };
+
+        let lastSqlError: { query: string; error: string } | undefined = undefined;
+        const lastErrRaw = localStorage.getItem('flux_last_sql_error');
+        if (lastErrRaw) {
+          try {
+            const parsed = JSON.parse(lastErrRaw);
+            if (Date.now() - (parsed.timestamp || 0) < 600000 && parsed.error) {
+              lastSqlError = { query: parsed.query, error: parsed.error };
+            }
+          } catch {}
+        }
+
+        return {
+          activeTable,
+          visibleColumns: cols,
+          rowCount: rowCount ? parseInt(rowCount, 10) : undefined,
+          activeError: activeError?.slice(0, 300),
+          lastSqlError
+        };
       } catch { return undefined; }
     };
 
@@ -993,6 +1011,29 @@ export function FluxAiAssistant({ userId, isOpen, onOpenChange }: { userId: stri
       setMessages(prev => [...prev, { role: "assistant", content: 'Connection issue. Try again.', timestamp: Date.now() }]);
     }
   }, [input, isTyping, messages, pathname, selectedModel, project, autoPilotActive, speak, finalizeActiveStream, streamAssistantResponse]);
+
+  // Listen for global flux:open-ai event to prefill prompt and open Flux AI
+  useEffect(() => {
+    const handleOpenAi = (e: any) => {
+      onOpenChange(true);
+      const prompt = e.detail?.prompt;
+      if (prompt) {
+        setInput(prompt);
+        if (textareaRef.current) {
+          textareaRef.current.value = prompt;
+          textareaRef.current.style.height = "auto";
+          textareaRef.current.style.height = `${Math.min(textareaRef.current.scrollHeight, 140)}px`;
+        }
+        if (e.detail?.autoSend) {
+          setTimeout(() => {
+            handleSend(undefined, prompt);
+          }, 200);
+        }
+      }
+    };
+    window.addEventListener('flux:open-ai', handleOpenAi);
+    return () => window.removeEventListener('flux:open-ai', handleOpenAi);
+  }, [onOpenChange, handleSend]);
 
   // --- Auto-pilot checkin loop ---
 
