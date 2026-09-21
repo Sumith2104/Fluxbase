@@ -1268,7 +1268,12 @@ export function FluxAiAssistant({ userId, isOpen, onOpenChange }: { userId: stri
           localStorage.removeItem('flux_autopilot_checkin_message');
           localStorage.removeItem('flux_active_workflow');
         }
-        throw new Error('Request failed with status ' + res.status);
+        let serverError = `Request failed with status ${res.status}`;
+        try {
+          const errData = await res.json();
+          if (errData.error) serverError = errData.error;
+        } catch {}
+        throw new Error(serverError);
       }
 
       const contentType = res.headers.get('content-type') || '';
@@ -1557,7 +1562,10 @@ export function FluxAiAssistant({ userId, isOpen, onOpenChange }: { userId: stri
         localStorage.removeItem('flux_autopilot_checkin_message');
         localStorage.removeItem('flux_active_workflow');
       }
-      setMessages(prev => [...prev, { role: "assistant", content: 'Connection issue. Try again.', timestamp: Date.now() }]);
+      const displayMsg = err?.message && !err.message.includes('object Object') && err.message.trim().length > 0
+        ? err.message
+        : 'Connection issue. Try again.';
+      setMessages(prev => [...prev, { role: "assistant", content: displayMsg, timestamp: Date.now() }]);
     }
   }, [input, isTyping, messages, pathname, selectedModel, project, autoPilotActive, speak, finalizeActiveStream, streamAssistantResponse]);
 

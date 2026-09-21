@@ -64,9 +64,12 @@ export const MODEL_CATALOG: Record<string, { provider: 'glm' | 'groq' | 'gemini'
 
   // Flux Omni Tier (Multimodal Agentic AI)
   'flux-omni': { provider: 'gemini', upstreamModel: 'gemini-2.0-flash', label: 'Flux Omni', description: 'Multimodal Agentic AI' },
+  'flux-vision': { provider: 'glm', upstreamModel: 'glm-4v-flash', label: 'Flux Vision', description: 'Multimodal Vision' },
   'gemini': { provider: 'gemini', upstreamModel: 'gemini-2.0-flash', label: 'Flux Omni', description: 'Multimodal Agentic AI' },
   'gemini-2.0-flash': { provider: 'gemini', upstreamModel: 'gemini-2.0-flash', label: 'Flux Omni', description: 'Multimodal Agentic AI' },
   'gemini-1.5-flash': { provider: 'gemini', upstreamModel: 'gemini-1.5-flash', label: 'Flux Omni', description: 'Multimodal Agentic AI' },
+  'glm-4v-flash': { provider: 'glm', upstreamModel: 'glm-4v-flash', label: 'Flux Vision', description: 'Multimodal Vision' },
+  'glm-4v': { provider: 'glm', upstreamModel: 'glm-4v', label: 'Flux Vision', description: 'Multimodal Vision' },
 
   // Flux Max Tier (Flagship Intelligence)
   'flux-max': { provider: 'openai', upstreamModel: 'gpt-4o-mini', label: 'Flux Max', description: 'Flagship Intelligence' },
@@ -164,25 +167,47 @@ export class ModelGateway {
     };
 
     if (hasMultimodal) {
-      // 1. If primary requested model is already vision-capable, use it first
-      if (primary.provider === 'gemini' || primary.provider === 'openai') {
+      // 1. If primary requested model is already vision-capable and configured, use it first
+      const hasGeminiKey = Boolean(process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY);
+      const hasOpenAiKey = Boolean(process.env.OPENAI_API_KEY);
+      const hasGlmKey = Boolean(process.env.GLM_API_KEY || process.env.ZHIPU_API_KEY);
+
+      if (
+        (primary.provider === 'gemini' && hasGeminiKey) ||
+        (primary.provider === 'openai' && hasOpenAiKey) ||
+        (primary.provider === 'glm' && primary.upstreamModel.includes('4v') && hasGlmKey)
+      ) {
         add(primary.provider, primary.upstreamModel);
       }
 
-      // 2. Gemini fallback (gemini-2.0-flash has excellent multimodal vision support)
-      if (process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY) {
+      // 2. GLM Vision (Active GLM_API_KEY, high-speed, 100% free multimodal vision)
+      if (hasGlmKey) {
+        add('glm', 'glm-4v-flash');
+        add('glm', 'glm-4v');
+      }
+
+      // 3. Gemini vision fallback
+      if (hasGeminiKey) {
         add('gemini', 'gemini-2.0-flash');
         add('gemini', 'gemini-1.5-flash');
       }
 
-      // 3. OpenAI vision fallback
-      if (process.env.OPENAI_API_KEY) {
+      // 4. OpenAI vision fallback
+      if (hasOpenAiKey) {
         add('openai', 'gpt-4o-mini');
         add('openai', 'gpt-4o');
       }
 
-      // 4. Primary fallback as last resort
-      add(primary.provider, primary.upstreamModel);
+      // 5. Final safety fallback: ensure at least one vision model is present
+      if (hasGlmKey) {
+        add('glm', 'glm-4v-flash');
+      } else if (hasGeminiKey) {
+        add('gemini', 'gemini-2.0-flash');
+      } else if (hasOpenAiKey) {
+        add('openai', 'gpt-4o-mini');
+      } else {
+        add(primary.provider, primary.upstreamModel);
+      }
     } else {
       // 1. Primary requested provider
       add(primary.provider, primary.upstreamModel);

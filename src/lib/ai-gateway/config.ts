@@ -165,6 +165,19 @@ export const FLUX_MODEL_REGISTRY: Record<string, FluxModelSpec> = {
     minTier: 'free',
     capabilities: ['text-generation', 'chat', 'tool-calling', 'json-mode'],
   },
+  'flux-vision': {
+    id: 'flux-vision',
+    modality: 'text',
+    provider: 'glm',
+    upstreamModel: 'glm-4v-flash',
+    upstreamEndpoint: PROVIDER_ENDPOINTS.glm.chat,
+    label: 'Flux Vision',
+    description: 'High-speed multimodal vision and visual schema recognition',
+    contextWindow: 128000,
+    maxOutputTokens: 4096,
+    minTier: 'free',
+    capabilities: ['text-generation', 'vision', 'chat', 'tool-calling', 'json-mode'],
+  },
   'flux-omni': {
     id: 'flux-omni',
     modality: 'text',
@@ -393,6 +406,9 @@ export const MODEL_ALIASES: Record<string, string> = {
   'glm-4-flash': 'flux-fast',
   'glm-4-air': 'flux-pro',
   'glm-4-plus': 'flux-ultra',
+  'glm-4v-flash': 'flux-vision',
+  'glm-4v': 'flux-vision',
+  'flux-vision': 'flux-vision',
   'llama-3.3-70b-versatile': 'flux-turbo',
   'gemini-2.0-flash': 'flux-omni',
   'cogview-4': 'flux-image',
@@ -408,6 +424,8 @@ export const WHITELABEL_MAP: Record<string, string> = {
   'glm-4-flash': 'flux',
   'glm-4-air': 'flux-pro',
   'glm-4-plus': 'flux-ultra',
+  'glm-4v-flash': 'flux-vision',
+  'glm-4v': 'flux-vision',
   'llama-3.3-70b-versatile': 'flux-turbo',
   'gemini-2.0-flash': 'flux-omni',
   'gemini-1.5-flash': 'flux-omni',
@@ -501,11 +519,12 @@ export function buildFallbackChain(primarySpec: FluxModelSpec, hasMultimodal = f
   const chain: FluxModelSpec[] = [];
 
   if (hasMultimodal) {
-    // When multimodal images are present, prioritize vision-capable models
+    // When multimodal images are present, prioritize vision-capable models with available keys
     if (primarySpec.capabilities?.includes('vision')) {
-      chain.push(primarySpec);
+      const config = getProviderConfig(primarySpec.provider);
+      if (config.isAvailable) chain.push(primarySpec);
     }
-    const visionPriority = ['flux-omni', 'flux-max'];
+    const visionPriority = ['flux-vision', 'flux-omni', 'flux-max'];
     for (const vId of visionPriority) {
       const spec = FLUX_MODEL_REGISTRY[vId];
       if (spec && !chain.some(s => s.id === spec.id)) {
@@ -514,14 +533,15 @@ export function buildFallbackChain(primarySpec: FluxModelSpec, hasMultimodal = f
       }
     }
     if (!chain.some(s => s.id === primarySpec.id)) {
-      chain.push(primarySpec);
+      const config = getProviderConfig(primarySpec.provider);
+      if (config.isAvailable) chain.push(primarySpec);
     }
   } else {
     chain.push(primarySpec);
   }
 
   if (primarySpec.modality === 'text') {
-    const fallbacks = hasMultimodal ? ['flux-omni', 'flux-max'] : ['flux-turbo', 'flux-omni', 'flux-fast', 'flux-max'];
+    const fallbacks = hasMultimodal ? ['flux-vision', 'flux-omni', 'flux-max'] : ['flux-turbo', 'flux-omni', 'flux-fast', 'flux-max'];
     for (const fbId of fallbacks) {
       const fbSpec = FLUX_MODEL_REGISTRY[fbId];
       if (fbSpec && fbSpec.id !== primarySpec.id && !chain.some(s => s.id === fbSpec.id)) {
