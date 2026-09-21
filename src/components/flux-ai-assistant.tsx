@@ -47,8 +47,26 @@ export function getTaskLabel(prompt?: string): string {
     return "Analyzing schema...";
   }
   // Error fixing / diagnosis
+  // Auto-Pilot system events
+  if (/^system:\s*observation/i.test(p)) {
+    if (/failed|error|violat/i.test(p)) return "Auto-fixing query...";
+    return "Executing next action...";
+  }
+  if (/^system:\s*auto-pilot/i.test(p)) {
+    if (/sql failed|error|violat/i.test(p)) return "Diagnosing error...";
+    return "Continuing auto-pilot...";
+  }
+  // Schema inspection & drawing
+  if (/schema|ddl|structure|columns|types|foreign key|constraint|relationship|erd|draw schema|show schema/i.test(p)) {
+    return "Analyzing schema...";
+  }
+  // Error diagnostic / Auto-fixing
   if (/fix|repair|error|fail|violat|exception|debug|issue|broke/i.test(p)) {
     return "Diagnosing error...";
+  }
+  // Summary & Architecture
+  if (/summary|summarize|overview|architecture|data flow|how does/i.test(p)) {
+    return "Synthesizing overview...";
   }
   // Row counts / table inspection
   if (/row count|how many rows|list tables|show tables|tables/i.test(p)) {
@@ -65,11 +83,6 @@ export function getTaskLabel(prompt?: string): string {
   // Charts & Visualizations
   if (/chart|graph|plot|visualiz|trend|breakdown|pie|bar/i.test(p)) {
     return "Synthesizing chart...";
-  }
-  // Auto-Pilot observations
-  if (/system: observation/i.test(p)) {
-    if (/failed/i.test(p)) return "Auto-fixing query...";
-    return "Executing next action...";
   }
   // General Query Execution
   if (/run|execute|select|query|fetch/i.test(p)) {
@@ -139,14 +152,14 @@ const parseWorkflow = (text: string, currentProjectId?: string): { steps: Workfl
     codeBlockRanges.push([cbMatch.index, cbMatch.index + cbMatch[0].length]);
   }
 
-  const tagRegex = /\[(NAVIGATE|CLICK|TYPE|CONFIRM_ACTION|EXECUTE_SQL|REQUEST_APPROVAL|CALL_MCP|GOAL_ACCOMPLISHED|RENDER_CHART):([^\]]*?)]/g;
+  const tagRegex = /\[(NAVIGATE|CLICK|TYPE|CONFIRM_ACTION|EXECUTE_SQL|REQUEST_APPROVAL|CALL_MCP|GOAL_ACCOMPLISHED|RENDER_CHART)(?::([^\]]*?))?\]/g;
   let match;
   while ((match = tagRegex.exec(workingText)) !== null) {
     const inCode = codeBlockRanges.some(([start, end]) => match!.index >= start && match!.index < end);
     if (inCode) continue;
 
     const type = match[1].toUpperCase();
-    const argsStr = match[2];
+    const argsStr = match[2] || '';
 
     if (type === 'NAVIGATE') {
       let p = argsStr.trim().replace(/^<\/+/, '/').replace(/>+$/, '');
@@ -267,6 +280,7 @@ export function FluxAiAssistant({ userId, isOpen, onOpenChange }: { userId: stri
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
   const abortRef = useRef<AbortController | null>(null);
+  const autoPilotTurnsRef = useRef(0);
 
   const scrollToBottom = useCallback((behavior: ScrollBehavior = 'auto') => {
     if (messagesContainerRef.current) {
@@ -416,9 +430,20 @@ export function FluxAiAssistant({ userId, isOpen, onOpenChange }: { userId: stri
   const toggleAutoPilot = () => {
     const next = !autoPilotActive;
     setAutoPilotActive(next);
+    autoPilotTurnsRef.current = 0;
     if (typeof window === 'undefined') return;
     localStorage.setItem("flux_autopilot_active", next ? "true" : "false");
-    if (!next) { localStorage.removeItem('flux_autopilot_goal'); localStorage.removeItem('flux_autopilot_pending_checkin'); localStorage.removeItem('flux_autopilot_checkin_message'); setAutoPilotGoal(""); }
+    if (!next) {
+      abortRef.current?.abort();
+      setIsTyping(false);
+      setIsStreamingActive(false);
+      setActiveWorkflow(null);
+      localStorage.removeItem('flux_autopilot_goal');
+      localStorage.removeItem('flux_autopilot_pending_checkin');
+      localStorage.removeItem('flux_autopilot_checkin_message');
+      localStorage.removeItem('flux_active_workflow');
+      setAutoPilotGoal("");
+    }
   };
 
   // --- Model selection ---
@@ -875,9 +900,14 @@ export function FluxAiAssistant({ userId, isOpen, onOpenChange }: { userId: stri
       setMessages(prev => [...prev, { role: 'assistant', content: `**Task Complete:** ${summary}`, timestamp: Date.now() }]);
       setAutoPilotActive(false);
       setAutoPilotGoal("");
-      localStorage.removeItem("flux_autopilot_active");
-      localStorage.removeItem("flux_autopilot_goal");
-      localStorage.removeItem("flux_active_workflow");
+      autoPilotTurnsRef.current = 0;
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem("flux_autopilot_active");
+        localStorage.removeItem("flux_autopilot_goal");
+        localStorage.removeItem("flux_autopilot_pending_checkin");
+        localStorage.removeItem("flux_autopilot_checkin_message");
+        localStorage.removeItem("flux_active_workflow");
+      }
       advanceWorkflow();
     }
 
@@ -969,6 +999,7 @@ export function FluxAiAssistant({ userId, isOpen, onOpenChange }: { userId: stri
       if (autoPilotActive && !localStorage.getItem("flux_autopilot_goal")) {
         localStorage.setItem("flux_autopilot_goal", msg);
         setAutoPilotGoal(msg);
+        autoPilotTurnsRef.current = 0;
       }
     }
 
@@ -1042,7 +1073,19 @@ export function FluxAiAssistant({ userId, isOpen, onOpenChange }: { userId: stri
         }),
       });
 
-      if (!res.ok) throw new Error('Request failed with status ' + res.status);
+      if (!res.ok) {
+        setAutoPilotActive(false);
+        setAutoPilotGoal("");
+        autoPilotTurnsRef.current = 0;
+        if (typeof window !== 'undefined') {
+          localStorage.removeItem('flux_autopilot_active');
+          localStorage.removeItem('flux_autopilot_goal');
+          localStorage.removeItem('flux_autopilot_pending_checkin');
+          localStorage.removeItem('flux_autopilot_checkin_message');
+          localStorage.removeItem('flux_active_workflow');
+        }
+        throw new Error('Request failed with status ' + res.status);
+      }
 
       const contentType = res.headers.get('content-type') || '';
 
@@ -1176,16 +1219,59 @@ export function FluxAiAssistant({ userId, isOpen, onOpenChange }: { userId: stri
 
         setIsStreamingActive(false);
 
+        const handleAutoPilotStepCompletion = (fullText: string, cleaned: string) => {
+          if (typeof window === 'undefined' || localStorage.getItem('flux_autopilot_active') !== 'true') return;
+          const goal = localStorage.getItem('flux_autopilot_goal') || autoPilotGoal;
+          if (!goal) return;
+
+          const isAccomplished = /\[GOAL_ACCOMPLISHED/i.test(fullText);
+          if (isAccomplished) {
+            const summaryMatch = fullText.match(/\[GOAL_ACCOMPLISHED(?::\s*([^\]]*))?\]/i);
+            const summary = summaryMatch?.[1]?.trim() || "Goal accomplished successfully.";
+            setMessages(prev => [...prev, { role: 'assistant', content: `**Task Complete:** ${summary}`, timestamp: Date.now() }]);
+            setAutoPilotActive(false);
+            setAutoPilotGoal("");
+            autoPilotTurnsRef.current = 0;
+            localStorage.removeItem("flux_autopilot_active");
+            localStorage.removeItem("flux_autopilot_goal");
+            localStorage.removeItem("flux_autopilot_pending_checkin");
+            localStorage.removeItem("flux_autopilot_checkin_message");
+            localStorage.removeItem("flux_active_workflow");
+            return;
+          }
+
+          // Check if goal was informational, explanatory, architectural, or summary
+          const isInformationalGoal = /^(summary|summarize|schema|draw|diagram|erd|overview|explain|how|what|show|list|help|info|describe|architecture|can you)/i.test(goal.trim());
+          const hasSubstantialAnswer = Boolean(cleaned && cleaned.length > 90);
+          const reachedTurnLimit = autoPilotTurnsRef.current >= 4;
+
+          if (isInformationalGoal || hasSubstantialAnswer || reachedTurnLimit) {
+            const summarySnippet = cleaned.slice(0, 100).replace(/[\r\n]+/g, ' ').trim() || `Goal "${goal}" accomplished.`;
+            setMessages(prev => [...prev, {
+              role: 'assistant',
+              content: `**Auto-Pilot Task Complete:** ${summarySnippet}`,
+              timestamp: Date.now()
+            }]);
+            setAutoPilotActive(false);
+            setAutoPilotGoal("");
+            autoPilotTurnsRef.current = 0;
+            localStorage.removeItem("flux_autopilot_active");
+            localStorage.removeItem("flux_autopilot_goal");
+            localStorage.removeItem("flux_autopilot_pending_checkin");
+            localStorage.removeItem("flux_autopilot_checkin_message");
+            localStorage.removeItem("flux_active_workflow");
+          } else {
+            autoPilotTurnsRef.current += 1;
+            requestAutopilotCheckin(`System: Auto-Pilot is active for goal: "${goal}". If all tasks are completed, conclude with [GOAL_ACCOMPLISHED:<summary>]. Otherwise proceed with the next concrete step.`);
+          }
+        };
+
         if (steps.length > 0) {
           const wf: ActiveWorkflow = { steps, currentStepIndex: 0 };
           localStorage.setItem('flux_active_workflow', JSON.stringify(wf));
           setActiveWorkflow(wf);
         } else if (typeof window !== 'undefined' && localStorage.getItem('flux_autopilot_active') === 'true' && !approvalRequest) {
-          const goal = localStorage.getItem('flux_autopilot_goal') || autoPilotGoal;
-          const isAccomplished = /\[GOAL_ACCOMPLISHED/i.test(accumulatedText);
-          if (!isAccomplished && goal) {
-            requestAutopilotCheckin(`System: Auto-Pilot is active for goal: "${goal}". You did not execute a database action or mark the goal complete. Diagnose the root cause, repair any query, and emit [EXECUTE_SQL:<query>] or [GOAL_ACCOMPLISHED:<summary>]. Continue autonomously now.`);
-          }
+          handleAutoPilotStepCompletion(accumulatedText, cleanText);
         }
         speak(cleanText);
 
@@ -1202,22 +1288,74 @@ export function FluxAiAssistant({ userId, isOpen, onOpenChange }: { userId: stri
             approvalRequest,
             sources: data.sources,
             onComplete: () => {
+              const handleAutoPilotStepCompletion = (fullText: string, cleaned: string) => {
+                if (typeof window === 'undefined' || localStorage.getItem('flux_autopilot_active') !== 'true') return;
+                const goal = localStorage.getItem('flux_autopilot_goal') || autoPilotGoal;
+                if (!goal) return;
+
+                const isAccomplished = /\[GOAL_ACCOMPLISHED/i.test(fullText);
+                if (isAccomplished) {
+                  const summaryMatch = fullText.match(/\[GOAL_ACCOMPLISHED(?::\s*([^\]]*))?\]/i);
+                  const summary = summaryMatch?.[1]?.trim() || "Goal accomplished successfully.";
+                  setMessages(prev => [...prev, { role: 'assistant', content: `**Task Complete:** ${summary}`, timestamp: Date.now() }]);
+                  setAutoPilotActive(false);
+                  setAutoPilotGoal("");
+                  autoPilotTurnsRef.current = 0;
+                  localStorage.removeItem("flux_autopilot_active");
+                  localStorage.removeItem("flux_autopilot_goal");
+                  localStorage.removeItem("flux_autopilot_pending_checkin");
+                  localStorage.removeItem("flux_autopilot_checkin_message");
+                  localStorage.removeItem("flux_active_workflow");
+                  return;
+                }
+
+                const isInformationalGoal = /^(summary|summarize|schema|draw|diagram|erd|overview|explain|how|what|show|list|help|info|describe|architecture|can you)/i.test(goal.trim());
+                const hasSubstantialAnswer = Boolean(cleaned && cleaned.length > 90);
+                const reachedTurnLimit = autoPilotTurnsRef.current >= 4;
+
+                if (isInformationalGoal || hasSubstantialAnswer || reachedTurnLimit) {
+                  const summarySnippet = cleaned.slice(0, 100).replace(/[\r\n]+/g, ' ').trim() || `Goal "${goal}" accomplished.`;
+                  setMessages(prev => [...prev, {
+                    role: 'assistant',
+                    content: `**Auto-Pilot Task Complete:** ${summarySnippet}`,
+                    timestamp: Date.now()
+                  }]);
+                  setAutoPilotActive(false);
+                  setAutoPilotGoal("");
+                  autoPilotTurnsRef.current = 0;
+                  localStorage.removeItem("flux_autopilot_active");
+                  localStorage.removeItem("flux_autopilot_goal");
+                  localStorage.removeItem("flux_autopilot_pending_checkin");
+                  localStorage.removeItem("flux_autopilot_checkin_message");
+                  localStorage.removeItem("flux_active_workflow");
+                } else {
+                  autoPilotTurnsRef.current += 1;
+                  requestAutopilotCheckin(`System: Auto-Pilot is active for goal: "${goal}". If all tasks are completed, conclude with [GOAL_ACCOMPLISHED:<summary>]. Otherwise proceed with the next concrete step.`);
+                }
+              };
+
               if (steps.length > 0) {
                 const wf: ActiveWorkflow = { steps, currentStepIndex: 0 };
                 localStorage.setItem('flux_active_workflow', JSON.stringify(wf));
                 setActiveWorkflow(wf);
               } else if (typeof window !== 'undefined' && localStorage.getItem('flux_autopilot_active') === 'true' && !approvalRequest) {
-                const goal = localStorage.getItem('flux_autopilot_goal') || autoPilotGoal;
-                const isAccomplished = /\[GOAL_ACCOMPLISHED/i.test(data.text);
-                if (!isAccomplished && goal) {
-                  requestAutopilotCheckin(`System: Auto-Pilot is active for goal: "${goal}". You did not execute a database action or mark the goal complete. Diagnose the root cause, repair any query, and emit [EXECUTE_SQL:<query>] or [GOAL_ACCOMPLISHED:<summary>]. Continue autonomously now.`);
-                }
+                handleAutoPilotStepCompletion(data.text, cleanText);
               }
               speak(cleanText);
             }
           });
         } else {
           setIsTyping(false);
+          setAutoPilotActive(false);
+          setAutoPilotGoal("");
+          autoPilotTurnsRef.current = 0;
+          if (typeof window !== 'undefined') {
+            localStorage.removeItem('flux_autopilot_active');
+            localStorage.removeItem('flux_autopilot_goal');
+            localStorage.removeItem('flux_autopilot_pending_checkin');
+            localStorage.removeItem('flux_autopilot_checkin_message');
+            localStorage.removeItem('flux_active_workflow');
+          }
           setMessages(prev => [...prev, { role: "assistant", content: data.error || 'Something went wrong. Try again.', timestamp: Date.now() }]);
         }
       }
@@ -1225,6 +1363,16 @@ export function FluxAiAssistant({ userId, isOpen, onOpenChange }: { userId: stri
       if (err.name === 'AbortError') return;
       setIsTyping(false);
       setIsStreamingActive(false);
+      setAutoPilotActive(false);
+      setAutoPilotGoal("");
+      autoPilotTurnsRef.current = 0;
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem('flux_autopilot_active');
+        localStorage.removeItem('flux_autopilot_goal');
+        localStorage.removeItem('flux_autopilot_pending_checkin');
+        localStorage.removeItem('flux_autopilot_checkin_message');
+        localStorage.removeItem('flux_active_workflow');
+      }
       setMessages(prev => [...prev, { role: "assistant", content: 'Connection issue. Try again.', timestamp: Date.now() }]);
     }
   }, [input, isTyping, messages, pathname, selectedModel, project, autoPilotActive, speak, finalizeActiveStream, streamAssistantResponse]);
@@ -1260,6 +1408,20 @@ export function FluxAiAssistant({ userId, isOpen, onOpenChange }: { userId: stri
     const active = localStorage.getItem("flux_autopilot_active") === "true";
     const goal = localStorage.getItem("flux_autopilot_goal") || "";
     if (!pending || !active || !goal || isTyping || isStreamingActive) return;
+
+    if (autoPilotTurnsRef.current >= 5) {
+      localStorage.removeItem('flux_autopilot_pending_checkin');
+      localStorage.removeItem('flux_autopilot_checkin_message');
+      localStorage.removeItem('flux_autopilot_active');
+      localStorage.removeItem('flux_autopilot_goal');
+      localStorage.removeItem('flux_active_workflow');
+      setAutoPilotActive(false);
+      setAutoPilotGoal("");
+      autoPilotTurnsRef.current = 0;
+      setMessages(prev => [...prev, { role: "assistant", content: `**Auto-Pilot Completed:** Reached iteration limit (5) for goal: "${goal}".`, timestamp: Date.now() }]);
+      return;
+    }
+
     localStorage.removeItem('flux_autopilot_pending_checkin');
 
     const customMsg = localStorage.getItem('flux_autopilot_checkin_message');

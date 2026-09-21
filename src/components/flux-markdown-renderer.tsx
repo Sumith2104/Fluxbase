@@ -70,7 +70,10 @@ function extractThinking(text: string): { thinking: string[]; cleanedContent: st
     }
   }
 
-  // 4. Extract Action: ... meta-narration blocks
+  // 7. Collapse runaway ASCII lifelines / repeating pipe lines (more than 3 consecutive lines of only pipes and spaces)
+  cleaned = cleaned.replace(/(?:^[ \t]*\|[ \t|]*(?:\n|$)){4,}/gm, '        |                   |                   |                   |\n');
+
+  // 8. Extract Action: ... meta-narration blocks
   cleaned = cleaned.replace(/^Action:\s*([^\n]+(?:\n[^\n]+)?)/gim, (_, act) => {
     const actTrimmed = act.trim();
     if (actTrimmed && !actTrimmed.startsWith('[') && !thinking.includes(actTrimmed)) {
@@ -79,7 +82,7 @@ function extractThinking(text: string): { thinking: string[]; cleanedContent: st
     return '';
   });
 
-  // 5. Extract transitional filler meta-narration before queries
+  // 9. Extract transitional filler meta-narration before queries
   // e.g. "To provide the row count for each table, I will execute another SQL query to retrieve the table names along with their respective row counts. Here's the query:"
   const metaFillerMatch = cleaned.match(/^((?:To\s+\w+|I\s+will|Let\s+me|I'm\s+going\s+to|I'll|Allow\s+me\s+to)\s+[^.\n]+(?:execute|query|retrieve|run|fetch|check|inspect)[^.\n]*[.:]?)(?:\s*(?:Here(?:'s|\s+is)\s+the\s+(?:query|result|code):?|```.*))?/i);
   if (metaFillerMatch && (cleaned.length < 400 || !cleaned.includes('|'))) {

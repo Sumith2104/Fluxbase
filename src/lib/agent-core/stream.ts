@@ -29,6 +29,39 @@ export function createAgentSseTransformStream(sources: string[] = []): Transform
   let accumulatedText = '';
   let keepAliveTimer: any = null;
 
+  let consecutivePipeLines = 0;
+  let loopBroken = false;
+
+  function emitTextToken(token: string, controller: TransformStreamDefaultController<Uint8Array>) {
+    if (loopBroken) return;
+
+    // Check for repetitive ASCII lifeline loop (e.g. lines with only | and spaces)
+    if (token.includes('\n') || token.includes('|')) {
+      const recentLines = (accumulatedText + token).split('\n').slice(-10);
+      let pipeCount = 0;
+      for (let i = recentLines.length - 1; i >= 0; i--) {
+        const line = recentLines[i].trim();
+        if (line && /^(\|\s*)+$/.test(line)) {
+          pipeCount++;
+        } else if (line) {
+          break;
+        }
+      }
+      if (pipeCount >= 4) {
+        // Suppress repetitive pipe lines
+        if (pipeCount >= 8) {
+          // Break loop completely, don't let upstream run 45 seconds to timeout
+          loopBroken = true;
+          return;
+        }
+        return;
+      }
+    }
+
+    accumulatedText += token;
+    controller.enqueue(textEncoder.encode(formatSseEvent({ type: 'text', token })));
+  }
+
   return new TransformStream({
     start(controller) {
       // Send SSE keep-alive ping every 10 seconds to prevent proxy/browser timeout disconnects
@@ -41,11 +74,13 @@ export function createAgentSseTransformStream(sources: string[] = []): Transform
       }, 10000);
     },
     transform(chunk, controller) {
+      if (loopBroken) return;
       buffer += textDecoder.decode(chunk, { stream: true });
       const lines = buffer.split('\n');
       buffer = lines.pop() || '';
 
       for (const line of lines) {
+        if (loopBroken) break;
         const trimmed = line.trim();
         if (!trimmed || trimmed.startsWith(':')) continue; // Comment or keep-alive
 
@@ -65,21 +100,19 @@ export function createAgentSseTransformStream(sources: string[] = []): Transform
             // Handle <think> / </think> tag transitions in the live stream
             let remaining = content;
 
-            while (remaining.length > 0) {
+            while (remaining.length > 0 && !loopBroken) {
               if (!inThinkTag) {
                 const thinkOpenIdx = remaining.indexOf('<think>');
                 if (thinkOpenIdx !== -1) {
                   // Emit any text preceding <think>
                   const pre = remaining.slice(0, thinkOpenIdx);
                   if (pre) {
-                    accumulatedText += pre;
-                    controller.enqueue(textEncoder.encode(formatSseEvent({ type: 'text', token: pre })));
+                    emitTextToken(pre, controller);
                   }
                   inThinkTag = true;
                   remaining = remaining.slice(thinkOpenIdx + 7);
                 } else {
-                  accumulatedText += remaining;
-                  controller.enqueue(textEncoder.encode(formatSseEvent({ type: 'text', token: remaining })));
+                  emitTextToken(remaining, controller);
                   remaining = '';
                 }
               } else {
