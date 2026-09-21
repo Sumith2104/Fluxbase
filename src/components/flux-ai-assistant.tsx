@@ -11,7 +11,7 @@ import { cn } from "@/lib/utils";
 import { FluxAiApprovalCard, ApprovalRequestData } from "@/components/flux-ai-approval-card";
 import { FluxMarkdownRenderer } from "@/components/flux-markdown-renderer";
 import { BorderBeam } from "@/components/ui/border-beam";
-import { Button, LiquidButton } from "@/components/ui/button";
+import { Button } from "@/components/ui/button";
 import { FluxAiIcon } from "@/components/ui/flux-ai-icon";
 import { AgenticThinkBlock } from "@/components/ai/agentic-think-block";
 import { InChatChart } from "@/components/ai/in-chat-chart";
@@ -1657,21 +1657,24 @@ export function FluxAiAssistant({ userId, isOpen, onOpenChange }: { userId: stri
               </div>
             </div>
 
-            <div className="flex items-center justify-between px-4 h-14 shrink-0 border-b border-border bg-card/95">
-              <div className="flex items-center gap-2.5">
-                <BorderBeam size="sm" colorVariant="ocean" borderRadius={8} className="rounded-lg">
+            <div className="flex items-center justify-between px-4 h-14 shrink-0 border-b border-border bg-card/95 gap-2">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <BorderBeam size="sm" colorVariant="ocean" borderRadius={8} className="rounded-lg shrink-0">
                   <div className="relative flex items-center justify-center w-7 h-7 rounded-lg bg-gradient-to-br from-white/[0.12] to-white/[0.04] border border-white/[0.16] shadow-xs">
                     <FluxAiIcon size={15} />
                     <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-emerald-400 border-2 border-card" />
                   </div>
                 </BorderBeam>
-                <div><p className="text-sm font-semibold text-foreground leading-none">Flux AI</p><p className="text-[10.5px] text-muted-foreground mt-0.5">Autonomous agent</p></div>
+                <div className="min-w-0">
+                  <p className="text-sm font-semibold text-foreground leading-none truncate">Flux AI</p>
+                  <p className="text-[10.5px] text-muted-foreground mt-0.5 truncate hidden xs:block">Autonomous agent</p>
+                </div>
               </div>
-              <div className="flex items-center gap-0.5">
+              <div className="flex items-center gap-0.5 shrink-0">
                 <select
                   value={selectedModel}
                   onChange={(e) => handleModelChange(e.target.value)}
-                  className="h-7 px-2 mr-1.5 rounded border border-border bg-background text-[11px] font-medium text-foreground/85 focus:outline-none focus:ring-1 focus:ring-border cursor-pointer max-w-[125px] truncate shadow-xs opacity-95"
+                  className="h-7 px-2 mr-1 rounded border border-border bg-background text-[11px] font-medium text-foreground/85 focus:outline-none focus:ring-1 focus:ring-border cursor-pointer max-w-[115px] sm:max-w-[130px] truncate shadow-xs opacity-95"
                   title="AI Model"
                 >
                   <option value="flux-fast">Flux Fast</option>
@@ -1681,16 +1684,25 @@ export function FluxAiAssistant({ userId, isOpen, onOpenChange }: { userId: stri
                   <option value="flux-omni">Flux Omni (Vision)</option>
                   <option value="flux-max">Flux Max (Vision)</option>
                 </select>
-                <button onClick={() => setVoiceEnabled(v => !v)} className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors" title={voiceEnabled ? 'Mute' : 'Unmute'}>{voiceEnabled ? <Volume2 size={15} /> : <VolumeX size={15} />}</button>
-                <button onClick={toggleFullScreen} className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors" title={isFullScreen ? "Restore sidebar size" : "Expand to full screen"}>{isFullScreen ? <Minimize2 size={15} /> : <Maximize2 size={15} />}</button>
-                <button onClick={() => onOpenChange(false)} className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"><X size={15} /></button>
+                <button onClick={() => setVoiceEnabled(v => !v)} className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors cursor-pointer" title={voiceEnabled ? 'Mute' : 'Unmute'}>{voiceEnabled ? <Volume2 size={15} /> : <VolumeX size={15} />}</button>
+                <button onClick={toggleFullScreen} className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors cursor-pointer" title={isFullScreen ? "Restore sidebar size" : "Expand to full screen"}>{isFullScreen ? <Minimize2 size={15} /> : <Maximize2 size={15} />}</button>
+                <button onClick={() => onOpenChange(false)} className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors cursor-pointer" title="Close"><X size={15} /></button>
               </div>
             </div>
 
             {autoPilotActive && autoPilotGoal && (
               <div className="mx-4 mt-3 p-2.5 rounded-lg bg-amber-500/10 border border-amber-500/20 flex items-center justify-between text-[11px] text-amber-600 dark:text-amber-400 font-medium">
-                <div className="flex items-center gap-2 truncate"><Zap size={13} className="animate-bounce shrink-0 fill-current text-amber-500" /><span className="truncate">Auto-Pilot: &quot;{autoPilotGoal}&quot;</span></div>
-                <LiquidButton variant="destructive" size="sm" onClick={toggleAutoPilot} className="h-6 px-2.5 text-[10px] uppercase font-bold shrink-0 ml-2 cursor-pointer">Stop</LiquidButton>
+                <div className="flex items-center gap-2 truncate min-w-0">
+                  <Zap size={13} className="animate-bounce shrink-0 fill-current text-amber-500" />
+                  <span className="truncate">Auto-Pilot: &quot;{autoPilotGoal}&quot;</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={toggleAutoPilot}
+                  className="h-6 px-2.5 rounded-md bg-destructive text-destructive-foreground hover:bg-destructive/90 text-[10px] uppercase font-bold shrink-0 ml-2 cursor-pointer transition-colors shadow-2xs"
+                >
+                  Stop
+                </button>
               </div>
             )}
 
@@ -1709,12 +1721,12 @@ export function FluxAiAssistant({ userId, isOpen, onOpenChange }: { userId: stri
                               <div
                                 key={imgIdx}
                                 onClick={() => setPreviewImage(img)}
-                                className="relative group rounded-lg overflow-hidden border border-border/70 bg-black/20 cursor-pointer hover:border-primary/60 transition-all shadow-xs"
+                                className="relative group rounded-lg overflow-hidden border border-border/70 bg-black/20 cursor-pointer hover:border-primary/60 transition-all shadow-xs shrink-0 size-20 sm:size-24"
                               >
                                 <img
                                   src={img}
                                   alt={`Attachment ${imgIdx + 1}`}
-                                  className="object-cover h-24 w-24 sm:h-28 sm:w-28 rounded-lg"
+                                  className="w-full h-full object-cover rounded-lg"
                                 />
                                 <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-all flex items-center justify-center opacity-0 group-hover:opacity-100">
                                   <Maximize2 size={14} className="text-white drop-shadow-md" />
@@ -1928,15 +1940,14 @@ export function FluxAiAssistant({ userId, isOpen, onOpenChange }: { userId: stri
                     { label: "⚡ Analyze Performance", prompt: "What queries or indexes could improve performance in this database?" },
                     { label: "🔍 Show Tables", prompt: "List all user tables in this database with their row counts." }
                   ].map((chip) => (
-                    <LiquidButton
+                    <button
                       key={chip.label}
                       type="button"
-                      size="sm"
                       onClick={() => handleSend(undefined, chip.prompt)}
-                      className="h-7 text-[10.5px] font-medium px-3 text-muted-foreground hover:text-foreground cursor-pointer"
+                      className="h-6.5 text-[10.5px] font-medium px-2.5 rounded-full border border-border/70 bg-secondary/40 hover:bg-secondary/80 text-muted-foreground hover:text-foreground transition-all cursor-pointer truncate shadow-2xs"
                     >
                       {chip.label}
-                    </LiquidButton>
+                    </button>
                   ))}
                 </div>
               )}
@@ -1945,17 +1956,17 @@ export function FluxAiAssistant({ userId, isOpen, onOpenChange }: { userId: stri
               <div className="relative rounded-2xl border border-border/90 bg-background/95 shadow-sm transition-all focus-within:border-white/30 focus-within:ring-2 focus-within:ring-white/10 overflow-hidden">
                 {/* Image Attachments Preview Tray */}
                 {attachments.length > 0 && (
-                  <div className="flex items-center gap-2 px-3 pt-2.5 pb-1 flex-wrap border-b border-border/40 bg-secondary/20">
+                  <div className="flex items-center gap-2 px-3 pt-2.5 pb-2 flex-wrap border-b border-border/40 bg-secondary/15">
                     {attachments.map((img, i) => (
-                      <div key={i} className="relative group rounded-lg overflow-hidden border border-border/80 bg-background/60 shadow-xs h-13 w-13 shrink-0">
+                      <div key={i} className="relative group rounded-lg overflow-hidden border border-border/80 bg-background/60 shadow-xs h-12 w-12 shrink-0">
                         <img src={img} alt={`Attachment ${i + 1}`} className="w-full h-full object-cover" />
                         <button
                           type="button"
                           onClick={() => handleRemoveAttachment(i)}
-                          className="absolute top-0.5 right-0.5 p-0.5 rounded-full bg-black/75 text-white/80 hover:text-white hover:bg-black transition-all cursor-pointer shadow-xs"
+                          className="absolute top-0.5 right-0.5 p-0.5 rounded-full bg-black/75 text-white/90 hover:text-white hover:bg-black transition-all cursor-pointer shadow-xs"
                           title="Remove image"
                         >
-                          <X size={11} />
+                          <X size={10} />
                         </button>
                       </div>
                     ))}
@@ -1963,7 +1974,7 @@ export function FluxAiAssistant({ userId, isOpen, onOpenChange }: { userId: stri
                       <button
                         type="button"
                         onClick={() => fileInputRef.current?.click()}
-                        className="h-13 w-13 rounded-lg border border-dashed border-border/80 hover:border-primary/50 flex flex-col items-center justify-center text-muted-foreground hover:text-foreground transition-all text-[9.5px] gap-0.5 cursor-pointer bg-white/[0.02]"
+                        className="h-12 w-12 rounded-lg border border-dashed border-border/80 hover:border-primary/50 flex flex-col items-center justify-center text-muted-foreground hover:text-foreground transition-all text-[9.5px] gap-0.5 cursor-pointer bg-white/[0.02]"
                         title="Add another image"
                       >
                         <Plus size={13} />
@@ -1987,8 +1998,8 @@ export function FluxAiAssistant({ userId, isOpen, onOpenChange }: { userId: stri
                 />
 
                 {/* Bottom Toolbar */}
-                <div className="flex items-center justify-between px-3 pb-2.5 pt-1 gap-2">
-                  <div className="flex items-center gap-1.5 sm:gap-2">
+                <div className="flex items-center justify-between px-3 pb-2 pt-1 gap-2 min-w-0">
+                  <div className="flex items-center gap-1.5 min-w-0">
                     <input
                       ref={fileInputRef}
                       type="file"
@@ -2003,64 +2014,65 @@ export function FluxAiAssistant({ userId, isOpen, onOpenChange }: { userId: stri
                       }}
                     />
 
-                    <LiquidButton
+                    <button
                       type="button"
                       onClick={() => fileInputRef.current?.click()}
-                      size="sm"
                       disabled={isTyping}
                       className={cn(
-                        "h-7 px-2.5 text-[11px] font-medium transition-all select-none cursor-pointer flex items-center gap-1.5",
+                        "h-7 px-2.5 rounded-lg border text-[11px] font-medium transition-all select-none cursor-pointer flex items-center gap-1.5 shrink-0",
                         attachments.length > 0
-                          ? "text-primary font-semibold"
-                          : "text-muted-foreground hover:text-foreground"
+                          ? "border-primary/50 bg-primary/10 text-primary font-semibold hover:bg-primary/15"
+                          : "border-border/60 bg-secondary/40 text-muted-foreground hover:text-foreground hover:bg-secondary/70 hover:border-border/80"
                       )}
                       title="Attach database diagrams, schemas, or screenshots (or paste with Ctrl+V)"
                     >
                       <Paperclip className="size-3.5 shrink-0" />
-                      <span className="hidden sm:inline">Attach</span>
+                      <span>Attach</span>
                       {attachments.length > 0 && (
-                        <span className="px-1.5 py-0.2 rounded-full text-[9px] bg-primary/20 text-primary font-mono font-bold">
+                        <span className="px-1.5 py-0.2 rounded-full text-[9px] bg-primary/25 text-primary font-mono font-bold leading-none">
                           {attachments.length}
                         </span>
                       )}
-                    </LiquidButton>
+                    </button>
 
-                    <LiquidButton
+                    <button
                       type="button"
                       onClick={toggleAutoPilot}
-                      size="sm"
                       className={cn(
-                        "h-7 px-2.5 sm:px-3 text-[11px] font-medium transition-all select-none cursor-pointer",
+                        "h-7 px-2.5 rounded-lg border text-[11px] font-medium transition-all select-none cursor-pointer flex items-center gap-1.5 shrink-0",
                         autoPilotActive
-                          ? "text-amber-400 font-semibold"
-                          : "text-muted-foreground hover:text-foreground"
+                          ? "border-amber-500/50 bg-amber-500/10 text-amber-400 font-semibold hover:bg-amber-500/15"
+                          : "border-border/60 bg-secondary/40 text-muted-foreground hover:text-foreground hover:bg-secondary/70 hover:border-border/80"
                       )}
                       title="Toggle Autonomous Goal Execution"
                     >
                       <Zap className={cn("size-3.5 shrink-0", autoPilotActive && "animate-pulse fill-current text-amber-500")} />
-                      <span className="whitespace-nowrap">Auto-Pilot</span>
-                    </LiquidButton>
-
-                    <span className="text-[10px] text-muted-foreground/40 font-mono hidden sm:inline select-none">
-                      Shift+↵ newline
-                    </span>
+                      <span>Auto-Pilot</span>
+                    </button>
                   </div>
 
-                  <LiquidButton
-                    type="button"
-                    onClick={() => handleSend()}
-                    disabled={(!input.trim() && attachments.length === 0) || isTyping}
-                    size="icon"
-                    className={cn(
-                      "h-8 w-8 rounded-xl transition-all shadow-xs cursor-pointer",
-                      (input.trim() || attachments.length > 0)
-                        ? "text-white opacity-100 hover:scale-105 active:scale-95"
-                        : "opacity-40 cursor-not-allowed text-muted-foreground"
+                  <div className="flex items-center gap-2 shrink-0">
+                    {isFullScreen && (
+                      <span className="text-[10px] text-muted-foreground/40 font-mono select-none hidden lg:inline">
+                        Shift+↵ newline
+                      </span>
                     )}
-                    title="Send message (Enter)"
-                  >
-                    <ArrowUp size={14} strokeWidth={2.5} />
-                  </LiquidButton>
+
+                    <button
+                      type="button"
+                      onClick={() => handleSend()}
+                      disabled={(!input.trim() && attachments.length === 0) || isTyping}
+                      className={cn(
+                        "h-7.5 w-7.5 sm:h-8 sm:w-8 rounded-xl flex items-center justify-center transition-all shadow-xs shrink-0 cursor-pointer",
+                        (input.trim() || attachments.length > 0) && !isTyping
+                          ? "bg-primary text-primary-foreground hover:opacity-90 active:scale-95 shadow-md shadow-primary/20"
+                          : "bg-secondary/60 text-muted-foreground/40 cursor-not-allowed"
+                      )}
+                      title="Send message (Enter)"
+                    >
+                      <ArrowUp size={15} strokeWidth={2.5} />
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
