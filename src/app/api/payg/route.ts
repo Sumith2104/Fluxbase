@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getCurrentUserId } from '@/lib/auth';
-import { getOrCreateCurrentCycle } from '@/lib/payg-engine';
+import { getOrCreateCurrentCycle, invalidatePaygCache } from '@/lib/payg-engine';
 import { getPgPool } from '@/lib/pg';
 import logger from '@/lib/logger';
 
@@ -12,6 +12,7 @@ export async function GET(req: NextRequest) {
 
     const { searchParams } = new URL(req.url);
     const projectId = searchParams.get('projectId');
+    const force = searchParams.get('force') === 'true';
 
     if (!projectId) {
         return NextResponse.json({ error: 'Missing projectId parameter' }, { status: 400 });
@@ -29,7 +30,7 @@ export async function GET(req: NextRequest) {
             return NextResponse.json({ error: 'Project not found or access denied' }, { status: 404 });
         }
 
-        const cycle = await getOrCreateCurrentCycle(projectId, userId);
+        const cycle = await getOrCreateCurrentCycle(projectId, userId, force);
 
         return NextResponse.json({
             success: true,
@@ -68,6 +69,8 @@ export async function POST(req: NextRequest) {
         if (updateRes.rows.length === 0) {
             return NextResponse.json({ error: 'Active billing cycle not found' }, { status: 404 });
         }
+
+        invalidatePaygCache(projectId);
 
         return NextResponse.json({
             success: true,

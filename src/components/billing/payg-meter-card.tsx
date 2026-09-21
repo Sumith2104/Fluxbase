@@ -35,16 +35,18 @@ export function PaygMeterCard({ projectId }: PaygMeterCardProps) {
     const [spendingLimitInput, setSpendingLimitInput] = useState<string>('');
     const [isSavingLimit, setIsSavingLimit] = useState(false);
     const [showBreakdown, setShowBreakdown] = useState(false);
+    const [lastSynced, setLastSynced] = useState<Date | null>(null);
 
-    const fetchPaygData = async () => {
+    const fetchPaygData = async (force: boolean = false) => {
         if (!projectId) return;
         setLoading(true);
         try {
-            const res = await fetch(`/api/payg?projectId=${projectId}`);
+            const res = await fetch(`/api/payg?projectId=${projectId}${force ? '&force=true' : ''}`);
             const data = await res.json();
             if (res.ok && data.success) {
                 setCycleData(data.cycle);
                 setSpendingLimitInput(data.cycle.spendingLimit?.toString() || '1000');
+                setLastSynced(new Date());
             }
         } catch (e: any) {
             console.error('Error fetching PAYG data:', e);
@@ -54,7 +56,7 @@ export function PaygMeterCard({ projectId }: PaygMeterCardProps) {
     };
 
     useEffect(() => {
-        fetchPaygData();
+        fetchPaygData(false);
     }, [projectId]);
 
     const handleSaveSpendingLimit = async () => {
@@ -74,7 +76,7 @@ export function PaygMeterCard({ projectId }: PaygMeterCardProps) {
             const data = await res.json();
             if (res.ok && data.success) {
                 toast({ title: 'Spending Cap Updated', description: `Alerts will trigger if usage exceeds ₹${val}.` });
-                fetchPaygData();
+                fetchPaygData(true);
             } else {
                 toast({ variant: 'destructive', title: 'Update Failed', description: data.error || 'Failed to update cap' });
             }
@@ -126,10 +128,16 @@ export function PaygMeterCard({ projectId }: PaygMeterCardProps) {
                     </div>
 
                     <div className="flex items-center gap-2">
+                        {lastSynced && (
+                            <span className="text-[10px] text-muted-foreground hidden sm:inline-block font-mono">
+                                Synced {lastSynced.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                            </span>
+                        )}
                         <Button
                             variant="ghost"
                             size="sm"
-                            onClick={fetchPaygData}
+                            onClick={() => fetchPaygData(true)}
+                            disabled={loading}
                             className="h-7 px-2 text-xs text-muted-foreground hover:text-foreground"
                         >
                             <RefreshCw className={`h-3.5 w-3.5 mr-1 ${loading ? 'animate-spin' : ''}`} /> Sync
