@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, Volume2, VolumeX, ArrowUp, Zap, GripVertical, Play } from "lucide-react";
+import { X, Volume2, VolumeX, ArrowUp, Zap, GripVertical, Play, Maximize2, Minimize2 } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
 import { useContext } from "react";
 import { ProjectContext } from "@/contexts/project-context";
@@ -319,27 +319,83 @@ export function FluxAiAssistant({ userId, isOpen, onOpenChange }: { userId: stri
   const [autoPilotActive, setAutoPilotActive] = useState(false);
   const [autoPilotGoal, setAutoPilotGoal] = useState("");
   const [triggerCheckin, setTriggerCheckin] = useState(0);
-  const [panelWidth, setPanelWidth] = useState(420);
+  const [panelWidth, setPanelWidth] = useState(460);
   const [isResizing, setIsResizing] = useState(false);
+  const lastCustomWidthRef = useRef<number>(460);
   const [isStreamingActive, setIsStreamingActive] = useState(false);
 
-  // --- Panel resize ---
+  // --- Panel resize & fullscreen ---
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
     const saved = localStorage.getItem('flux_ai_panel_width');
-    if (saved) { const w = parseInt(saved, 10); if (!isNaN(w) && w >= 340 && w <= 1200) setPanelWidth(w); }
+    if (saved) {
+      const w = parseInt(saved, 10);
+      if (!isNaN(w) && w >= 340) {
+        const clamped = Math.min(w, window.innerWidth);
+        setPanelWidth(clamped);
+        if (clamped < window.innerWidth - 30) {
+          lastCustomWidthRef.current = clamped;
+        }
+      }
+    }
   }, []);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const onWindowResize = () => {
+      setPanelWidth(prev => Math.min(prev, window.innerWidth));
+    };
+    window.addEventListener('resize', onWindowResize);
+    return () => window.removeEventListener('resize', onWindowResize);
+  }, []);
+
+  const isFullScreen = typeof window !== 'undefined' ? panelWidth >= window.innerWidth - 20 : false;
+
+  const toggleFullScreen = () => {
+    if (typeof window === 'undefined') return;
+    if (isFullScreen) {
+      const restored = Math.max(380, Math.min(lastCustomWidthRef.current || 460, window.innerWidth - 60));
+      setPanelWidth(restored);
+      localStorage.setItem('flux_ai_panel_width', String(restored));
+    } else {
+      lastCustomWidthRef.current = panelWidth;
+      setPanelWidth(window.innerWidth);
+      localStorage.setItem('flux_ai_panel_width', String(window.innerWidth));
+    }
+  };
 
   const handleResizeStart = (e: React.MouseEvent) => {
     e.preventDefault();
     setIsResizing(true);
+    document.body.style.cursor = 'ew-resize';
+    document.body.style.userSelect = 'none';
+
     const onMove = (ev: MouseEvent) => {
-      const w = Math.max(340, Math.min(window.innerWidth - ev.clientX, Math.min(950, window.innerWidth - 20)));
+      const availableWidth = window.innerWidth;
+      const rawWidth = availableWidth - ev.clientX;
+      let w = rawWidth;
+      // If user drags near the left edge (within 35px), expand to full 100vw
+      if (rawWidth >= availableWidth - 35 || ev.clientX <= 35) {
+        w = availableWidth;
+      } else {
+        w = Math.max(340, Math.min(rawWidth, availableWidth));
+      }
       setPanelWidth(w);
+      if (w < availableWidth - 40) {
+        lastCustomWidthRef.current = w;
+      }
       localStorage.setItem('flux_ai_panel_width', String(w));
     };
-    const onUp = () => { setIsResizing(false); window.removeEventListener('mousemove', onMove); window.removeEventListener('mouseup', onUp); };
+
+    const onUp = () => {
+      setIsResizing(false);
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+    };
+
     window.addEventListener('mousemove', onMove);
     window.addEventListener('mouseup', onUp);
   };
@@ -1455,11 +1511,22 @@ export function FluxAiAssistant({ userId, isOpen, onOpenChange }: { userId: stri
           <motion.div
             initial={{ opacity: 0, x: 400 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 400 }}
             transition={{ duration: 0.25, type: 'spring', bounce: 0.1 }}
-            style={{ width: `${panelWidth}px`, maxWidth: 'calc(100vw - 20px)' }}
-            className={cn("fixed right-0 top-0 bottom-0 z-50 flex flex-col bg-card border-l border-border shadow-2xl transition-none", isResizing && "select-none")}
+            style={{ width: isFullScreen ? '100vw' : `${panelWidth}px`, maxWidth: '100vw' }}
+            className={cn(
+              "fixed right-0 top-0 bottom-0 z-50 flex flex-col bg-card border-l border-border shadow-2xl transition-none",
+              isResizing && "select-none",
+              isFullScreen && "border-l-0"
+            )}
           >
-            <div onMouseDown={handleResizeStart} className="absolute left-0 top-0 bottom-0 w-3 -translate-x-1/2 cursor-ew-resize hover:bg-white/10 active:bg-white/20 z-50 transition-colors flex items-center justify-center group" title="Drag to resize">
-              <div className="w-1 h-10 rounded-full bg-border/80 group-hover:bg-white/40 transition-colors flex items-center justify-center"><GripVertical className="h-3 w-3 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" /></div>
+            {/* Draggable resize handle - allows dragging all the way up to full screen */}
+            <div
+              onMouseDown={handleResizeStart}
+              className="absolute left-0 top-0 bottom-0 w-3.5 -translate-x-1/2 cursor-ew-resize hover:bg-primary/20 active:bg-primary/30 z-50 transition-colors flex items-center justify-center group select-none"
+              title="Drag to resize up to full screen"
+            >
+              <div className="w-1 h-12 rounded-full bg-border/80 group-hover:bg-primary/80 group-active:bg-primary transition-colors flex items-center justify-center shadow-xs">
+                <GripVertical className="h-3 w-3 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+              </div>
             </div>
 
             <div className="flex items-center justify-between px-4 h-14 shrink-0 border-b border-border bg-card/95">
@@ -1486,6 +1553,7 @@ export function FluxAiAssistant({ userId, isOpen, onOpenChange }: { userId: stri
                   <option value="flux-omni">Flux Omni</option>
                 </select>
                 <button onClick={() => setVoiceEnabled(v => !v)} className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors" title={voiceEnabled ? 'Mute' : 'Unmute'}>{voiceEnabled ? <Volume2 size={15} /> : <VolumeX size={15} />}</button>
+                <button onClick={toggleFullScreen} className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors" title={isFullScreen ? "Restore sidebar size" : "Expand to full screen"}>{isFullScreen ? <Minimize2 size={15} /> : <Maximize2 size={15} />}</button>
                 <button onClick={() => onOpenChange(false)} className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"><X size={15} /></button>
               </div>
             </div>
