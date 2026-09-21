@@ -34,6 +34,14 @@ export interface PaygBill {
     breakdown: PaygBreakdownItem[];
 }
 
+export interface UserPlanInfo {
+    plan: string;
+    role: string;
+    isSubscription: boolean;
+    planName: string;
+    billingCycleEnd: string | null;
+}
+
 export interface PaygCycleRecord {
     id: number;
     projectId: string;
@@ -49,6 +57,7 @@ export interface PaygCycleRecord {
     spendingLimit: number;
     depositCredit: number;
     status: 'active' | 'due' | 'paid' | 'grace_period';
+    userPlan?: UserPlanInfo;
 }
 
 export const PAYG_CONFIG = {
@@ -71,37 +80,222 @@ export const PAYG_CONFIG = {
     }
 };
 
+export function getPlanAllowance(plan: string = '', role: string = '') {
+    const p = (plan || '').toLowerCase();
+    const r = (role || p || '').toLowerCase();
+
+    if (r === 'org_owner' || p === 'org_owner' || p === 'org') {
+        return {
+            requests: 5000000,
+            tables: 100,
+            rows: 10000000,
+            storageMb: 100 * 1024,
+            apiKeys: 50,
+            mcpCalls: 10000,
+            planName: 'Organization Owner Tier',
+            isSubscription: true,
+            overageRatePer10kReqs: 2.00,
+            overageRatePerGbStorage: 15.00
+        };
+    } else if (r === 'employee' || p === 'employee') {
+        return {
+            requests: 500000,
+            tables: 50,
+            rows: 2500000,
+            storageMb: 10 * 1024,
+            apiKeys: 20,
+            mcpCalls: 2000,
+            planName: 'Employee Tier',
+            isSubscription: true,
+            overageRatePer10kReqs: 0.50,
+            overageRatePerGbStorage: 5.00
+        };
+    } else if (p === 'max') {
+        return {
+            requests: 1000000,
+            tables: 50,
+            rows: 5000000,
+            storageMb: 20 * 1024,
+            apiKeys: 25,
+            mcpCalls: 5000,
+            planName: 'Developer Max Tier',
+            isSubscription: true,
+            overageRatePer10kReqs: 1.00,
+            overageRatePerGbStorage: 8.00
+        };
+    } else if (p === 'pro') {
+        return {
+            requests: 250000,
+            tables: 20,
+            rows: 1000000,
+            storageMb: 5 * 1024,
+            apiKeys: 10,
+            mcpCalls: 1000,
+            planName: 'Developer Pro Tier',
+            isSubscription: true,
+            overageRatePer10kReqs: 1.00,
+            overageRatePerGbStorage: 10.00
+        };
+    } else if (p === 'pay_as_you_go' || p === 'payg') {
+        return {
+            requests: 50000,
+            tables: 5,
+            rows: 25000,
+            storageMb: 100,
+            apiKeys: 2,
+            mcpCalls: 100,
+            planName: 'Pay-As-You-Go',
+            isSubscription: false,
+            overageRatePer10kReqs: 2.00,
+            overageRatePerGbStorage: 15.00
+        };
+    }
+
+    return {
+        requests: 50000,
+        tables: 5,
+        rows: 25000,
+        storageMb: 500,
+        apiKeys: 2,
+        mcpCalls: 100,
+        planName: 'Student Free Tier',
+        isSubscription: false,
+        overageRatePer10kReqs: 2.00,
+        overageRatePerGbStorage: 15.00
+    };
+}
+
 /**
  * Calculates current bill and itemized line items from raw usage metrics.
+ * Subscription tiers (org_owner, employee, max, pro) have full quotas covered by monthly plan.
  */
-export function calculatePaygBill(metrics: PaygMetrics, depositCredit: number = 0): PaygBill {
-    const { freeAllowance, unitRates } = PAYG_CONFIG;
+export function calculatePaygBill(
+    metrics: PaygMetrics, 
+    depositCredit: number = 0,
+    planInfo?: { plan: string; role?: string }
+): PaygBill {
+    const allowance = getPlanAllowance(planInfo?.plan || '', planInfo?.role || '');
+    const { unitRates } = PAYG_CONFIG;
+
+    if (allowance.isSubscription) {
+        // Subscription Tier (e.g. Org Owner):
+        // Base allowance is fully covered by monthly fee. Overage applies ONLY beyond included limits.
+        const excessRequests = Math.max(0, metrics.totalRequests - allowance.requests);
+        const requestCost = excessRequests > 0 ? Math.ceil(excessRequests / 10000) * allowance.overageRatePer10kReqs : 0;
+
+        const excessTables = Math.max(0, metrics.totalTables - allowance.tables);
+        const tableCost = excessTables > 0 ? excessTables * 2 : 0;
+
+        const excessRows = Math.max(0, metrics.totalRows - allowance.rows);
+        const rowCost = excessRows > 0 ? Math.ceil(excessRows / 50000) * 5 : 0;
+
+        const excessStorageMb = Math.max(0, metrics.storageMb - allowance.storageMb);
+        const excessStorageGb = excessStorageMb / 1024;
+        const storageCost = excessStorageGb > 0 ? Number((excessStorageGb * allowance.overageRatePerGbStorage).toFixed(2)) : 0;
+
+        const excessKeys = Math.max(0, metrics.activeApiKeys - allowance.apiKeys);
+        const keyCost = excessKeys > 0 ? excessKeys * 5 : 0;
+
+        const excessMcp = Math.max(0, metrics.mcpCalls - allowance.mcpCalls);
+        const mcpCost = excessMcp > 0 ? Math.ceil(excessMcp / 500) * 10 : 0;
+
+        const grossAmount = Number((requestCost + tableCost + rowCost + storageCost + keyCost + mcpCost).toFixed(2));
+        const totalAmount = grossAmount;
+
+        const breakdown: PaygBreakdownItem[] = [
+            {
+                dimension: 'API & Query Requests',
+                used: metrics.totalRequests,
+                unit: 'requests',
+                freeAllowance: allowance.requests,
+                billableUnits: excessRequests,
+                rateDescription: excessRequests === 0 
+                    ? `100% Covered (${allowance.requests.toLocaleString()} included in plan)`
+                    : `₹${allowance.overageRatePer10kReqs} / 10k excess beyond ${allowance.requests.toLocaleString()}`,
+                cost: requestCost
+            },
+            {
+                dimension: 'Database Tables',
+                used: metrics.totalTables,
+                unit: 'tables',
+                freeAllowance: allowance.tables,
+                billableUnits: excessTables,
+                rateDescription: excessTables === 0 ? 'Included in subscription' : '₹2 / table excess',
+                cost: tableCost
+            },
+            {
+                dimension: 'Database Rows',
+                used: metrics.totalRows,
+                unit: 'rows',
+                freeAllowance: allowance.rows,
+                billableUnits: excessRows,
+                rateDescription: excessRows === 0 ? 'Included in subscription' : '₹5 / 50k rows excess',
+                cost: rowCost
+            },
+            {
+                dimension: 'Storage Footprint',
+                used: metrics.storageMb,
+                unit: 'MB',
+                freeAllowance: allowance.storageMb,
+                billableUnits: excessStorageMb,
+                rateDescription: excessStorageMb === 0 
+                    ? `100% Covered (${(allowance.storageMb / 1024).toFixed(0)}GB included in plan)`
+                    : `₹${allowance.overageRatePerGbStorage} / GB excess`,
+                cost: storageCost
+            },
+            {
+                dimension: 'Active API Keys',
+                used: metrics.activeApiKeys,
+                unit: 'keys',
+                freeAllowance: allowance.apiKeys,
+                billableUnits: excessKeys,
+                rateDescription: excessKeys === 0 ? 'Included in subscription' : '₹5 / key excess',
+                cost: keyCost
+            },
+            {
+                dimension: 'MCP Tool Calls',
+                used: metrics.mcpCalls,
+                unit: 'calls',
+                freeAllowance: allowance.mcpCalls,
+                billableUnits: excessMcp,
+                rateDescription: excessMcp === 0 ? 'Included in subscription' : '₹10 / 500 excess',
+                cost: mcpCost
+            }
+        ];
+
+        return {
+            grossAmount,
+            depositCreditApplied: 0,
+            totalAmount,
+            breakdown
+        };
+    }
 
     // 1. API Requests
-    const excessRequests = Math.max(0, metrics.totalRequests - freeAllowance.requests);
+    const excessRequests = Math.max(0, metrics.totalRequests - allowance.requests);
     const requestUnits = Math.ceil(excessRequests / 50000);
     const requestCost = requestUnits * unitRates.per50kRequests;
 
     // 2. Tables
-    const excessTables = Math.max(0, metrics.totalTables - freeAllowance.tables);
+    const excessTables = Math.max(0, metrics.totalTables - allowance.tables);
     const tableCost = excessTables * unitRates.perTable;
 
     // 3. Rows
-    const excessRows = Math.max(0, metrics.totalRows - freeAllowance.rows);
+    const excessRows = Math.max(0, metrics.totalRows - allowance.rows);
     const rowUnits = Math.ceil(excessRows / 50000);
     const rowCost = rowUnits * unitRates.per50kRows;
 
     // 4. Storage MB
-    const excessStorage = Math.max(0, metrics.storageMb - freeAllowance.storageMb);
+    const excessStorage = Math.max(0, metrics.storageMb - allowance.storageMb);
     const storageUnits = Math.ceil(excessStorage / 100);
     const storageCost = storageUnits * unitRates.per100MbStorage;
 
     // 5. API Keys
-    const excessKeys = Math.max(0, metrics.activeApiKeys - freeAllowance.apiKeys);
+    const excessKeys = Math.max(0, metrics.activeApiKeys - allowance.apiKeys);
     const keyCost = excessKeys * unitRates.perApiKey;
 
     // 6. MCP Calls
-    const excessMcp = Math.max(0, metrics.mcpCalls - freeAllowance.mcpCalls);
+    const excessMcp = Math.max(0, metrics.mcpCalls - allowance.mcpCalls);
     const mcpUnits = Math.ceil(excessMcp / 500);
     const mcpCost = mcpUnits * unitRates.per500McpCalls;
 
@@ -114,7 +308,7 @@ export function calculatePaygBill(metrics: PaygMetrics, depositCredit: number = 
             dimension: 'API Requests',
             used: metrics.totalRequests,
             unit: 'requests',
-            freeAllowance: freeAllowance.requests,
+            freeAllowance: allowance.requests,
             billableUnits: excessRequests,
             rateDescription: '₹10 / 50,000 reqs',
             cost: requestCost
@@ -123,7 +317,7 @@ export function calculatePaygBill(metrics: PaygMetrics, depositCredit: number = 
             dimension: 'Database Tables',
             used: metrics.totalTables,
             unit: 'tables',
-            freeAllowance: freeAllowance.tables,
+            freeAllowance: allowance.tables,
             billableUnits: excessTables,
             rateDescription: '₹2 / table',
             cost: tableCost
@@ -132,17 +326,17 @@ export function calculatePaygBill(metrics: PaygMetrics, depositCredit: number = 
             dimension: 'Database Rows',
             used: metrics.totalRows,
             unit: 'rows',
-            freeAllowance: freeAllowance.rows,
+            freeAllowance: allowance.rows,
             billableUnits: excessRows,
             rateDescription: '₹5 / 50,000 rows',
             cost: rowCost
         },
         {
-            dimension: 'Disk Storage',
+            dimension: 'Storage Footprint',
             used: metrics.storageMb,
             unit: 'MB',
-            freeAllowance: freeAllowance.storageMb,
-            billableUnits: Number(excessStorage.toFixed(2)),
+            freeAllowance: allowance.storageMb,
+            billableUnits: excessStorage,
             rateDescription: '₹15 / 100 MB',
             cost: storageCost
         },
@@ -150,7 +344,7 @@ export function calculatePaygBill(metrics: PaygMetrics, depositCredit: number = 
             dimension: 'Active API Keys',
             used: metrics.activeApiKeys,
             unit: 'keys',
-            freeAllowance: freeAllowance.apiKeys,
+            freeAllowance: allowance.apiKeys,
             billableUnits: excessKeys,
             rateDescription: '₹5 / key',
             cost: keyCost
@@ -159,7 +353,7 @@ export function calculatePaygBill(metrics: PaygMetrics, depositCredit: number = 
             dimension: 'MCP Tool Calls',
             used: metrics.mcpCalls,
             unit: 'calls',
-            freeAllowance: freeAllowance.mcpCalls,
+            freeAllowance: allowance.mcpCalls,
             billableUnits: excessMcp,
             rateDescription: '₹10 / 500 calls',
             cost: mcpCost
@@ -388,6 +582,30 @@ export async function getOrCreateCurrentCycle(
     const userId = project.user_id || fallbackUserId;
     const projectCreatedAt = new Date(project.created_at || Date.now());
 
+    let userRow: any = {};
+    if (userId) {
+        try {
+            const uRes = await pool.query(
+                'SELECT plan_type, user_role, billing_cycle_end, status FROM fluxbase_global.users WHERE id = $1::text',
+                [userId]
+            );
+            userRow = uRes.rows[0] || {};
+        } catch (e) {
+            logger.warn('[PAYG Meter] Error fetching user plan:', e);
+        }
+    }
+
+    const plan = (userRow.plan_type || 'free').toLowerCase();
+    const role = (userRow.user_role || plan || 'student').toLowerCase();
+    const planAllowance = getPlanAllowance(plan, role);
+    const userPlanInfo: UserPlanInfo = {
+        plan,
+        role,
+        isSubscription: planAllowance.isSubscription,
+        planName: planAllowance.planName,
+        billingCycleEnd: userRow.billing_cycle_end ? new Date(userRow.billing_cycle_end).toISOString() : null
+    };
+
     // 2. Look for an active cycle
     const cycleRes = await pool.query(`
         SELECT * FROM fluxbase_global.payg_usage_cycles 
@@ -428,7 +646,7 @@ export async function getOrCreateCurrentCycle(
         } : undefined;
 
         const finalMetrics = await fetchProjectRealtimeMetrics(projectId, project.dialect, new Date(cycleRow.cycle_start), oldCheckpoint);
-        const finalBill = calculatePaygBill(finalMetrics, currentDeposit);
+        const finalBill = calculatePaygBill(finalMetrics, currentDeposit, userPlanInfo);
         const leftoverCredit = Math.max(0, currentDeposit - finalBill.grossAmount);
 
         await pool.query(`
@@ -499,7 +717,7 @@ export async function getOrCreateCurrentCycle(
         } : undefined;
 
         currentMetrics = await fetchProjectRealtimeMetrics(projectId, project.dialect, currentCycleStart, checkpoint);
-        const billPreview = calculatePaygBill(currentMetrics, depositCredit);
+        const billPreview = calculatePaygBill(currentMetrics, depositCredit, userPlanInfo);
 
         // Sync updated metrics into database row for reporting and next delta
         await pool.query(`
@@ -525,7 +743,7 @@ export async function getOrCreateCurrentCycle(
         ]);
     }
 
-    const bill = calculatePaygBill(currentMetrics, depositCredit);
+    const bill = calculatePaygBill(currentMetrics, depositCredit, userPlanInfo);
 
     const startMs = currentCycleStart.getTime();
     const endMs = new Date(cycleRow.cycle_end).getTime();
@@ -549,7 +767,8 @@ export async function getOrCreateCurrentCycle(
         bill,
         spendingLimit: parseFloat(cycleRow.spending_limit || '1000'),
         depositCredit,
-        status: cycleRow.status
+        status: cycleRow.status,
+        userPlan: userPlanInfo
     };
 
     _cycleMemoryCache.set(projectId, record);

@@ -40,7 +40,7 @@ export default function BillingSettingsPage() {
                 <TabsList className="grid w-full sm:w-[420px] grid-cols-2 bg-secondary/40 border border-border/60">
                     <TabsTrigger value="overview" className="flex items-center gap-2 text-xs font-medium">
                         <CreditCard className="h-3.5 w-3.5" />
-                        Workspace & Pay-As-You-Go
+                        Workspace & Plan Usage
                     </TabsTrigger>
                     <TabsTrigger value="api-bills" className="flex items-center gap-2 text-xs font-medium">
                         <Receipt className="h-3.5 w-3.5" />
