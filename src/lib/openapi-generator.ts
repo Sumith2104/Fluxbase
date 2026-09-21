@@ -55,12 +55,12 @@ export function generateOpenAPISpec(): Record<string, any> {
         paths: {
             '/api/v1/models': {
                 get: {
-                    summary: 'List available Flux AI models',
-                    tags: ['Flux AI'],
+                    summary: 'List available Flux AI models across all modalities',
+                    tags: ['Flux AI Multimodal'],
                     security: [{ bearerAuth: [] }, { apiKeyAuth: [] }],
                     responses: {
                         '200': {
-                            description: 'OpenAI-compatible list of available Flux AI models (flux, flux-flash, flux-pro, flux-ultra, flux-5.2)',
+                            description: 'OpenAI-compatible list of available Flux AI models across text, image, audio, video, and embedding modalities',
                         },
                         '401': unauthorized,
                     },
@@ -68,8 +68,8 @@ export function generateOpenAPISpec(): Record<string, any> {
             },
             '/api/v1/chat/completions': {
                 post: {
-                    summary: 'Generate chat completions with Flux AI models',
-                    tags: ['Flux AI'],
+                    summary: 'Generate chat completions with Flux AI reasoning models',
+                    tags: ['Flux AI Multimodal'],
                     security: [{ bearerAuth: [] }, { apiKeyAuth: [] }],
                     requestBody: {
                         required: true,
@@ -81,8 +81,8 @@ export function generateOpenAPISpec(): Record<string, any> {
                                     properties: {
                                         model: {
                                             type: 'string',
-                                            default: 'flux',
-                                            enum: ['flux', 'flux-flash', 'flux-pro', 'flux-ultra', 'flux-5.2', 'gpt-4o', 'gpt-3.5-turbo'],
+                                            default: 'flux-fast',
+                                            enum: ['flux-fast', 'flux-pro', 'flux-ultra', 'flux-turbo', 'flux-omni', 'flux-max', 'gpt-4o', 'gpt-3.5-turbo'],
                                             description: 'Model identifier to use for completion'
                                         },
                                         messages: {
@@ -108,10 +108,196 @@ export function generateOpenAPISpec(): Record<string, any> {
                         '200': { description: 'Chat completion response (or event-stream if stream=true)' },
                         '401': unauthorized,
                         '403': forbidden,
-                        '429': { description: 'Rate limit exceeded (60 req/min)' },
+                        '429': { description: 'Rate limit exceeded' },
                         '500': serverError,
                     },
                 },
+            },
+            '/api/v1/images/generations': {
+                post: {
+                    summary: 'Generate photorealistic images with Flux Image models',
+                    tags: ['Flux AI Multimodal'],
+                    security: [{ bearerAuth: [] }, { apiKeyAuth: [] }],
+                    requestBody: {
+                        required: true,
+                        content: {
+                            'application/json': {
+                                schema: {
+                                    type: 'object',
+                                    required: ['prompt'],
+                                    properties: {
+                                        model: { type: 'string', default: 'flux-image', enum: ['flux-image', 'flux-image-fast', 'flux-image-hd', 'flux-image-pro', 'dall-e-3'] },
+                                        prompt: { type: 'string', description: 'Text prompt describing the desired image' },
+                                        n: { type: 'integer', default: 1, minimum: 1, maximum: 4 },
+                                        size: { type: 'string', default: '1024x1024' },
+                                        response_format: { type: 'string', default: 'url', enum: ['url', 'b64_json'] }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    responses: {
+                        '200': { description: 'OpenAI-compatible image generation result with durable S3 URLs' },
+                        '401': unauthorized,
+                        '429': { description: 'Rate limit exceeded' },
+                        '500': serverError,
+                    }
+                }
+            },
+            '/api/v1/audio/transcriptions': {
+                post: {
+                    summary: 'Transcribe audio to text with Flux Listen models',
+                    tags: ['Flux AI Multimodal'],
+                    security: [{ bearerAuth: [] }, { apiKeyAuth: [] }],
+                    requestBody: {
+                        required: true,
+                        content: {
+                            'multipart/form-data': {
+                                schema: {
+                                    type: 'object',
+                                    required: ['file'],
+                                    properties: {
+                                        file: { type: 'string', format: 'binary', description: 'Audio file (mp3, wav, m4a, ogg, webm, mp4)' },
+                                        model: { type: 'string', default: 'flux-listen', enum: ['flux-listen', 'flux-listen-pro', 'flux-listen-en', 'whisper-1'] },
+                                        language: { type: 'string', description: 'ISO language code' },
+                                        response_format: { type: 'string', default: 'json', enum: ['json', 'text', 'verbose_json'] }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    responses: {
+                        '200': { description: 'Audio transcription response' },
+                        '401': unauthorized,
+                        '429': { description: 'Rate limit exceeded' },
+                        '500': serverError,
+                    }
+                }
+            },
+            '/api/v1/audio/speech': {
+                post: {
+                    summary: 'Synthesize speech from text with Flux Speak models',
+                    tags: ['Flux AI Multimodal'],
+                    security: [{ bearerAuth: [] }, { apiKeyAuth: [] }],
+                    requestBody: {
+                        required: true,
+                        content: {
+                            'application/json': {
+                                schema: {
+                                    type: 'object',
+                                    required: ['input', 'voice'],
+                                    properties: {
+                                        model: { type: 'string', default: 'flux-speak', enum: ['flux-speak', 'flux-speak-hd', 'tts-1'] },
+                                        input: { type: 'string', description: 'The text to generate audio for' },
+                                        voice: { type: 'string', default: 'alloy', enum: ['alloy', 'echo', 'fable', 'onyx', 'nova', 'shimmer'] },
+                                        response_format: { type: 'string', default: 'mp3', enum: ['mp3', 'opus', 'aac', 'flac', 'wav', 'pcm'] },
+                                        speed: { type: 'number', default: 1.0, minimum: 0.25, maximum: 4.0 }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    responses: {
+                        '200': { description: 'Binary audio stream (audio/mpeg, etc.)' },
+                        '401': unauthorized,
+                        '429': { description: 'Rate limit exceeded' },
+                        '500': serverError,
+                    }
+                }
+            },
+            '/api/v1/videos/generations': {
+                post: {
+                    summary: 'Dispatch async video generation with Flux Video models',
+                    tags: ['Flux AI Multimodal'],
+                    security: [{ bearerAuth: [] }, { apiKeyAuth: [] }],
+                    requestBody: {
+                        required: true,
+                        content: {
+                            'application/json': {
+                                schema: {
+                                    type: 'object',
+                                    required: ['prompt'],
+                                    properties: {
+                                        model: { type: 'string', default: 'flux-video', enum: ['flux-video', 'flux-video-pro'] },
+                                        prompt: { type: 'string', description: 'Text prompt describing the desired video motion' },
+                                        image_url: { type: 'string', description: 'Optional source image for image-to-video synthesis' }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    responses: {
+                        '202': { description: 'Task accepted for processing with task_id and poll_url' },
+                        '401': unauthorized,
+                        '429': { description: 'Rate limit exceeded' },
+                        '500': serverError,
+                    }
+                }
+            },
+            '/api/v1/videos/generations/{taskId}': {
+                get: {
+                    summary: 'Poll status and retrieve generated video URL',
+                    tags: ['Flux AI Multimodal'],
+                    security: [{ bearerAuth: [] }, { apiKeyAuth: [] }],
+                    parameters: [
+                        { name: 'taskId', in: 'path', required: true, schema: { type: 'string' } }
+                    ],
+                    responses: {
+                        '200': { description: 'Video generation status and final S3 video URL upon completion' },
+                        '401': unauthorized,
+                        '404': notFound,
+                        '500': serverError,
+                    }
+                }
+            },
+            '/api/v1/embeddings': {
+                post: {
+                    summary: 'Generate high-performance 768-dimensional text embeddings',
+                    tags: ['Flux AI Multimodal'],
+                    security: [{ bearerAuth: [] }, { apiKeyAuth: [] }],
+                    requestBody: {
+                        required: true,
+                        content: {
+                            'application/json': {
+                                schema: {
+                                    type: 'object',
+                                    required: ['input'],
+                                    properties: {
+                                        model: { type: 'string', default: 'flux-embed', enum: ['flux-embed', 'text-embedding-3-small'] },
+                                        input: {
+                                            oneOf: [
+                                                { type: 'string' },
+                                                { type: 'array', items: { type: 'string' } }
+                                            ],
+                                            description: 'Input text or array of strings to embed'
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    responses: {
+                        '200': { description: 'OpenAI-compatible embedding vectors' },
+                        '401': unauthorized,
+                        '429': { description: 'Rate limit exceeded' },
+                        '500': serverError,
+                    }
+                }
+            },
+            '/api/v1/media/{mediaId}': {
+                get: {
+                    summary: 'Securely retrieve generated multimodal media asset via presigned redirect',
+                    tags: ['Flux AI Multimodal'],
+                    parameters: [
+                        { name: 'mediaId', in: 'path', required: true, schema: { type: 'string' } }
+                    ],
+                    responses: {
+                        '302': { description: 'Redirect to secure private S3 presigned asset URL' },
+                        '404': notFound,
+                        '410': { description: 'Asset expired' },
+                        '500': serverError,
+                    }
+                }
             },
             '/api/v1/sql': {
                 post: {

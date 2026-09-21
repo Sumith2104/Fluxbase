@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, Volume2, VolumeX, ArrowUp, Zap, GripVertical, Play, Maximize2, Minimize2 } from "lucide-react";
+import { X, Volume2, VolumeX, ArrowUp, Zap, GripVertical, Play, Maximize2, Minimize2, Paperclip, Plus } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
 import { useContext } from "react";
 import { ProjectContext } from "@/contexts/project-context";
@@ -21,6 +21,7 @@ import { InChatChart } from "@/components/ai/in-chat-chart";
 type Message = {
   role: "user" | "assistant";
   content: string;
+  images?: string[];
   thought?: string;
   isThinking?: boolean;
   thoughtDuration?: number;
@@ -34,7 +35,8 @@ type Message = {
   taskLabel?: string;
 };
 
-export function getTaskLabel(prompt?: string): string {
+export function getTaskLabel(prompt?: string, hasImages?: boolean): string {
+  if (hasImages) return "Inspecting image...";
   if (!prompt) return "Thinking...";
   const p = prompt.toLowerCase().trim();
 
@@ -324,6 +326,94 @@ export function FluxAiAssistant({ userId, isOpen, onOpenChange }: { userId: stri
   const lastCustomWidthRef = useRef<number>(460);
   const [isStreamingActive, setIsStreamingActive] = useState(false);
 
+  // --- Image Attachments State ---
+  const [attachments, setAttachments] = useState<string[]>([]);
+  const [isUploadingImage, setIsUploadingImage] = useState(false);
+  const [previewImage, setPreviewImage] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const processImageFiles = useCallback((files: FileList | File[]) => {
+    const fileArray = Array.from(files).filter(f => f.type.startsWith('image/'));
+    if (fileArray.length === 0) return;
+
+    setAttachments(prev => {
+      const remainingSlots = Math.max(0, 5 - prev.length);
+      if (remainingSlots <= 0) return prev;
+      const toProcess = fileArray.slice(0, remainingSlots);
+      setIsUploadingImage(true);
+
+      Promise.all(
+        toProcess.map(file => {
+          return new Promise<string>((resolve) => {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+              const dataUrl = (e.target?.result as string) || '';
+              // If file is > 1.5MB, resize via HTML canvas to keep payload snappy
+              if (file.size > 1.5 * 1024 * 1024) {
+                const img = new Image();
+                img.onload = () => {
+                  const canvas = document.createElement('canvas');
+                  const maxDim = 1920;
+                  let { width, height } = img;
+                  if (width > maxDim || height > maxDim) {
+                    if (width > height) {
+                      height = Math.round((height * maxDim) / width);
+                      width = maxDim;
+                    } else {
+                      width = Math.round((width * maxDim) / height);
+                      height = maxDim;
+                    }
+                  }
+                  canvas.width = width;
+                  canvas.height = height;
+                  const ctx = canvas.getContext('2d');
+                  ctx?.drawImage(img, 0, 0, width, height);
+                  resolve(canvas.toDataURL('image/jpeg', 0.85));
+                };
+                img.onerror = () => resolve(dataUrl);
+                img.src = dataUrl;
+              } else {
+                resolve(dataUrl);
+              }
+            };
+            reader.onerror = () => resolve('');
+            reader.readAsDataURL(file);
+          });
+        })
+      ).then(newImages => {
+        const filtered = newImages.filter(Boolean);
+        if (filtered.length > 0) {
+          setAttachments(curr => [...curr, ...filtered].slice(0, 5));
+        }
+        setIsUploadingImage(false);
+      }).catch(() => {
+        setIsUploadingImage(false);
+      });
+
+      return prev;
+    });
+  }, []);
+
+  const handleRemoveAttachment = useCallback((idx: number) => {
+    setAttachments(prev => prev.filter((_, i) => i !== idx));
+  }, []);
+
+  const handlePaste = useCallback((e: React.ClipboardEvent<HTMLTextAreaElement>) => {
+    if (e.clipboardData && e.clipboardData.items) {
+      const items = Array.from(e.clipboardData.items);
+      const imageItems = items.filter(item => item.type.startsWith('image/'));
+      if (imageItems.length > 0) {
+        e.preventDefault();
+        const files: File[] = [];
+        for (const item of imageItems) {
+          const file = item.getAsFile();
+          if (file) files.push(file);
+        }
+        processImageFiles(files);
+      }
+    }
+  }, [processImageFiles]);
+
   // --- Panel resize & fullscreen ---
 
   useEffect(() => {
@@ -447,9 +537,30 @@ export function FluxAiAssistant({ userId, isOpen, onOpenChange }: { userId: stri
 
   useEffect(() => {
     if (!isRestored.current) return;
-    const sanitized = messages.slice(-MAX_MESSAGES).map(m => m.isStreaming ? { ...m, isStreaming: false } : m);
-    const serialized = JSON.stringify(sanitized);
-    localStorage.setItem(storageKey, serialized.length < MAX_STORAGE_BYTES ? serialized : JSON.stringify(sanitized.slice(-10)));
+    try {
+      const sanitized = messages.slice(-MAX_MESSAGES).map(m => {
+        const copy = { ...m };
+        if (copy.isStreaming) copy.isStreaming = false;
+        return copy;
+      });
+      let serialized = JSON.stringify(sanitized);
+      if (serialized.length >= MAX_STORAGE_BYTES) {
+        // Strip large data URLs from older messages if storage limit is approached
+        const lightweight = sanitized.map((m, idx, arr) => {
+          if (idx < arr.length - 2 && m.images) {
+            return { ...m, images: undefined };
+          }
+          return m;
+        });
+        serialized = JSON.stringify(lightweight);
+      }
+      localStorage.setItem(storageKey, serialized.length < MAX_STORAGE_BYTES ? serialized : JSON.stringify(sanitized.slice(-5)));
+    } catch (e) {
+      try {
+        const minimal = messages.slice(-3).map(m => ({ role: m.role, content: m.content, timestamp: m.timestamp }));
+        localStorage.setItem(storageKey, JSON.stringify(minimal));
+      } catch {}
+    }
   }, [messages, storageKey]);
 
   // Dedicated Auto-Scroll: Keeps viewport pinned to the bottom on new messages, typing indicator, or streaming tokens
@@ -1045,10 +1156,12 @@ export function FluxAiAssistant({ userId, isOpen, onOpenChange }: { userId: stri
     if (e) e.preventDefault();
     finalizeActiveStream();
     const msg = overrideMsg || input.trim();
-    if (!msg.trim() || isTyping) return;
+    const currentAttachments = overrideMsg ? [] : [...attachments];
+    if ((!msg.trim() && currentAttachments.length === 0) || isTyping) return;
 
     if (!overrideMsg) {
       setInput("");
+      setAttachments([]);
       if (textareaRef.current) {
         textareaRef.current.style.height = "auto";
       }
@@ -1059,11 +1172,18 @@ export function FluxAiAssistant({ userId, isOpen, onOpenChange }: { userId: stri
       }
     }
 
+    const effectiveMsg = msg.trim() || (currentAttachments.length > 0 ? "Please inspect the attached image(s) and explain what you see, extracting schema, tables, or solutions." : "");
     const isHidden = !!overrideMsg && msg.startsWith("System:");
-    const taskLabel = getTaskLabel(msg);
+    const taskLabel = getTaskLabel(msg, currentAttachments.length > 0);
     setMessages(prev => [
       ...prev,
-      { role: "user", content: msg, hidden: isHidden, timestamp: Date.now() },
+      {
+        role: "user",
+        content: effectiveMsg,
+        images: currentAttachments.length > 0 ? currentAttachments : undefined,
+        hidden: isHidden,
+        timestamp: Date.now()
+      },
       {
         role: "assistant",
         content: "",
@@ -1078,7 +1198,15 @@ export function FluxAiAssistant({ userId, isOpen, onOpenChange }: { userId: stri
     setIsStreamingActive(true);
     setTimeout(() => scrollToBottom('smooth'), 20);
 
-    const currentMsgs = [...messages, { role: "user" as const, content: msg, hidden: isHidden }];
+    const currentMsgs = [
+      ...messages,
+      {
+        role: "user" as const,
+        content: effectiveMsg,
+        images: currentAttachments.length > 0 ? currentAttachments : undefined,
+        hidden: isHidden
+      }
+    ];
     abortRef.current?.abort();
     const controller = new AbortController();
     abortRef.current = controller;
@@ -1550,7 +1678,8 @@ export function FluxAiAssistant({ userId, isOpen, onOpenChange }: { userId: stri
                   <option value="flux-pro">Flux Pro</option>
                   <option value="flux-ultra">Flux Ultra</option>
                   <option value="flux-turbo">Flux Turbo</option>
-                  <option value="flux-omni">Flux Omni</option>
+                  <option value="flux-omni">Flux Omni (Vision)</option>
+                  <option value="flux-max">Flux Max (Vision)</option>
                 </select>
                 <button onClick={() => setVoiceEnabled(v => !v)} className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors" title={voiceEnabled ? 'Mute' : 'Unmute'}>{voiceEnabled ? <Volume2 size={15} /> : <VolumeX size={15} />}</button>
                 <button onClick={toggleFullScreen} className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors" title={isFullScreen ? "Restore sidebar size" : "Expand to full screen"}>{isFullScreen ? <Minimize2 size={15} /> : <Maximize2 size={15} />}</button>
@@ -1570,11 +1699,33 @@ export function FluxAiAssistant({ userId, isOpen, onOpenChange }: { userId: stri
                 <motion.div key={idx} initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.16 }} className="w-full">
                   {msg.role === 'user' ? (
                     <div className="flex justify-end w-full pl-6">
-                      <div className="max-w-[90%] rounded-xl bg-secondary/80 border border-border/80 text-foreground px-3.5 py-2.5 shadow-2xs">
-                        <div className="flex items-center gap-1.5 mb-1 opacity-60 text-[10px] font-mono uppercase tracking-wider font-semibold">
+                      <div className="max-w-[90%] rounded-xl bg-secondary/80 border border-border/80 text-foreground px-3.5 py-2.5 shadow-2xs space-y-2">
+                        <div className="flex items-center gap-1.5 opacity-60 text-[10px] font-mono uppercase tracking-wider font-semibold">
                           <span>You</span>
                         </div>
-                        <p className="whitespace-pre-wrap leading-relaxed text-[12.5px] font-normal">{msg.content}</p>
+                        {msg.images && msg.images.length > 0 && (
+                          <div className="flex flex-wrap gap-2 pt-0.5 pb-1">
+                            {msg.images.map((img, imgIdx) => (
+                              <div
+                                key={imgIdx}
+                                onClick={() => setPreviewImage(img)}
+                                className="relative group rounded-lg overflow-hidden border border-border/70 bg-black/20 cursor-pointer hover:border-primary/60 transition-all shadow-xs"
+                              >
+                                <img
+                                  src={img}
+                                  alt={`Attachment ${imgIdx + 1}`}
+                                  className="object-cover h-24 w-24 sm:h-28 sm:w-28 rounded-lg"
+                                />
+                                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-all flex items-center justify-center opacity-0 group-hover:opacity-100">
+                                  <Maximize2 size={14} className="text-white drop-shadow-md" />
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                        {msg.content && (
+                          <p className="whitespace-pre-wrap leading-relaxed text-[12.5px] font-normal">{msg.content}</p>
+                        )}
                       </div>
                     </div>
                   ) : (
@@ -1792,12 +1943,43 @@ export function FluxAiAssistant({ userId, isOpen, onOpenChange }: { userId: stri
 
               {/* Modern expanding prompt card */}
               <div className="relative rounded-2xl border border-border/90 bg-background/95 shadow-sm transition-all focus-within:border-white/30 focus-within:ring-2 focus-within:ring-white/10 overflow-hidden">
+                {/* Image Attachments Preview Tray */}
+                {attachments.length > 0 && (
+                  <div className="flex items-center gap-2 px-3 pt-2.5 pb-1 flex-wrap border-b border-border/40 bg-secondary/20">
+                    {attachments.map((img, i) => (
+                      <div key={i} className="relative group rounded-lg overflow-hidden border border-border/80 bg-background/60 shadow-xs h-13 w-13 shrink-0">
+                        <img src={img} alt={`Attachment ${i + 1}`} className="w-full h-full object-cover" />
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveAttachment(i)}
+                          className="absolute top-0.5 right-0.5 p-0.5 rounded-full bg-black/75 text-white/80 hover:text-white hover:bg-black transition-all cursor-pointer shadow-xs"
+                          title="Remove image"
+                        >
+                          <X size={11} />
+                        </button>
+                      </div>
+                    ))}
+                    {attachments.length < 5 && (
+                      <button
+                        type="button"
+                        onClick={() => fileInputRef.current?.click()}
+                        className="h-13 w-13 rounded-lg border border-dashed border-border/80 hover:border-primary/50 flex flex-col items-center justify-center text-muted-foreground hover:text-foreground transition-all text-[9.5px] gap-0.5 cursor-pointer bg-white/[0.02]"
+                        title="Add another image"
+                      >
+                        <Plus size={13} />
+                        <span>Add</span>
+                      </button>
+                    )}
+                  </div>
+                )}
+
                 <textarea
                   ref={textareaRef}
                   value={input}
                   onChange={handleTextareaChange}
                   onKeyDown={handleKeyDown}
-                  placeholder="Ask Flux AI, request SQL execution, or enter a prompt..."
+                  onPaste={handlePaste}
+                  placeholder={attachments.length > 0 ? "Ask about these images or request SQL..." : "Ask Flux AI, request SQL execution, or paste/attach an image..."}
                   rows={1}
                   className="w-full resize-none bg-transparent px-3.5 pt-3 pb-1 text-xs sm:text-[13px] text-foreground placeholder:text-muted-foreground/45 focus:outline-none leading-relaxed max-h-[140px] custom-scrollbar block"
                   disabled={isTyping}
@@ -1806,13 +1988,49 @@ export function FluxAiAssistant({ userId, isOpen, onOpenChange }: { userId: stri
 
                 {/* Bottom Toolbar */}
                 <div className="flex items-center justify-between px-3 pb-2.5 pt-1 gap-2">
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-1.5 sm:gap-2">
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept="image/*"
+                      multiple
+                      className="hidden"
+                      onChange={(e) => {
+                        if (e.target.files) {
+                          processImageFiles(e.target.files);
+                          e.target.value = '';
+                        }
+                      }}
+                    />
+
+                    <LiquidButton
+                      type="button"
+                      onClick={() => fileInputRef.current?.click()}
+                      size="sm"
+                      disabled={isTyping}
+                      className={cn(
+                        "h-7 px-2.5 text-[11px] font-medium transition-all select-none cursor-pointer flex items-center gap-1.5",
+                        attachments.length > 0
+                          ? "text-primary font-semibold"
+                          : "text-muted-foreground hover:text-foreground"
+                      )}
+                      title="Attach database diagrams, schemas, or screenshots (or paste with Ctrl+V)"
+                    >
+                      <Paperclip className="size-3.5 shrink-0" />
+                      <span className="hidden sm:inline">Attach</span>
+                      {attachments.length > 0 && (
+                        <span className="px-1.5 py-0.2 rounded-full text-[9px] bg-primary/20 text-primary font-mono font-bold">
+                          {attachments.length}
+                        </span>
+                      )}
+                    </LiquidButton>
+
                     <LiquidButton
                       type="button"
                       onClick={toggleAutoPilot}
                       size="sm"
                       className={cn(
-                        "h-7 px-3 text-[11px] font-medium transition-all select-none cursor-pointer",
+                        "h-7 px-2.5 sm:px-3 text-[11px] font-medium transition-all select-none cursor-pointer",
                         autoPilotActive
                           ? "text-amber-400 font-semibold"
                           : "text-muted-foreground hover:text-foreground"
@@ -1831,11 +2049,11 @@ export function FluxAiAssistant({ userId, isOpen, onOpenChange }: { userId: stri
                   <LiquidButton
                     type="button"
                     onClick={() => handleSend()}
-                    disabled={!input.trim() || isTyping}
+                    disabled={(!input.trim() && attachments.length === 0) || isTyping}
                     size="icon"
                     className={cn(
                       "h-8 w-8 rounded-xl transition-all shadow-xs cursor-pointer",
-                      input.trim()
+                      (input.trim() || attachments.length > 0)
                         ? "text-white opacity-100 hover:scale-105 active:scale-95"
                         : "opacity-40 cursor-not-allowed text-muted-foreground"
                     )}
@@ -1848,6 +2066,29 @@ export function FluxAiAssistant({ userId, isOpen, onOpenChange }: { userId: stri
             </div>
           </motion.div>
         </>
+      )}
+
+      {/* Image Lightbox Modal */}
+      {previewImage && (
+        <div
+          onClick={() => setPreviewImage(null)}
+          className="fixed inset-0 z-[100] bg-black/85 backdrop-blur-md flex items-center justify-center p-4 cursor-zoom-out animate-in fade-in duration-150"
+        >
+          <div className="relative max-w-4xl max-h-[90vh] flex items-center justify-center" onClick={(e) => e.stopPropagation()}>
+            <img
+              src={previewImage}
+              alt="Enlarged preview"
+              className="max-w-full max-h-[85vh] rounded-xl object-contain shadow-2xl border border-white/20"
+            />
+            <button
+              onClick={() => setPreviewImage(null)}
+              className="absolute -top-3 -right-3 p-1.5 rounded-full bg-black/90 border border-white/25 text-white hover:bg-black transition-all cursor-pointer shadow-lg"
+              title="Close image"
+            >
+              <X size={16} />
+            </button>
+          </div>
+        </div>
       )}
     </AnimatePresence>
   );

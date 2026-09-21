@@ -87,9 +87,9 @@ export const PLAN_STORAGE_LIMITS = {
     free: 50 * 1024 * 1024,             // 50 MB per file
     pro: 500 * 1024 * 1024,             // 500 MB per file
     max: 2 * 1024 * 1024 * 1024,        // 2 GB per file
-    employee: 2 * 1024 * 1024 * 1024,   // 2 GB per file
-    org_owner: 5 * 1024 * 1024 * 1024,  // 5 GB per file (allows enterprise database archives & zips)
-    pay_as_you_go: 2 * 1024 * 1024 * 1024, // 2 GB per file
+    employee: 5 * 1024 * 1024 * 1024,   // 5 GB per file (unlimited tier)
+    org_owner: 5 * 1024 * 1024 * 1024,  // 5 GB per file (unlimited tier)
+    pay_as_you_go: 5 * 1024 * 1024 * 1024, // 5 GB per file (unlimited tier)
 } as const;
 
 // Plan-based total storage limits (in bytes)
@@ -97,8 +97,8 @@ export const PLAN_STORAGE_TOTAL_LIMITS = {
     free: 1 * 1024 * 1024 * 1024,          // 1 GB total storage
     pro: 10 * 1024 * 1024 * 1024,         // 10 GB total storage
     max: 100 * 1024 * 1024 * 1024,        // 100 GB total storage
-    employee: 50 * 1024 * 1024 * 1024,    // 50 GB total storage
-    org_owner: 500 * 1024 * 1024 * 1024,  // 500 GB total storage
-    pay_as_you_go: 50 * 1024 * 1024 * 1024, // 50 GB total storage
+    employee: 500 * 1024 * 1024 * 1024,   // 500 GB total storage (unlimited tier)
+    org_owner: 500 * 1024 * 1024 * 1024,  // 500 GB total storage (unlimited tier)
+    pay_as_you_go: 500 * 1024 * 1024 * 1024, // 500 GB total storage (unlimited tier)
 } as const;
 

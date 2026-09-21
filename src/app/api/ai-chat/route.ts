@@ -137,17 +137,27 @@ export async function POST(req: Request) {
         const body = await req.json();
         const { currentPath = '/', model, activeProject, screenContext, stream = false } = body;
 
-        let messages: Array<{ role: string; content: string; hidden?: boolean }> = [];
+        let messages: Array<{ role: string; content: any; images?: string[]; hidden?: boolean }> = [];
         if (Array.isArray(body.messages)) {
             messages = body.messages;
         } else if (typeof body.message === 'string' && body.message.trim()) {
             messages = [{ role: 'user', content: body.message.trim() }];
         }
 
-        const userLastMsg = messages[messages.length - 1]?.content || '';
+        const lastMsgObj = messages[messages.length - 1];
+        let userLastMsg = '';
+        if (lastMsgObj) {
+            if (typeof lastMsgObj.content === 'string') {
+                userLastMsg = lastMsgObj.content;
+            } else if (Array.isArray(lastMsgObj.content)) {
+                const txt = lastMsgObj.content.find((p: any) => p && p.type === 'text');
+                userLastMsg = txt?.text || '';
+            }
+        }
+        const hasAttachedImages = messages.some((m: any) => (Array.isArray(m.images) && m.images.length > 0) || (Array.isArray(m.content) && m.content.some((p: any) => p?.type === 'image_url')));
         const dialect = activeProject?.dialect || 'postgresql';
 
-        const isGreeting = isCasualOrGreeting(userLastMsg);
+        const isGreeting = !hasAttachedImages && isCasualOrGreeting(userLastMsg);
 
         let rawSchema = '';
         let rag = { schemaSnippet: '', docSnippet: '', errorMemorySnippet: '', sources: [] as string[] };
@@ -310,6 +320,13 @@ CRITICAL RULES:
       b. NEVER output raw ASCII boxes with vertical bar lifelines.
       c. If Auto-Pilot is active: conclude with [GOAL_ACCOMPLISHED:Data flow explained successfully].
 
+13. MULTIMODAL COMPUTER VISION & IMAGE ATTACHMENTS:
+    - You possess multimodal computer vision capabilities. When users attach screenshots, architecture diagrams, ERD diagrams, schema photos, whiteboard sketches, or SQL error dialogs:
+      a. Thoroughly inspect and extract all visible database entities, table names, column definitions, data types, primary/foreign keys, and constraints.
+      b. If the image is a screenshot of an error, extract the exact error message, identify the broken line or column, and immediately provide the diagnosis and corrected SQL.
+      c. If the image is an ERD or schema diagram, explain the relationships and offer to create the corresponding tables in Fluxbase with [EXECUTE_SQL:...].
+      d. Keep image responses clear, direct, and actionable.
+
 AVAILABLE ACTION TAGS (append at the end of response):
 - Execute SQL (Read / Insert / Create / Update): [EXECUTE_SQL:<exact_sql_query>]
 - Destructive SQL (Drop / Truncate / Delete all): [REQUEST_APPROVAL:appr_${Date.now()}:EXECUTE_SQL:<summary>:<sql>]
@@ -327,10 +344,39 @@ AVAILABLE ACTION TAGS (append at the end of response):
 
         for (const msg of recentMessages) {
             if (msg.hidden) continue;
-            modelMessages.push({
-                role: msg.role === 'user' ? 'user' : 'assistant',
-                content: msg.content
-            });
+
+            const images = Array.isArray(msg.images) ? msg.images : [];
+            if (images.length > 0) {
+                const parts: any[] = [];
+                const textContent = typeof msg.content === 'string'
+                    ? msg.content
+                    : (Array.isArray(msg.content) ? (msg.content.find((p: any) => p?.type === 'text')?.text || '') : '');
+
+                if (textContent && textContent.trim()) {
+                    parts.push({ type: 'text', text: textContent });
+                } else {
+                    parts.push({ type: 'text', text: 'Please analyze the attached image(s) in the context of our database schema and project.' });
+                }
+
+                for (const imgUrl of images) {
+                    if (imgUrl && typeof imgUrl === 'string') {
+                        parts.push({
+                            type: 'image_url',
+                            image_url: { url: imgUrl }
+                        });
+                    }
+                }
+
+                modelMessages.push({
+                    role: msg.role === 'user' ? 'user' : 'assistant',
+                    content: parts
+                });
+            } else {
+                modelMessages.push({
+                    role: msg.role === 'user' ? 'user' : 'assistant',
+                    content: msg.content || ''
+                });
+            }
         }
 
         // ── 2. Handle Streaming (SSE) ──────────────────────────────────────────

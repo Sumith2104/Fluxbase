@@ -18,6 +18,7 @@ import {
 export interface Project {
     project_id: string;
     user_id: string;
+    owner_id?: string;
     display_name: string;
     description?: string;
     created_at: string;
@@ -214,7 +215,7 @@ export async function getProjectsForCurrentUser(overrideUserId?: string): Promis
         const pool = getPgPool();
         const sqlQuery = `
             SELECT p.project_id, p.display_name, p.created_at, p.dialect, p.timezone, p.ai_allow_destructive, p.ai_schema_inference, p.status, p.creator_role, p.billing_preference,
-                   p.connection_type, p.connection_config, p.schema_name, p.is_serverless, p.github_repo,
+                   p.connection_type, p.connection_config, p.schema_name, p.is_serverless, p.github_repo, p.user_id as owner_id,
                    COALESCE(pm.role, CASE WHEN p.user_id = $1::text THEN 'admin' ELSE 'developer' END) as role
             FROM fluxbase_global.projects p
             LEFT JOIN fluxbase_global.project_members pm ON p.project_id = pm.project_id AND pm.user_id = $1::text
@@ -237,7 +238,8 @@ export async function getProjectsForCurrentUser(overrideUserId?: string): Promis
 
         const projects = result.rows.map(row => ({
             project_id: row.project_id,
-            user_id: userId,
+            user_id: row.owner_id || userId,
+            owner_id: row.owner_id,
             display_name: row.display_name,
             description: '',
             created_at: row.created_at.toISOString(),
@@ -489,6 +491,7 @@ export async function getProjectById(projectId: string, explicitUserId?: string)
                 const newProject: Project = {
                     project_id: row.project_id,
                     user_id: row.owner_id,
+                    owner_id: row.owner_id,
                     display_name: row.display_name,
                     description: '',
                     created_at: row.created_at.toISOString(),
@@ -707,13 +710,11 @@ export async function createProject(
             maxProjects = parseInt(planDbRes.rows[0].max_projects, 10);
         } else {
             if (planType === 'pro') maxProjects = 3;
-            else if (planType === 'max' || planType === 'org_owner') maxProjects = 999999;
-            else if (planType === 'employee' || planType === 'pay_as_you_go') maxProjects = 10;
+            else if (planType === 'max' || planType === 'org_owner' || planType === 'org' || planType === 'employee' || planType === 'emp' || planType === 'pay_as_you_go' || planType === 'payg') maxProjects = 999999;
         }
     } catch {
         if (planType === 'pro') maxProjects = 3;
-        else if (planType === 'max' || planType === 'org_owner') maxProjects = 999999;
-        else if (planType === 'employee' || planType === 'pay_as_you_go') maxProjects = 10;
+        else if (planType === 'max' || planType === 'org_owner' || planType === 'org' || planType === 'employee' || planType === 'emp' || planType === 'pay_as_you_go' || planType === 'payg') maxProjects = 999999;
     }
 
     // Check limit

@@ -1,11 +1,17 @@
 import logger from '@/lib/logger';
 
+export type ContentPart =
+  | { type: 'text'; text: string }
+  | { type: 'image_url'; image_url: { url: string; detail?: 'auto' | 'low' | 'high' } }
+  | Record<string, any>;
+
 export interface ModelMessage {
   role: 'system' | 'user' | 'assistant' | 'tool';
-  content: string;
+  content: string | ContentPart[];
   name?: string;
   tool_call_id?: string;
   tool_calls?: any[];
+  images?: string[];
 }
 
 export interface ModelGatewayOptions {
@@ -74,19 +80,32 @@ export const MODEL_CATALOG: Record<string, { provider: 'glm' | 'groq' | 'gemini'
  */
 export class ModelGateway {
   /**
+   * Helper to determine if messages contain multimodal image content
+   */
+  private static hasMultimodalContent(messages: ModelMessage[]): boolean {
+    return messages.some(m => {
+      if (Array.isArray(m.content)) {
+        return m.content.some((part: any) => part && typeof part === 'object' && (part.type === 'image_url' || part.image_url));
+      }
+      return Array.isArray(m.images) && m.images.length > 0;
+    });
+  }
+
+  /**
    * Dispatches a non-streaming chat completion with automatic tiered fallback.
    */
   public static async generate(options: ModelGatewayOptions): Promise<ModelGatewayResult> {
     const requestedKey = (options.model || 'flux-fast').toLowerCase();
     const primarySpec = MODEL_CATALOG[requestedKey] || MODEL_CATALOG['flux-fast'];
+    const hasMultimodal = this.hasMultimodalContent(options.messages);
 
     // Assemble prioritized execution chain
-    const chain = this.buildFallbackChain(primarySpec);
+    const chain = this.buildFallbackChain(primarySpec, hasMultimodal);
     let lastError: any = null;
 
     for (const step of chain) {
       try {
-        logger.info(`[ModelGateway] Attempting tier: ${step.provider} (${step.upstreamModel})`);
+        logger.info(`[ModelGateway] Attempting tier: ${step.provider} (${step.upstreamModel})${hasMultimodal ? ' [multimodal]' : ''}`);
         const result = await this.executeProvider(step.provider, step.upstreamModel, options);
         logger.info(`[ModelGateway] Succeeded with tier: ${step.provider} (${step.upstreamModel})`);
         return result;
@@ -106,13 +125,14 @@ export class ModelGateway {
   public static async stream(options: ModelGatewayOptions): Promise<{ stream: ReadableStream<Uint8Array>; provider: string; model: string }> {
     const requestedKey = (options.model || 'flux-fast').toLowerCase();
     const primarySpec = MODEL_CATALOG[requestedKey] || MODEL_CATALOG['flux-fast'];
+    const hasMultimodal = this.hasMultimodalContent(options.messages);
 
-    const chain = this.buildFallbackChain(primarySpec);
+    const chain = this.buildFallbackChain(primarySpec, hasMultimodal);
     let lastError: any = null;
 
     for (const step of chain) {
       try {
-        logger.info(`[ModelGateway] Attempting streaming tier: ${step.provider} (${step.upstreamModel})`);
+        logger.info(`[ModelGateway] Attempting streaming tier: ${step.provider} (${step.upstreamModel})${hasMultimodal ? ' [multimodal]' : ''}`);
         const stream = await this.executeProviderStream(step.provider, step.upstreamModel, options);
         return { stream, provider: step.provider, model: step.upstreamModel };
       } catch (err: any) {
@@ -126,8 +146,12 @@ export class ModelGateway {
 
   /**
    * Constructs the ordered provider fallback chain based on active environment keys.
+   * When hasMultimodal is true, prioritizes vision-capable providers (Gemini and OpenAI).
    */
-  private static buildFallbackChain(primary: { provider: string; upstreamModel: string }): Array<{ provider: string; upstreamModel: string }> {
+  private static buildFallbackChain(
+    primary: { provider: string; upstreamModel: string },
+    hasMultimodal = false
+  ): Array<{ provider: string; upstreamModel: string }> {
     const chain: Array<{ provider: string; upstreamModel: string }> = [];
     const seen = new Set<string>();
 
@@ -139,30 +163,52 @@ export class ModelGateway {
       }
     };
 
-    // 1. Primary requested provider
-    add(primary.provider, primary.upstreamModel);
+    if (hasMultimodal) {
+      // 1. If primary requested model is already vision-capable, use it first
+      if (primary.provider === 'gemini' || primary.provider === 'openai') {
+        add(primary.provider, primary.upstreamModel);
+      }
 
-    // 2. GLM flash fallback if primary is not GLM-flash
-    if (process.env.GLM_API_KEY) {
-      add('glm', 'glm-4-flash');
-      add('glm', 'glm-4-air');
-      add('glm', 'glm-4-plus');
-    }
+      // 2. Gemini fallback (gemini-2.0-flash has excellent multimodal vision support)
+      if (process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY) {
+        add('gemini', 'gemini-2.0-flash');
+        add('gemini', 'gemini-1.5-flash');
+      }
 
-    // 3. Groq fallback
-    if (process.env.GROQ_API_KEY) {
-      add('groq', 'llama-3.3-70b-versatile');
-    }
+      // 3. OpenAI vision fallback
+      if (process.env.OPENAI_API_KEY) {
+        add('openai', 'gpt-4o-mini');
+        add('openai', 'gpt-4o');
+      }
 
-    // 4. Gemini fallback
-    if (process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY) {
-      add('gemini', 'gemini-2.0-flash');
-      add('gemini', 'gemini-1.5-flash');
-    }
+      // 4. Primary fallback as last resort
+      add(primary.provider, primary.upstreamModel);
+    } else {
+      // 1. Primary requested provider
+      add(primary.provider, primary.upstreamModel);
 
-    // 5. OpenAI fallback
-    if (process.env.OPENAI_API_KEY) {
-      add('openai', 'gpt-4o-mini');
+      // 2. GLM flash fallback if primary is not GLM-flash
+      if (process.env.GLM_API_KEY) {
+        add('glm', 'glm-4-flash');
+        add('glm', 'glm-4-air');
+        add('glm', 'glm-4-plus');
+      }
+
+      // 3. Groq fallback
+      if (process.env.GROQ_API_KEY) {
+        add('groq', 'llama-3.3-70b-versatile');
+      }
+
+      // 4. Gemini fallback
+      if (process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY) {
+        add('gemini', 'gemini-2.0-flash');
+        add('gemini', 'gemini-1.5-flash');
+      }
+
+      // 5. OpenAI fallback
+      if (process.env.OPENAI_API_KEY) {
+        add('openai', 'gpt-4o-mini');
+      }
     }
 
     return chain;

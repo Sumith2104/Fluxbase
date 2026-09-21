@@ -528,16 +528,20 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
                     />
                     {selectedProject && (() => {
                         const liveProject = projects.find(p => p.project_id === selectedProject.project_id) || selectedProject;
-                        const accountRole = (user as any)?.plan_type || (user as any)?.user_role || liveProject.creator_role || 'student';
-                        const effectiveRole = accountRole === 'employee' || accountRole === 'org_owner' ? accountRole : (liveProject.creator_role || 'student');
-                        const isStudent = effectiveRole === 'student';
-                        const rawBilling = liveProject.billing_preference || selectedProject.billing_preference || (user as any)?.billing_preference;
+                        const isProjectOwner = !liveProject.owner_id || liveProject.owner_id === userId || (liveProject as any).user_id === userId;
+                        const projectRole = liveProject.role || (isProjectOwner ? 'admin' : 'developer');
+
+                        // The authenticated user's real account role and plan (NEVER inherited from project creator)
+                        const userAccountRole = (user as any)?.user_role || (user as any)?.plan_type || 'student';
+                        const effectiveUserRole = (userAccountRole === 'employee' || userAccountRole === 'org_owner') ? userAccountRole : 'student';
+                        const isStudent = effectiveUserRole === 'student';
+
+                        const rawBilling = (user as any)?.billing_preference || liveProject.billing_preference;
                         const billingPlan = (rawBilling === 'pay_as_you_go' || planType === 'Pay-As-You-Go' || (user as any)?.plan_type === 'pay_as_you_go')
                             ? 'pay_as_you_go'
                             : (rawBilling === 'hybrid' ? 'hybrid' : 'fixed');
 
-                        const projectRole = liveProject.role || selectedProject.role || 'admin';
-                        const roleLabel = effectiveRole === 'org_owner' ? 'Owner' : (effectiveRole === 'employee' ? 'Emp' : 'Student');
+                        const roleLabel = effectiveUserRole === 'org_owner' ? 'Owner' : (effectiveUserRole === 'employee' ? 'Emp' : 'Student');
                         const planLabel = isStudent
                             ? (planType === 'Max' ? 'Max' : (planType === 'Pro' ? 'Pro' : 'Free'))
                             : (billingPlan === 'pay_as_you_go' ? 'PAY-AS-YOU-GO' : (billingPlan === 'hybrid' ? 'Hybrid' : 'Fixed'));
@@ -572,20 +576,32 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
                                     {projectRole}
                                 </Badge>
 
-                                {/* 2. Role Badge (Student, Emp, Owner) */}
-                                <Badge
-                                    variant="secondary"
-                                    className={cn(
-                                        "hidden sm:inline-flex transition-colors shadow-none text-[9px] uppercase font-bold tracking-wider rounded-md border font-mono",
-                                        effectiveRole === 'org_owner' && "bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/20",
-                                        effectiveRole === 'employee' && "bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20",
-                                        effectiveRole === 'student' && "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20"
-                                    )}
-                                >
-                                    {roleLabel}
-                                </Badge>
+                                {/* If collaborator on a team project, show Team badge */}
+                                {!isProjectOwner && (
+                                    <Badge
+                                        variant="outline"
+                                        className="hidden sm:inline-flex transition-colors shadow-none text-[9px] uppercase font-bold tracking-wider rounded-md border font-mono bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/20"
+                                    >
+                                        Team
+                                    </Badge>
+                                )}
 
-                                {/* 3. Plan Name Badge (Free, Pro, Max for Student | Fixed, Pay-As-You-Go, Hybrid for Emp/Owner) */}
+                                {/* 2. Role Badge for Project Owner (Student, Emp, Owner) */}
+                                {isProjectOwner && (
+                                    <Badge
+                                        variant="secondary"
+                                        className={cn(
+                                            "hidden sm:inline-flex transition-colors shadow-none text-[9px] uppercase font-bold tracking-wider rounded-md border font-mono",
+                                            effectiveUserRole === 'org_owner' && "bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/20",
+                                            effectiveUserRole === 'employee' && "bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20",
+                                            effectiveUserRole === 'student' && "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20"
+                                        )}
+                                    >
+                                        {roleLabel}
+                                    </Badge>
+                                )}
+
+                                {/* 3. User's Personal Plan Badge (Free, Pro, Max for Student | Fixed, Pay-As-You-Go, Hybrid for Emp/Owner) */}
                                 <Badge
                                     variant="outline"
                                     className={cn(

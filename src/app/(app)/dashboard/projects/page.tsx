@@ -123,8 +123,7 @@ export default function SelectProjectPage() {
   const isUpgradedAccount = currentPlan === 'employee' || currentPlan === 'org_owner' || currentPlan === 'org' || currentPlan === 'max' || currentPlan === 'pro' || currentPlan === 'pay_as_you_go';
 
   const maxAllowedProjects = 
-    (currentPlan === 'max' || currentPlan === 'org_owner' || currentPlan === 'org') ? 999999 :
-    (currentPlan === 'employee' || currentPlan === 'pay_as_you_go') ? 10 :
+    (currentPlan === 'max' || currentPlan === 'org_owner' || currentPlan === 'org' || currentPlan === 'employee' || currentPlan === 'emp' || currentPlan === 'pay_as_you_go' || currentPlan === 'payg') ? 999999 :
     (currentPlan === 'pro') ? 3 : 1;
 
   const hasAvailableQuota = isUpgradedAccount && projects.length < maxAllowedProjects;
@@ -676,7 +675,7 @@ export default function SelectProjectPage() {
                     project.creator_role === 'org_owner' && "bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/20",
                     project.creator_role === 'student' && "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20"
                   )}>
-                    {project.creator_role.replace('_', ' ')}
+                    {project.role && project.role !== 'admin' ? `Workspace: ${project.creator_role.replace('_', ' ')}` : project.creator_role.replace('_', ' ')}
                   </Badge>
                 )}
 

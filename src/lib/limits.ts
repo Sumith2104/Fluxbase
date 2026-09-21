@@ -32,13 +32,13 @@ const PLAN_LIMITS = {
         allowedInstanceSizes: ['db.t3.micro', 'db.t3.medium', 'db.t3.large']
     },
     employee: {
-        projects: 10,
-        tablesPerProject: 50,
-        rowsPerTable: 500000,
-        apiKeys: 25,
-        webhooks: 10,
-        scrapers: 10,
-        allowedInstanceSizes: ['db.t3.micro', 'db.t3.medium', 'db.t3.large']
+        projects: 999999,
+        tablesPerProject: 999999,
+        rowsPerTable: 999999999,
+        apiKeys: 999999,
+        webhooks: 999999,
+        scrapers: 999999,
+        allowedInstanceSizes: ['db.t3.micro', 'db.t3.medium', 'db.t3.large', 'db.m5.large']
     },
     org_owner: {
         projects: 999999,
@@ -50,13 +50,13 @@ const PLAN_LIMITS = {
         allowedInstanceSizes: ['db.t3.micro', 'db.t3.medium', 'db.t3.large', 'db.m5.large']
     },
     pay_as_you_go: {
-        projects: 10,
-        tablesPerProject: 50,
-        rowsPerTable: 500000,
-        apiKeys: 25,
-        webhooks: 10,
-        scrapers: 10,
-        allowedInstanceSizes: ['db.t3.micro', 'db.t3.medium', 'db.t3.large']
+        projects: 999999,
+        tablesPerProject: 999999,
+        rowsPerTable: 999999999,
+        apiKeys: 999999,
+        webhooks: 999999,
+        scrapers: 999999,
+        allowedInstanceSizes: ['db.t3.micro', 'db.t3.medium', 'db.t3.large', 'db.m5.large']
     }
 } as const;
 
@@ -83,6 +83,24 @@ export async function getUserPlan(userId: string): Promise<PlanType> {
     return 'free';
 }
 
+export async function getProjectOwnerPlan(projectId: string): Promise<PlanType> {
+    try {
+        const pool = getPgPool();
+        const res = await pool.query(
+            `SELECT u.plan_type 
+             FROM fluxbase_global.projects p 
+             JOIN fluxbase_global.users u ON u.id = p.user_id 
+             WHERE p.project_id = $1`,
+            [projectId]
+        );
+        const plan = res.rows[0]?.plan_type || 'free';
+        if (plan in PLAN_LIMITS) return plan as PlanType;
+        return 'free';
+    } catch {
+        return 'free';
+    }
+}
+
 export async function checkProjectLimit(userId: string): Promise<void> {
     const plan = await getUserPlan(userId);
     const limit = PLAN_LIMITS[plan].projects;
@@ -97,18 +115,18 @@ export async function checkProjectLimit(userId: string): Promise<void> {
 }
 
 export async function checkTableLimit(projectId: string, userId: string): Promise<void> {
-    const plan = await getUserPlan(userId);
+    const plan = await getProjectOwnerPlan(projectId);
     const limit = PLAN_LIMITS[plan].tablesPerProject;
 
     const tables = await getTablesForProject(projectId, userId);
 
     if (tables.length >= limit) {
-        throw new LimitExceededError(`Table limit reached. Your ${plan.toUpperCase()} plan allows a maximum of ${limit} tables per project. Please upgrade to create more.`);
+        throw new LimitExceededError(`Table limit reached. This project's ${plan.toUpperCase()} plan allows a maximum of ${limit} tables per project. Please upgrade to create more.`);
     }
 }
 
 export async function checkRowLimit(projectId: string, userId: string, tableName: string, insertingCount: number = 1): Promise<void> {
-    const plan = await getUserPlan(userId);
+    const plan = await getProjectOwnerPlan(projectId);
     const limit = PLAN_LIMITS[plan].rowsPerTable;
 
     const project = await getProjectById(projectId, userId);
@@ -334,36 +352,36 @@ export async function checkApiKeyLimit(userId: string): Promise<void> {
 }
 
 export async function checkWebhookLimit(projectId: string, userId: string): Promise<void> {
-    const plan = await getUserPlan(userId);
+    const plan = await getProjectOwnerPlan(projectId);
     const limit = PLAN_LIMITS[plan].webhooks;
 
     if (limit === 0) {
-        throw new LimitExceededError(`Webhooks are only available on the PRO and MAX plans. Please upgrade to access real-time event triggers.`);
+        throw new LimitExceededError(`Webhooks are only available on the PRO, MAX, and ORG OWNER plans. Please upgrade this project's subscription to access real-time event triggers.`);
     }
 
     const pool = getPgPool();
-    const res = await pool.query('SELECT COUNT(*) as count FROM fluxbase_global.webhooks WHERE project_id = $1 AND user_id = $2', [projectId, userId]);
+    const res = await pool.query('SELECT COUNT(*) as count FROM fluxbase_global.webhooks WHERE project_id = $1', [projectId]);
     const count = parseInt(res.rows[0].count, 10);
 
     if (count >= limit) {
-        throw new LimitExceededError(`Webhook limit reached. Your ${plan.toUpperCase()} plan allows a maximum of ${limit} webhooks per project. Please upgrade to create more.`);
+        throw new LimitExceededError(`Webhook limit reached. This project's ${plan.toUpperCase()} plan allows a maximum of ${limit} webhooks per project. Please upgrade to create more.`);
     }
 }
 
 export async function checkScraperLimit(projectId: string, userId: string): Promise<void> {
-    const plan = await getUserPlan(userId);
+    const plan = await getProjectOwnerPlan(projectId);
     const limit = PLAN_LIMITS[plan].scrapers;
 
     if (limit === 0) {
-        throw new LimitExceededError(`The Cloud Scraper Engine is only available on the PRO and MAX plans. Please upgrade to automate data extraction.`);
+        throw new LimitExceededError(`The Cloud Scraper Engine is only available on the PRO, MAX, and ORG OWNER plans. Please upgrade this project's subscription to automate data extraction.`);
     }
 
     const pool = getPgPool();
-    const res = await pool.query('SELECT COUNT(*) as count FROM fluxbase_global.fluxbase_scrapers WHERE project_id = $1 AND user_id = $2', [projectId, userId]);
+    const res = await pool.query('SELECT COUNT(*) as count FROM fluxbase_global.fluxbase_scrapers WHERE project_id = $1', [projectId]);
     const count = parseInt(res.rows[0].count, 10);
 
     if (count >= limit) {
-        throw new LimitExceededError(`Scraper limit reached. Your ${plan.toUpperCase()} plan allows a maximum of ${limit} scrapers per project. Please upgrade to allocate more engine workers.`);
+        throw new LimitExceededError(`Scraper limit reached. This project's ${plan.toUpperCase()} plan allows a maximum of ${limit} scrapers per project. Please upgrade to allocate more engine workers.`);
     }
 }
 

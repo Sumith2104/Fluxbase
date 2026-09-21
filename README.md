@@ -63,6 +63,7 @@ It enables multi-dialect database execution (**PostgreSQL** and **MySQL**) with 
 | 📡 **Real-Time Data Streaming** | Stream row-level events (`INSERT`, `UPDATE`, `DELETE`) to clients over resilient Server-Sent Events (SSE). |
 | 🔒 **Security-First Architecture** | Built-in AST-based SQL validation, JWT-claim RLS mapping, and scoped API key authorization. |
 | 🌐 **Multi-Dialect Support** | First-class support for both PostgreSQL and MySQL with dialect-aware query generation. |
+| 🤖 **Flux AI Multimodal Gateway** | OpenAI-compatible drop-in gateway for Text Reasoning, Image Generation, Voice (STT & TTS), Video, and 768-dim Embeddings with unlimited quotas for Enterprise, Employee, and PAYG accounts. |
 | 📊 **Observability** | Prometheus metrics endpoint + preconfigured Grafana dashboard out of the box. |
 
 ---
@@ -168,6 +169,54 @@ Authorization: Bearer <your-api-key>
 ```
 
 > **Note:** Clients should implement exponential backoff reconnection logic. The Fluxbase JS client SDK handles this automatically.
+
+---
+
+## Flux (OpenAI-Compatible AI Gateway)
+
+Fluxbase provides a built-in, drop-in replacement for OpenAI endpoints named **Flux** with dynamic model whitelabeling, S3 media persistence, and multi-provider failover.
+
+Base URL: `https://fluxbasedb.me/api/v1`
+
+### Supported Modalities & Models
+
+| Modality | Canonical Model | OpenAI Alias | Upstream / Capability |
+|---|---|---|---|
+| **Text Reasoning** | `flux` (Default) | `gpt-3.5-turbo`, `flux-fast` | Ultra-fast reasoning & SQL synthesis (128k context) |
+| **Deep Reasoning** | `flux-ultra`, `flux-pro`, `flux-5.2` | `gpt-4o`, `claude-3-5-sonnet` | Complex multi-table reasoning & migration logic |
+| **Image Synthesis** | `flux-image`, `flux-image-fast` | `dall-e-3`, `dall-e-2` | Photorealistic image generation with durable S3 URLs |
+| **Speech-to-Text** | `flux-listen`, `flux-listen-pro` | `whisper-1`, `whisper` | Multilingual transcription with timestamps |
+| **Text-to-Speech** | `flux-speak`, `flux-speak-hd` | `tts-1`, `tts-1-hd` | Natural voices: alloy, echo, fable, onyx, nova, shimmer |
+| **Video Generation** | `flux-video`, `flux-video-pro` | `cogvideox` | Text-to-video with async task polling (`HTTP 202`) |
+| **Embeddings** | `flux-embed` | `text-embedding-3-small` | 768-dimensional vectors for semantic search & RAG |
+
+### Unlimited Quota Policy
+Accounts on **`employee`**, **`org_owner`**, and **`pay_as_you_go` (PAYG)** receive **unlimited quotas across all modalities** (no RPM/TPM restrictions, no daily limits, and access to all models).
+
+### Python OpenAI SDK Example
+
+```python
+from openai import OpenAI
+
+client = OpenAI(
+    base_url="https://fluxbasedb.me/api/v1",
+    api_key="flx_live_your_fluxbase_key"
+)
+
+# Text Reasoning
+chat = client.chat.completions.create(
+    model="flux-fast",
+    messages=[{"role": "user", "content": "Write an index optimization plan."}]
+)
+
+# Image Generation
+img = client.images.generate(
+    model="flux-image",
+    prompt="A futuristic neon server farm, 8k octane render",
+    n=1
+)
+print(f"Generated Image: {img.data[0].url}")
+```
 
 ---
 

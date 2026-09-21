@@ -306,10 +306,14 @@ Content-Type: application/json`} />
                                         {[
                                             { id: 'flux', tier: 'Flagship (Default)', speed: 'Ultra-Fast', desc: 'High-accuracy general reasoning, SQL synthesis, and conversational code intelligence.' },
                                             { id: 'flux-flash', tier: 'Low Latency', speed: 'Realtime', desc: 'Ultra-fast token throughput. Ideal for autocompletion, real-time UX, and lightweight tasks.' },
+                                            { id: 'flux-omni', tier: 'Multimodal Vision', speed: 'Realtime', desc: 'Native visual comprehension, ERD diagrams, UI screenshots, and 1M context window.' },
                                             { id: 'flux-pro', tier: 'Balanced Pro', speed: 'Fast', desc: 'Enhanced instruction following, multi-table analysis, and strict JSON formatting.' },
                                             { id: 'flux-ultra', tier: 'Enterprise Intelligence', speed: 'Deep Reasoning', desc: 'Maximum cognitive depth for complex system architecture, long reasoning chains, and auditing.' },
+                                            { id: 'flux-turbo', tier: 'Hyper-Speed', speed: '300+ TPS', desc: 'Hyper-speed 300 tokens/sec inference powered by LLaMA 3.3 70B.' },
+                                            { id: 'flux-max', tier: 'Flagship Vision', speed: 'Fast', desc: 'Flagship vision, multimodal reasoning, and OpenAI coding benchmarks.' },
                                             { id: 'flux-5.2', tier: 'Frontier', speed: 'Advanced', desc: 'Next-generation reasoning architecture specialized in multi-step agentic execution.' },
                                             { id: 'gpt-4o', tier: 'Alias', speed: 'Deep Reasoning', desc: 'OpenAI drop-in compatibility alias automatically mapped to flux-ultra.' },
+                                            { id: 'gpt-4o-mini', tier: 'Alias', speed: 'Fast', desc: 'OpenAI drop-in compatibility alias automatically mapped to flux-max.' },
                                             { id: 'gpt-3.5-turbo', tier: 'Alias', speed: 'Realtime', desc: 'OpenAI drop-in compatibility alias automatically mapped to flux-flash.' },
                                         ].map(m => (
                                             <tr key={m.id} className="hover:bg-secondary/70">
@@ -330,6 +334,7 @@ Content-Type: application/json`} />
                                 <TabsList className="bg-secondary border border-border">
                                     <TabsTrigger value="python">Python (OpenAI SDK)</TabsTrigger>
                                     <TabsTrigger value="node">Node.js / TypeScript</TabsTrigger>
+                                    <TabsTrigger value="vision">Image Attachments (Vision)</TabsTrigger>
                                     <TabsTrigger value="curl">cURL</TabsTrigger>
                                 </TabsList>
 
@@ -385,6 +390,40 @@ async function main() {
 }
 
 main();`} />
+                                </TabsContent>
+
+                                <TabsContent value="vision" className="space-y-3 mt-3">
+                                    <p className="text-xs text-muted-foreground">Attach images (ERD diagrams, UI mockups, error dialogs, or schema photos) via standard OpenAI <code className="font-mono text-foreground/80">image_url</code> format with base64 data URLs or HTTPS image links:</p>
+                                    <CodeBlock title="vision_analyze.py" code={`import base64
+from openai import OpenAI
+
+client = OpenAI(
+    base_url="https://fluxbasedb.me/api/v1",
+    api_key="flx_live_your_fluxbase_key"
+)
+
+# Read image and convert to base64
+with open("schema_diagram.png", "rb") as f:
+    b64_image = base64.b64encode(f.read()).decode("utf-8")
+
+response = client.chat.completions.create(
+    model="flux-omni",  # Native multimodal vision model (or "flux-max")
+    messages=[
+        {
+            "role": "user",
+            "content": [
+                {"type": "text", "text": "Analyze this ERD database diagram and generate PostgreSQL DDL CREATE TABLE statements."},
+                {
+                    "type": "image_url",
+                    "image_url": {
+                        "url": f"data:image/png;base64,{b64_image}"
+                    }
+                }
+            ]
+        }
+    ]
+)
+print(response.choices[0].message.content)`} />
                                 </TabsContent>
 
                                 <TabsContent value="curl" className="space-y-3 mt-3">

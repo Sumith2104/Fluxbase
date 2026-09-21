@@ -98,7 +98,7 @@ function Endpoint({ method, path }: { method: 'GET' | 'POST' | 'DELETE' | 'PATCH
 const NAV_SECTIONS = [
     { id: 'getting-started', label: 'Getting Started', icon: Zap },
     { id: 'authentication', label: 'Authentication', icon: KeyRound },
-    { id: 'flux-ai-gateway', label: 'Flux AI Gateway', icon: Bot },
+    { id: 'flux-ai-gateway', label: 'Flux', icon: Bot },
     { id: 'mcp-gateway', label: 'MCP AI Gateway', icon: Cpu },
     { id: 'core-api', label: 'Core SQL API', icon: Database },
     { id: 'sdks', label: 'Language SDKs', icon: Code2 },
@@ -324,18 +324,29 @@ Content-Type: application/json`} />
                             </Callout>
                         </Section>
 
-                        {/* ── 3. Flux AI Gateway (Chat & Completions) ── */}
-                        <Section id="flux-ai-gateway" title="Flux AI Gateway (Chat & Completions)" icon={Bot}>
+                        {/* ── 3. Flux (AI Gateway) ── */}
+                        <Section id="flux-ai-gateway" title="Flux" icon={Bot}>
                             <p>
-                                Fluxbase includes an enterprise-grade, <strong className="text-white">OpenAI-compatible AI Gateway</strong>. It enables your applications, developers, and agents to interact with our proprietary <strong className="text-white">Flux AI reasoning model family</strong> using standard OpenAI SDKs, LangChain, Cursor, Windsurf, or direct HTTP requests.
+                                Fluxbase includes an enterprise-grade, <strong className="text-white">OpenAI-compatible AI Gateway named Flux</strong>. It enables your applications, developers, and autonomous agents to interact with our proprietary <strong className="text-white">Flux AI reasoning model family</strong> across <strong className="text-white">6 distinct modalities</strong>: Text Reasoning & Chat, Image Generation, Speech-to-Text (STT), Text-to-Speech (TTS), Video Generation, and Vector Embeddings using standard OpenAI SDKs, LangChain, Cursor, Windsurf, or direct HTTP requests.
                             </p>
 
                             <div className="flex flex-wrap gap-2 pt-1">
-                                <Endpoint method="POST" path="/api/v1/chat/completions" />
                                 <Endpoint method="GET" path="/api/v1/models" />
+                                <Endpoint method="POST" path="/api/v1/chat/completions" />
+                                <Endpoint method="POST" path="/api/v1/images/generations" />
+                                <Endpoint method="POST" path="/api/v1/audio/transcriptions" />
+                                <Endpoint method="POST" path="/api/v1/audio/speech" />
+                                <Endpoint method="POST" path="/api/v1/videos/generations" />
+                                <Endpoint method="GET" path="/api/v1/videos/generations/:taskId" />
+                                <Endpoint method="POST" path="/api/v1/embeddings" />
+                                <Endpoint method="GET" path="/api/v1/media/:mediaId" />
                             </div>
 
-                            <h3 className="text-base font-bold text-white mt-6 flex items-center gap-2">
+                            <Callout type="success">
+                                <strong>Unlimited Everything Policy:</strong> Accounts on <strong className="text-emerald-300">Employee</strong>, <strong className="text-emerald-300">Org Owner</strong>, and <strong className="text-emerald-300">Pay-As-You-Go (PAYG)</strong> plans enjoy <strong>unlimited access across all modalities</strong>. Rate limits (RPM/TPM), daily quotas, and tier-lock restrictions are completely waived.
+                            </Callout>
+
+                            <h3 className="text-base font-bold text-white mt-8 flex items-center gap-2">
                                 <Sparkles className="h-4 w-4 text-orange-400" />
                                 Available Flux AI Models
                             </h3>
@@ -343,30 +354,43 @@ Content-Type: application/json`} />
                                 All requests to <code className="text-xs font-mono text-foreground/80 bg-muted px-1.5 py-0.5 rounded">/api/v1/chat/completions</code> use these model identifiers. If omitted, the default model is <code className="text-xs font-mono text-orange-400 bg-orange-500/10 px-1.5 py-0.5 rounded">flux</code>.
                             </p>
 
+                            {/* Modality Catalog Table */}
                             <div className="rounded-lg border border-border overflow-hidden text-sm mt-3">
                                 <table className="w-full text-left bg-card">
                                     <thead>
                                         <tr className="bg-secondary border-b border-border text-xs uppercase tracking-wide text-muted-foreground/75">
+                                            <th className="px-4 py-3">Modality</th>
                                             <th className="px-4 py-3">Model ID</th>
-                                            <th className="px-4 py-3">Tier / Speed</th>
+                                            <th className="px-4 py-3">Tier / Aliases</th>
                                             <th className="px-4 py-3">Capabilities & Best For</th>
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-border/60">
                                         {[
-                                            { id: 'flux', tier: 'Flagship (Default)', speed: 'Ultra-Fast', desc: 'High-accuracy general reasoning, SQL synthesis, and conversational code intelligence.' },
-                                            { id: 'flux-flash', tier: 'Low Latency', speed: 'Realtime', desc: 'Ultra-fast token throughput. Ideal for autocompletion, real-time UX, and lightweight tasks.' },
-                                            { id: 'flux-pro', tier: 'Balanced Pro', speed: 'Fast', desc: 'Enhanced instruction following, multi-table analysis, and strict JSON formatting.' },
-                                            { id: 'flux-ultra', tier: 'Enterprise Intelligence', speed: 'Deep Reasoning', desc: 'Maximum cognitive depth for complex system architecture, long reasoning chains, and auditing.' },
-                                            { id: 'flux-5.2', tier: 'Frontier', speed: 'Advanced', desc: 'Next-generation reasoning architecture specialized in multi-step agentic execution.' },
-                                            { id: 'gpt-4o', tier: 'Alias', speed: 'Deep Reasoning', desc: 'OpenAI drop-in compatibility alias automatically mapped to flux-ultra.' },
-                                            { id: 'gpt-3.5-turbo', tier: 'Alias', speed: 'Realtime', desc: 'OpenAI drop-in compatibility alias automatically mapped to flux-flash.' },
+                                            { mod: 'Text / Chat', id: 'flux', tier: 'Flagship (Default)', desc: 'High-accuracy general reasoning, SQL synthesis, and conversational code intelligence. 128k context.' },
+                                            { mod: 'Text / Chat', id: 'flux-flash', tier: 'Low Latency', desc: 'Ultra-fast token throughput. Ideal for autocompletion, real-time UX, and lightweight tasks.' },
+                                            { mod: 'Text / Chat', id: 'flux-pro', tier: 'Balanced Pro', desc: 'Enhanced instruction following, multi-table analysis, and strict JSON formatting.' },
+                                            { mod: 'Text / Chat', id: 'flux-ultra', tier: 'Enterprise Intelligence', desc: 'Maximum cognitive depth for complex system architecture, long reasoning chains, and auditing.' },
+                                            { mod: 'Text / Chat', id: 'flux-5.2', tier: 'Frontier', desc: 'Next-generation reasoning architecture specialized in multi-step agentic execution.' },
+                                            { mod: 'Text / Chat', id: 'flux-turbo', tier: 'Hyper-Speed (300+ tok/s)', desc: 'Hyper-speed 300+ tokens/second inference powered by Groq LLaMA 3.3. 128k context.' },
+                                            { mod: 'Text / Chat', id: 'flux-omni', tier: 'Multimodal Vision', desc: 'Multimodal vision, document comprehension, and fast reasoning. 1M context.' },
+                                            { mod: 'Text / Chat', id: 'gpt-4o', tier: 'Alias → flux-ultra', desc: 'OpenAI drop-in compatibility alias automatically mapped to flux-ultra.' },
+                                            { mod: 'Text / Chat', id: 'gpt-3.5-turbo', tier: 'Alias → flux-flash', desc: 'OpenAI drop-in compatibility alias automatically mapped to flux-flash.' },
+                                            { mod: 'Image Generation', id: 'flux-image', tier: 'Photorealistic (dall-e-3)', desc: 'High-quality photorealistic text-to-image synthesis with automatic S3 hosting.' },
+                                            { mod: 'Image Generation', id: 'flux-image-fast', tier: 'Fast (dall-e-2)', desc: 'Ultra-fast low-latency image generation for web assets and thumbnails.' },
+                                            { mod: 'Image Generation', id: 'flux-image-hd', tier: 'High Definition', desc: 'High-definition 4K image generation with superior typography rendering.' },
+                                            { mod: 'Speech-to-Text', id: 'flux-listen', tier: 'STT (whisper-1)', desc: 'Ultra-fast multilingual audio transcription with segment timestamps.' },
+                                            { mod: 'Speech-to-Text', id: 'flux-listen-pro', tier: 'STT Studio Quality', desc: 'Maximum precision transcription for noisy, accented, or technical audio.' },
+                                            { mod: 'Text-to-Speech', id: 'flux-speak', tier: 'TTS (tts-1)', desc: 'Natural, expressive voice synthesis across 6 voices (alloy, echo, fable, onyx, nova, shimmer).' },
+                                            { mod: 'Text-to-Speech', id: 'flux-speak-hd', tier: 'TTS Studio HD', desc: 'Studio-grade high-definition audio synthesis for production voiceovers.' },
+                                            { mod: 'Video Generation', id: 'flux-video', tier: 'Text / Image to Video', desc: 'Dynamic motion video synthesis (HTTP 202 async task polling).' },
+                                            { mod: 'Video Generation', id: 'flux-video-pro', tier: 'Cinematic 1080p', desc: 'Cinematic 1080p high-fidelity video generation.' },
+                                            { mod: 'Embeddings', id: 'flux-embed', tier: 'Vector (768-dim)', desc: '768-dimensional vector embeddings for semantic search and RAG pipelines.' },
                                         ].map(m => (
                                             <tr key={m.id} className="hover:bg-secondary/70">
+                                                <td className="px-4 py-3 font-mono text-cyan-400 text-xs font-semibold whitespace-nowrap">{m.mod}</td>
                                                 <td className="px-4 py-3 font-mono text-orange-400 text-xs font-bold whitespace-nowrap">{m.id}</td>
-                                                <td className="px-4 py-3 text-xs">
-                                                    <span className="px-2 py-0.5 rounded bg-muted text-muted-foreground text-[11px] font-medium">{m.tier}</span>
-                                                </td>
+                                                <td className="px-4 py-3 text-xs text-muted-foreground font-mono">{m.tier}</td>
                                                 <td className="px-4 py-3 text-foreground/85 text-xs">{m.desc}</td>
                                             </tr>
                                         ))}
@@ -374,98 +398,199 @@ Content-Type: application/json`} />
                                 </table>
                             </div>
 
-                            <h3 className="text-base font-bold text-white mt-6">Integration Examples</h3>
-                            
-                            <Tabs defaultValue="python" className="w-full">
-                                <TabsList className="bg-secondary border border-border">
-                                    <TabsTrigger value="python">Python (OpenAI SDK)</TabsTrigger>
-                                    <TabsTrigger value="node">Node.js / TypeScript</TabsTrigger>
-                                    <TabsTrigger value="curl">cURL</TabsTrigger>
+                            <h3 className="text-base font-bold text-white mt-8">Integration Examples by Modality</h3>
+                            <p className="text-sm">
+                                The gateway is a 100% drop-in replacement for OpenAI. Point your client to <code className="text-xs font-mono text-foreground/80 bg-muted px-1.5 py-0.5 rounded">base_url=&quot;https://www.fluxbasedb.me/api/v1&quot;</code> and use your Fluxbase API Key:
+                            </p>
+
+                            <Tabs defaultValue="chat" className="w-full mt-3">
+                                <TabsList className="flex flex-wrap h-auto gap-1 bg-secondary border border-border p-1 rounded-lg">
+                                    <TabsTrigger value="chat" className="text-xs">1. Chat & Reasoning</TabsTrigger>
+                                    <TabsTrigger value="images" className="text-xs">2. Image Generation</TabsTrigger>
+                                    <TabsTrigger value="voice-stt" className="text-xs">3. Speech-to-Text</TabsTrigger>
+                                    <TabsTrigger value="voice-tts" className="text-xs">4. Text-to-Speech</TabsTrigger>
+                                    <TabsTrigger value="video" className="text-xs">5. Video Generation</TabsTrigger>
+                                    <TabsTrigger value="embeddings" className="text-xs">6. Embeddings</TabsTrigger>
                                 </TabsList>
 
-                                <TabsContent value="python" className="space-y-3 mt-3">
-                                    <p className="text-xs text-muted-foreground">Works out-of-the-box with the standard <code className="font-mono text-foreground/80">openai</code> Python library by pointing <code className="font-mono text-foreground/80">base_url</code> to your Fluxbase API:</p>
-                                    <CodeBlock title="main.py" code={`from openai import OpenAI
+                                {/* Tab 1: Chat */}
+                                <TabsContent value="chat" className="space-y-3 mt-4">
+                                    <h4 className="text-sm font-bold text-white">Chat & SQL Reasoning (SSE Streaming Supported)</h4>
+                                    <CodeBlock title="chat_completion.py" code={`from openai import OpenAI
 
 client = OpenAI(
-    base_url="https://fluxbasedb.me/api/v1",
-    api_key="flx_live_your_fluxbase_key"        # Scoped with 'ai' or 'admin'
+    base_url="https://www.fluxbasedb.me/api/v1",
+    api_key="flx_live_your_fluxbase_key"
 )
 
-# Standard Completion
-response = client.chat.completions.create(
-    model="flux",  # or "flux-flash", "flux-pro", "flux-ultra"
+# Streaming Chat Completion
+stream = client.chat.completions.create(
+    model="flux",  # or "flux-pro", "flux-ultra", "gpt-4o"
     messages=[
         {"role": "system", "content": "You are a database architect."},
-        {"role": "user", "content": "Design an indexing strategy for a high-traffic analytics table."}
+        {"role": "user", "content": "Generate an optimal indexing strategy for a high-traffic analytics table."}
     ],
-    temperature=0.3
-)
-print(response.choices[0].message.content)
-
-# Real-Time Streaming (SSE)
-stream = client.chat.completions.create(
-    model="flux",
-    messages=[{"role": "user", "content": "Write a Python script to test API latency."}],
     stream=True
 )
+
 for chunk in stream:
     print(chunk.choices[0].delta.content or "", end="", flush=True)`} />
                                 </TabsContent>
 
-                                <TabsContent value="node" className="space-y-3 mt-3">
-                                    <p className="text-xs text-muted-foreground">Compatible with the official <code className="font-mono text-foreground/80">openai</code> Node package:</p>
-                                    <CodeBlock title="ai-gateway.ts" code={`import OpenAI from 'openai';
+                                {/* Tab 2: Images */}
+                                <TabsContent value="images" className="space-y-3 mt-4">
+                                    <h4 className="text-sm font-bold text-white">Photorealistic Image Generation</h4>
+                                    <p className="text-xs text-muted-foreground">Generated images are automatically persisted to private S3 buckets and delivered via high-speed CDN URLs or Base64 JSON:</p>
+                                    <CodeBlock title="generate_image.py" code={`from openai import OpenAI
 
-const client = new OpenAI({
-  baseURL: 'https://www.fluxbasedb.me/api/v1',
-  apiKey: process.env.FLUXBASE_API_KEY, // flx_live_...
-});
+client = OpenAI(
+    base_url="https://www.fluxbasedb.me/api/v1",
+    api_key="flx_live_your_fluxbase_key"
+)
 
-async function main() {
-  const stream = await client.chat.completions.create({
-    model: 'flux', // or 'flux-ultra', 'flux-flash'
-    messages: [{ role: 'user', content: 'Generate a PostgreSQL partitioned table schema.' }],
-    stream: true,
-  });
+response = client.images.generate(
+    model="flux-image",       # or "flux-image-fast", "dall-e-3"
+    prompt="Cinematic render of a futuristic serverless database facility in neon lighting, 8k octane render",
+    n=1,
+    size="1024x1024"
+)
 
-  for await (const chunk of stream) {
-    process.stdout.write(chunk.choices[0]?.delta?.content || '');
-  }
-}
-
-main();`} />
+image_url = response.data[0].url
+print(f"Generated Image URL: {image_url}")`} />
                                 </TabsContent>
 
-                                <TabsContent value="curl" className="space-y-3 mt-3">
-                                    <p className="text-xs text-muted-foreground">Standard HTTP POST with JSON body and Bearer authentication:</p>
-                                    <CodeBlock title="Terminal" code={`# Non-streaming Request
-curl -X POST https://www.fluxbasedb.me/api/v1/chat/completions \\
+                                {/* Tab 3: Audio STT */}
+                                <TabsContent value="voice-stt" className="space-y-3 mt-4">
+                                    <h4 className="text-sm font-bold text-white">Speech-to-Text Transcription</h4>
+                                    <p className="text-xs text-muted-foreground">Supports mp3, wav, m4a, ogg, webm, and mp4 audio uploads:</p>
+                                    <CodeBlock title="transcribe_audio.py" code={`from openai import OpenAI
+
+client = OpenAI(
+    base_url="https://www.fluxbasedb.me/api/v1",
+    api_key="flx_live_your_fluxbase_key"
+)
+
+with open("meeting_recording.mp3", "rb") as audio_file:
+    transcript = client.audio.transcriptions.create(
+        model="flux-listen",  # or "flux-listen-pro", "whisper-1"
+        file=audio_file,
+        response_format="text"
+    )
+
+print(f"Transcript: {transcript}")`} />
+                                </TabsContent>
+
+                                {/* Tab 4: Audio TTS */}
+                                <TabsContent value="voice-tts" className="space-y-3 mt-4">
+                                    <h4 className="text-sm font-bold text-white">Text-to-Speech Voice Synthesis</h4>
+                                    <p className="text-xs text-muted-foreground">Synthesize high-fidelity voice audio across alloy, echo, fable, onyx, nova, and shimmer voices:</p>
+                                    <CodeBlock title="synthesize_speech.py" code={`from openai import OpenAI
+
+client = OpenAI(
+    base_url="https://www.fluxbasedb.me/api/v1",
+    api_key="flx_live_your_fluxbase_key"
+)
+
+response = client.audio.speech.create(
+    model="flux-speak",      # or "flux-speak-hd", "tts-1"
+    voice="alloy",           # alloy | echo | fable | onyx | nova | shimmer
+    input="Welcome to Fluxbase. Your multi-tenant serverless database is ready."
+)
+
+response.stream_to_file("welcome.mp3")
+print("Audio saved to welcome.mp3")`} />
+                                </TabsContent>
+
+                                {/* Tab 5: Video */}
+                                <TabsContent value="video" className="space-y-3 mt-4">
+                                    <h4 className="text-sm font-bold text-white">Asynchronous Video Generation & Polling</h4>
+                                    <p className="text-xs text-muted-foreground">Video generation returns an async task ID with HTTP 202 Accepted. Poll the status endpoint until completed:</p>
+                                    <CodeBlock title="generate_video.sh" code={`# 1. Dispatch Video Generation Task
+curl -X POST https://www.fluxbasedb.me/api/v1/videos/generations \\
   -H "Authorization: Bearer flx_live_your_fluxbase_key" \\
   -H "Content-Type: application/json" \\
   -d '{
-    "model": "flux",
-    "messages": [
-      {"role": "system", "content": "You are a helpful assistant."},
-      {"role": "user", "content": "Hello Flux AI!"}
-    ]
+    "model": "flux-video",
+    "prompt": "A continuous drone flyover through a futuristic crystal server rack room, cinematic lighting"
   }'
 
-# Real-time Streaming (Server-Sent Events)
-curl -N -X POST https://www.fluxbasedb.me/api/v1/chat/completions \\
-  -H "Authorization: Bearer flx_live_your_fluxbase_key" \\
-  -H "Content-Type: application/json" \\
-  -d '{
-    "model": "flux-flash",
-    "messages": [{"role": "user", "content": "Count from 1 to 10."}],
-    "stream": true
-  }'`} />
+# Response (HTTP 202 Accepted):
+# { "task_id": "vid_abc123", "status": "PROCESSING", "poll_url": "/api/v1/videos/generations/vid_abc123" }
+
+# 2. Poll Status until SUCCESS:
+curl https://www.fluxbasedb.me/api/v1/videos/generations/vid_abc123 \\
+  -H "Authorization: Bearer flx_live_your_fluxbase_key"
+
+# When completed:
+# { "task_id": "vid_abc123", "status": "SUCCESS", "video_url": "https://www.fluxbasedb.me/api/v1/media/..." }`} />
+                                </TabsContent>
+
+                                {/* Tab 6: Embeddings */}
+                                <TabsContent value="embeddings" className="space-y-3 mt-4">
+                                    <h4 className="text-sm font-bold text-white">768-Dimensional Text Embeddings for RAG</h4>
+                                    <CodeBlock title="create_embeddings.py" code={`from openai import OpenAI
+
+client = OpenAI(
+    base_url="https://www.fluxbasedb.me/api/v1",
+    api_key="flx_live_your_fluxbase_key"
+)
+
+response = client.embeddings.create(
+    model="flux-embed",     # or "text-embedding-3-small"
+    input=["Vector search and pgvector in Fluxbase", "Serverless PostgreSQL database"]
+)
+
+for item in response.data:
+    print(f"Index {item.index}: Vector length = {len(item.embedding)}")`} />
                                 </TabsContent>
                             </Tabs>
 
-                            <Callout type="info">
-                                <strong>Rate Limits & Quota:</strong> Standard Fluxbase keys include 60 requests per minute. All token metrics are aggregated live into project rollups for usage tracking.
-                            </Callout>
+                            <h3 className="text-base font-bold text-white mt-8">Rate Limits & Quota Specifications</h3>
+                            <div className="rounded-lg border border-border overflow-hidden text-sm mt-3">
+                                <table className="w-full text-left bg-card">
+                                    <thead>
+                                        <tr className="bg-secondary border-b border-border text-xs uppercase tracking-wide text-muted-foreground/75">
+                                            <th className="px-4 py-3">Subscription Tier</th>
+                                            <th className="px-4 py-3">Text (RPM / TPM / Daily)</th>
+                                            <th className="px-4 py-3">Images (Daily)</th>
+                                            <th className="px-4 py-3">Audio (Daily)</th>
+                                            <th className="px-4 py-3">Video (Daily)</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-border/60">
+                                        <tr className="hover:bg-secondary/70">
+                                            <td className="px-4 py-3 font-semibold text-foreground/90 text-xs">Free</td>
+                                            <td className="px-4 py-3 text-xs text-muted-foreground font-mono">10 RPM / 10k TPM / 500 req</td>
+                                            <td className="px-4 py-3 text-xs text-muted-foreground font-mono">5 / day</td>
+                                            <td className="px-4 py-3 text-xs text-muted-foreground font-mono">20 / day</td>
+                                            <td className="px-4 py-3 text-xs text-red-400 font-mono">Locked (Requires Pro)</td>
+                                        </tr>
+                                        <tr className="hover:bg-secondary/70">
+                                            <td className="px-4 py-3 font-semibold text-blue-400 text-xs">Pro</td>
+                                            <td className="px-4 py-3 text-xs text-muted-foreground font-mono">60 RPM / 100k TPM / 10k req</td>
+                                            <td className="px-4 py-3 text-xs text-muted-foreground font-mono">50 / day</td>
+                                            <td className="px-4 py-3 text-xs text-muted-foreground font-mono">200 / day</td>
+                                            <td className="px-4 py-3 text-xs text-muted-foreground font-mono">5 / day</td>
+                                        </tr>
+                                        <tr className="hover:bg-secondary/70">
+                                            <td className="px-4 py-3 font-semibold text-purple-400 text-xs">Max</td>
+                                            <td className="px-4 py-3 text-xs text-muted-foreground font-mono">300 RPM / 500k TPM / 50k req</td>
+                                            <td className="px-4 py-3 text-xs text-muted-foreground font-mono">200 / day</td>
+                                            <td className="px-4 py-3 text-xs text-muted-foreground font-mono">1,000 / day</td>
+                                            <td className="px-4 py-3 text-xs text-muted-foreground font-mono">20 / day</td>
+                                        </tr>
+                                        <tr className="bg-emerald-500/5 hover:bg-emerald-500/10">
+                                            <td className="px-4 py-3 font-bold text-emerald-400 text-xs flex items-center gap-1.5">
+                                                <Sparkles className="h-3.5 w-3.5" /> Employee / Org Owner / PAYG
+                                            </td>
+                                            <td className="px-4 py-3 text-xs text-emerald-300 font-mono font-bold">Unlimited</td>
+                                            <td className="px-4 py-3 text-xs text-emerald-300 font-mono font-bold">Unlimited</td>
+                                            <td className="px-4 py-3 text-xs text-emerald-300 font-mono font-bold">Unlimited</td>
+                                            <td className="px-4 py-3 text-xs text-emerald-300 font-mono font-bold">Unlimited</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
                         </Section>
 
                         {/* ── 4. Model Context Protocol (MCP) AI Gateway ── */}
@@ -1250,6 +1375,10 @@ wscat -c wss://fluxbase-realtime.onrender.com
 
                             <Callout type="info">
                                 Invitations are <strong>email-case-insensitive</strong>. Sending a new invite automatically resets any previous pending, accepted, or rejected state for that email in the project.
+                            </Callout>
+
+                            <Callout type="success">
+                                <strong>Role Isolation & Owner-Driven Limits:</strong> Collaborators invited to a project retain their personal subscription tier and display as <code className="text-xs font-mono bg-muted px-1.5 py-0.5 rounded text-emerald-300">[ DEVELOPER ] [ TEAM ]</code> without affecting their personal account billing. Meanwhile, all database limits for that project (tables, rows, instance sizes, webhooks, and scrapers) evaluate against the <strong>Project Owner's</strong> plan tier—enabling team members to work seamlessly in high-tier enterprise projects without hitting personal plan limits.
                             </Callout>
                         </Section>
 
