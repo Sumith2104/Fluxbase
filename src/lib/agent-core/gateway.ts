@@ -215,6 +215,7 @@ export class ModelGateway {
       // 2. GLM flash fallback if primary is not GLM-flash
       if (process.env.GLM_API_KEY) {
         add('glm', 'glm-4-flash');
+        add('glm', 'glm-4v-flash');
         add('glm', 'glm-4-air');
         add('glm', 'glm-4-plus');
       }
