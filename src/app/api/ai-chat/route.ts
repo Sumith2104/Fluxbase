@@ -8,6 +8,7 @@ import { getRagContext } from '@/lib/rag-service';
 import { getSqlCapabilityPrompt } from '@/lib/sql-capabilities';
 import { ModelGateway, ModelMessage } from '@/lib/agent-core/gateway';
 import { createAgentSseTransformStream } from '@/lib/agent-core/stream';
+import { recordAiUsage } from '@/lib/ai-gateway/usage-ledger';
 
 // ── Schema Cache ──────────────────────────────────────────────────────────────
 // Avoids querying information_schema on every chat message.
@@ -379,16 +380,44 @@ AVAILABLE ACTION TAGS (append at the end of response):
             }
         }
 
+        const hasMultimodalAttachments = recentMessages.some(m => Array.isArray(m.images) && m.images.length > 0);
+        const callStartTime = Date.now();
+        const currentUserId = auth.userId;
+        const currentProjectId = activeProject?.project_id || body.projectId || undefined;
+
         // ── 2. Handle Streaming (SSE) ──────────────────────────────────────────
         const wantsStream = Boolean(stream) || req.headers.get('accept')?.includes('text/event-stream');
         if (wantsStream) {
-            const { stream: upstreamStream } = await ModelGateway.stream({
+            const { stream: upstreamStream, provider: streamProvider, model: streamModel } = await ModelGateway.stream({
                 model: model || 'flux-fast',
                 messages: modelMessages,
                 temperature: 0.2
             });
 
-            const transformStream = createAgentSseTransformStream(rag.sources);
+            const transformStream = createAgentSseTransformStream(rag.sources, (stats) => {
+                const latencyMs = Date.now() - callStartTime;
+                const promptTokens = Math.max(1, Math.ceil(JSON.stringify(modelMessages).length / 4));
+                const completionTokens = Math.max(1, Math.ceil((stats.fullText.length + (stats.thought?.length || 0)) / 4));
+
+                recordAiUsage({
+                    userId: currentUserId,
+                    projectId: currentProjectId,
+                    modelId: streamModel || model || 'flux-fast',
+                    modality: hasMultimodalAttachments ? 'image' : 'text',
+                    provider: (streamProvider as any) || 'glm',
+                    inputTokens: promptTokens,
+                    outputTokens: completionTokens,
+                    latencyMs,
+                    status: 'success',
+                    metadata: {
+                        source: 'in_app_chat_stream',
+                        hasImages: hasMultimodalAttachments,
+                        sourcesCount: rag.sources?.length || 0
+                    }
+                }).catch((err) => {
+                    logger.warn('[AI Chat] Failed to record streaming AI usage:', err);
+                });
+            });
             const clientStream = upstreamStream.pipeThrough(transformStream);
 
             return new Response(clientStream, {
@@ -406,6 +435,29 @@ AVAILABLE ACTION TAGS (append at the end of response):
             model: model || 'flux-fast',
             messages: modelMessages,
             temperature: 0.2
+        });
+
+        const latencyMs = Date.now() - callStartTime;
+        const promptTokens = result.usage?.prompt_tokens || Math.max(1, Math.ceil(JSON.stringify(modelMessages).length / 4));
+        const completionTokens = result.usage?.completion_tokens || Math.max(1, Math.ceil(((result.text?.length || 0) + (result.thought?.length || 0)) / 4));
+
+        recordAiUsage({
+            userId: currentUserId,
+            projectId: currentProjectId,
+            modelId: result.model || model || 'flux-fast',
+            modality: hasMultimodalAttachments ? 'image' : 'text',
+            provider: (result.provider as any) || 'glm',
+            inputTokens: promptTokens,
+            outputTokens: completionTokens,
+            latencyMs,
+            status: 'success',
+            metadata: {
+                source: 'in_app_chat',
+                hasImages: hasMultimodalAttachments,
+                sourcesCount: rag.sources?.length || 0
+            }
+        }).catch((err) => {
+            logger.warn('[AI Chat] Failed to record non-streaming AI usage:', err);
         });
 
         let responseText = result.text || '';

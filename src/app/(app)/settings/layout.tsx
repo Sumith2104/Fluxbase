@@ -4,7 +4,7 @@ import { ReactNode } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
-import { Settings, Key, Webhook, Bot, Activity, Users, Bell, Archive, BookOpen, CreditCard } from 'lucide-react';
+import { Settings, Key, Webhook, Bot, Activity, Users, Bell, Archive, BookOpen, CreditCard, Receipt } from 'lucide-react';
 import { BackButton } from "@/components/back-button";
 
 const sidebarNavItems = [
@@ -17,6 +17,11 @@ const sidebarNavItems = [
         title: "Billing & Usage",
         href: "/settings/billing",
         icon: CreditCard,
+    },
+    {
+        title: "API Bills",
+        href: "/settings/api-bills",
+        icon: Receipt,
     },
     {
         title: "API Keys",

@@ -19,7 +19,10 @@ export function formatSseEvent(event: AgentStreamEvent): string {
  * Creates a TransformStream that ingests upstream OpenAI/GLM SSE lines
  * and emits structured Fluxbase AgentStreamEvent chunks.
  */
-export function createAgentSseTransformStream(sources: string[] = []): TransformStream<Uint8Array, Uint8Array> {
+export function createAgentSseTransformStream(
+  sources: string[] = [],
+  onFinish?: (stats: { fullText: string; thought: string }) => void
+): TransformStream<Uint8Array, Uint8Array> {
   const textDecoder = new TextDecoder();
   const textEncoder = new TextEncoder();
 
@@ -144,12 +147,23 @@ export function createAgentSseTransformStream(sources: string[] = []): Transform
         controller.enqueue(textEncoder.encode(formatSseEvent({ type: 'sources', sources })));
       }
 
+      const finalFullText = accumulatedText.trim();
+      const finalThought = accumulatedThought.trim();
+
+      if (onFinish) {
+        try {
+          onFinish({ fullText: finalFullText, thought: finalThought });
+        } catch (e) {
+          // Non-blocking
+        }
+      }
+
       controller.enqueue(
         textEncoder.encode(
           formatSseEvent({
             type: 'done',
-            fullText: accumulatedText.trim(),
-            thought: accumulatedThought.trim() || undefined
+            fullText: finalFullText,
+            thought: finalThought || undefined
           })
         )
       );
