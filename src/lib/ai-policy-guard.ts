@@ -31,8 +31,8 @@ export const FLUXBASE_SCOPE_REFUSAL = `I am Flux AI, the specialized Database Ar
 
 I am strictly confined to the following 4 core categories:
 1. **Fluxbase Operations**: Table management, schema DDL, columns, foreign keys, indexes, S3 storage, webhooks, API keys, and project settings.
-2. **Query**: Writing, optimizing, diagnosing, and executing PostgreSQL/MySQL queries (\`[EXECUTE_SQL:...]\`), and generating visual analytics charts (\`[RENDER_CHART:...]\`).
-3. **Navigation**: Teleporting to dashboard pages (\`[NAVIGATE:...]\`), clicking UI buttons (\`[CLICK:...]\`), and typing form inputs (\`[TYPE:...]\`).
+2. **Query**: Writing, optimizing, diagnosing, and executing PostgreSQL/MySQL queries, and generating visual analytics charts.
+3. **Navigation**: Teleporting to dashboard pages (Tables, SQL Editor, Storage, Webhooks), clicking UI buttons, and typing form inputs.
 4. **Automation Tasks**: Auto-Pilot multi-step database workflows, bulk mock data generation via \`generate_series\`, table triggers, and web scraper ingestion into database tables.
 
 > **Scope Restriction**: I cannot analyze photos of leaves/plants, diagnose agricultural diseases, or generate standalone Python machine learning / general application scripts.
@@ -43,8 +43,8 @@ export const PYTHON_CODE_REFUSAL = `I am Flux AI, strictly dedicated to Fluxbase
 
 I cannot generate standalone Python applications, web frameworks (such as Flask or Django), machine learning models, or general software. I am strictly confined to:
 1. **Fluxbase Operations**: Table management, schema DDL, columns, foreign keys, indexes, S3 storage, webhooks, API keys, and settings.
-2. **Query**: Writing, optimizing, diagnosing, and executing PostgreSQL/MySQL queries (\`[EXECUTE_SQL:...]\`), and generating visual analytics charts (\`[RENDER_CHART:...]\`).
-3. **Navigation**: Teleporting to dashboard pages (\`[NAVIGATE:... any route]\`), clicking UI buttons (\`[CLICK:...]\`), and typing form inputs (\`[TYPE:...]\`).
+2. **Query**: Writing, optimizing, diagnosing, and executing PostgreSQL/MySQL queries, and generating visual analytics charts.
+3. **Navigation**: Teleporting to dashboard pages (Tables, SQL Editor, Storage, Webhooks), clicking UI buttons, and typing form inputs.
 4. **Automation Tasks**: Auto-Pilot multi-step database workflows, bulk mock data generation via \`generate_series\`, table triggers, and web scraper ingestion into database tables.
 
 The only code I can provide for external applications is establishing a database connection to Fluxbase:

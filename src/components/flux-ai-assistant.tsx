@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, Volume2, VolumeX, ArrowUp, Zap, GripVertical, Play, Maximize2, Minimize2, Paperclip, Plus } from "lucide-react";
+import { X, Volume2, VolumeX, ArrowUp, Zap, GripVertical, Play, Maximize2, Minimize2, Paperclip, Plus, Square } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
 import { useContext } from "react";
 import { ProjectContext } from "@/contexts/project-context";
@@ -153,6 +153,11 @@ const parseWorkflow = (text: string, currentProjectId?: string): { steps: Workfl
   while ((cbMatch = codeBlockRegex.exec(workingText)) !== null) {
     codeBlockRanges.push([cbMatch.index, cbMatch.index + cbMatch[0].length]);
   }
+  const inlineCodeRegex = /`[^`\n]+`/g;
+  let icMatch;
+  while ((icMatch = inlineCodeRegex.exec(workingText)) !== null) {
+    codeBlockRanges.push([icMatch.index, icMatch.index + icMatch[0].length]);
+  }
 
   const tagRegex = /\[(NAVIGATE|CLICK|TYPE|CONFIRM_ACTION|EXECUTE_SQL|REQUEST_APPROVAL|CALL_MCP|GOAL_ACCOMPLISHED|RENDER_CHART)(?::([^\]]*?))?\]/g;
   let match;
@@ -166,13 +171,27 @@ const parseWorkflow = (text: string, currentProjectId?: string): { steps: Workfl
     if (type === 'NAVIGATE') {
       let p = argsStr.trim().replace(/^<\/+/, '/').replace(/>+$/, '');
       if (!p.startsWith('/')) p = '/' + p;
-      steps.push({ type: 'NAVIGATE', path: p });
+      const cleanPath = p.split('?')[0];
+      const isDummy = cleanPath.includes('...') || cleanPath.includes('<') || cleanPath.includes('>') || cleanPath.includes(' ') || cleanPath === '/' || /route|example|placeholder/i.test(cleanPath);
+      const isValid = /^\/[a-zA-Z0-9_\-\/]+$/.test(cleanPath);
+      if (!isDummy && isValid) {
+        steps.push({ type: 'NAVIGATE', path: p });
+      }
     } else if (type === 'CLICK') {
-      steps.push({ type: 'CLICK', elementId: argsStr.trim() });
+      const el = argsStr.trim();
+      const isDummy = !el || el === '...' || el.includes('<') || el.includes('>') || /^(?:button|label|element)(?:\s+name)?$/i.test(el);
+      if (!isDummy) {
+        steps.push({ type: 'CLICK', elementId: el });
+      }
     } else if (type === 'TYPE') {
       const colonIdx = argsStr.lastIndexOf(':');
       if (colonIdx !== -1) {
-        steps.push({ type: 'TYPE', value: argsStr.substring(0, colonIdx).trim(), locator: argsStr.substring(colonIdx + 1).trim() });
+        const val = argsStr.substring(0, colonIdx).trim();
+        const loc = argsStr.substring(colonIdx + 1).trim();
+        const isDummy = !val || !loc || val === '...' || loc === '...' || val.includes('<') || loc.includes('<');
+        if (!isDummy) {
+          steps.push({ type: 'TYPE', value: val, locator: loc });
+        }
       }
     } else if (type === 'EXECUTE_SQL') {
       let query = argsStr.trim();
@@ -308,9 +327,16 @@ export function FluxAiAssistant({ userId, isOpen, onOpenChange }: { userId: stri
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === "Escape" && (isTyping || isStreamingActive)) {
+      e.preventDefault();
+      handleStop();
+      return;
+    }
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
-      handleSend();
+      if (!isTyping && !isStreamingActive) {
+        handleSend();
+      }
     }
   };
 
@@ -876,6 +902,11 @@ export function FluxAiAssistant({ userId, isOpen, onOpenChange }: { userId: stri
     const cleanup = () => { if (interval) { clearInterval(interval); interval = null; } };
 
     if (step.type === 'NAVIGATE' && step.path) {
+      const cleanPath = step.path.split('?')[0];
+      if (cleanPath.includes('...') || cleanPath.includes('<') || cleanPath.includes(' ') || cleanPath === '/' || !/^\/[a-zA-Z0-9_\-\/]+$/.test(cleanPath)) {
+        advanceWorkflow();
+        return;
+      }
       let finalPath = step.path;
       if (project?.project_id && !finalPath.includes('projectId')) finalPath += `${finalPath.includes('?') ? '&' : '?'}projectId=${project.project_id}`;
       recentNavPaths.current.push(finalPath.replace(/\?.*$/, ""));
@@ -1149,6 +1180,42 @@ export function FluxAiAssistant({ userId, isOpen, onOpenChange }: { userId: stri
       tick();
     }, 350);
   };
+
+  // --- Stop Generation ---
+
+  const handleStop = useCallback(() => {
+    if (abortRef.current) {
+      abortRef.current.abort();
+      abortRef.current = null;
+    }
+    if (streamingTimerRef.current) {
+      clearInterval(streamingTimerRef.current);
+      streamingTimerRef.current = null;
+    }
+    activeStreamFinalizeRef.current = null;
+    if (typeof window !== 'undefined' && window.speechSynthesis) {
+      window.speechSynthesis.cancel();
+    }
+
+    setMessages(prev => {
+      if (prev.length === 0) return prev;
+      const last = prev[prev.length - 1];
+      if (last.role === 'assistant' && (last.isStreaming || last.isThinking)) {
+        const updated = [...prev];
+        updated[updated.length - 1] = {
+          ...last,
+          isStreaming: false,
+          isThinking: false,
+          content: last.content || (last.thought ? 'Generation stopped.' : 'Stopped.')
+        };
+        return updated;
+      }
+      return prev;
+    });
+
+    setIsTyping(false);
+    setIsStreamingActive(false);
+  }, []);
 
   // --- Send Message ---
 
@@ -1798,6 +1865,18 @@ export function FluxAiAssistant({ userId, isOpen, onOpenChange }: { userId: stri
                                       <span className="text-[11px] font-mono text-muted-foreground font-medium ml-1 select-none">
                                         {msg.taskLabel || "Thinking..."}
                                       </span>
+                                      <button
+                                        type="button"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          handleStop();
+                                        }}
+                                        className="ml-2 px-1.5 py-0.5 rounded text-[10px] font-mono bg-red-500/15 hover:bg-red-500/25 text-red-400 border border-red-500/20 transition-colors flex items-center gap-1 cursor-pointer"
+                                        title="Stop generation"
+                                      >
+                                        <Square size={8} className="fill-current" />
+                                        <span>Stop</span>
+                                      </button>
                                     </div>
                                   ) : (
                                     /* Expanded Full Response Card */
@@ -1818,9 +1897,23 @@ export function FluxAiAssistant({ userId, isOpen, onOpenChange }: { userId: stri
                                           </span>
                                         </div>
                                         {msg.isStreaming && (
-                                          <span className="inline-flex items-center gap-1 px-1.5 py-0.2 rounded text-[9.5px] font-mono text-cyan-400 bg-cyan-500/10 border border-cyan-500/20 animate-pulse">
-                                            Generating
-                                          </span>
+                                          <div className="flex items-center gap-1.5">
+                                            <span className="inline-flex items-center gap-1 px-1.5 py-0.2 rounded text-[9.5px] font-mono text-cyan-400 bg-cyan-500/10 border border-cyan-500/20 animate-pulse">
+                                              Generating
+                                            </span>
+                                            <button
+                                              type="button"
+                                              onClick={(e) => {
+                                                e.stopPropagation();
+                                                handleStop();
+                                              }}
+                                              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9.5px] font-mono text-red-400 bg-red-500/15 hover:bg-red-500/25 border border-red-500/30 transition-all cursor-pointer shadow-xs"
+                                              title="Stop generation"
+                                            >
+                                              <Square size={8} className="fill-current" />
+                                              <span>Stop</span>
+                                            </button>
+                                          </div>
                                         )}
                                       </div>
 
@@ -1843,16 +1936,7 @@ export function FluxAiAssistant({ userId, isOpen, onOpenChange }: { userId: stri
                                         <InChatChart chart={msg.chart} projectId={project?.project_id} />
                                       )}
 
-                                      {msg.sources && msg.sources.length > 0 && (
-                                        <div className="mt-3 pt-2.5 border-t border-border/40 flex flex-wrap gap-1 items-center">
-                                          <span className="text-[10px] text-muted-foreground/80 font-mono tracking-wider uppercase font-semibold">RAG:</span>
-                                          {msg.sources.map((src, si) => (
-                                            <span key={si} className="text-[9.5px] px-1.5 py-0.5 rounded bg-muted/70 text-muted-foreground border border-border/50 font-mono">
-                                              {src}
-                                            </span>
-                                          ))}
-                                        </div>
-                                      )}
+                                      {/* RAG Sources banner hidden per user request */}
 
                                       {msg.approvalRequest && (
                                         <FluxAiApprovalCard
@@ -1932,6 +2016,15 @@ export function FluxAiAssistant({ userId, isOpen, onOpenChange }: { userId: stri
                       <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 animate-pulse" style={{ animationDelay: '150ms' }} />
                       <span className="w-1.5 h-1.5 rounded-full bg-violet-400 animate-pulse" style={{ animationDelay: '300ms' }} />
                       <span className="text-[11px] font-mono text-muted-foreground font-medium ml-1">Thinking...</span>
+                      <button
+                        type="button"
+                        onClick={handleStop}
+                        className="ml-2 px-1.5 py-0.5 rounded text-[10px] font-mono bg-red-500/15 hover:bg-red-500/25 text-red-400 border border-red-500/20 transition-colors flex items-center gap-1 cursor-pointer"
+                        title="Stop generation"
+                      >
+                        <Square size={8} className="fill-current" />
+                        <span>Stop</span>
+                      </button>
                     </div>
                   </BorderBeam>
                 </motion.div>
@@ -2066,20 +2159,31 @@ export function FluxAiAssistant({ userId, isOpen, onOpenChange }: { userId: stri
                       </span>
                     )}
 
-                    <button
-                      type="button"
-                      onClick={() => handleSend()}
-                      disabled={(!input.trim() && attachments.length === 0) || isTyping}
-                      className={cn(
-                        "h-7.5 w-7.5 sm:h-8 sm:w-8 rounded-xl flex items-center justify-center transition-all shadow-xs shrink-0 cursor-pointer",
-                        (input.trim() || attachments.length > 0) && !isTyping
-                          ? "bg-primary text-primary-foreground hover:opacity-90 active:scale-95 shadow-md shadow-primary/20"
-                          : "bg-secondary/60 text-muted-foreground/40 cursor-not-allowed"
-                      )}
-                      title="Send message (Enter)"
-                    >
-                      <ArrowUp size={15} strokeWidth={2.5} />
-                    </button>
+                    {isTyping || isStreamingActive ? (
+                      <button
+                        type="button"
+                        onClick={handleStop}
+                        className="h-7.5 w-7.5 sm:h-8 sm:w-8 rounded-xl flex items-center justify-center transition-all shadow-xs shrink-0 cursor-pointer bg-red-500 hover:bg-red-600 text-white shadow-md shadow-red-500/25 active:scale-95 animate-in fade-in zoom-in-90 duration-150"
+                        title="Stop generation (Esc)"
+                      >
+                        <Square size={12} className="fill-current" />
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => handleSend()}
+                        disabled={(!input.trim() && attachments.length === 0)}
+                        className={cn(
+                          "h-7.5 w-7.5 sm:h-8 sm:w-8 rounded-xl flex items-center justify-center transition-all shadow-xs shrink-0 cursor-pointer",
+                          (input.trim() || attachments.length > 0)
+                            ? "bg-primary text-primary-foreground hover:opacity-90 active:scale-95 shadow-md shadow-primary/20"
+                            : "bg-secondary/60 text-muted-foreground/40 cursor-not-allowed"
+                        )}
+                        title="Send message (Enter)"
+                      >
+                        <ArrowUp size={15} strokeWidth={2.5} />
+                      </button>
+                    )}
                   </div>
                 </div>
               </div>
