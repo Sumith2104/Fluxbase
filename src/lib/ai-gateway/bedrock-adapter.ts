@@ -12,8 +12,8 @@ let cachedClient: BedrockRuntimeClient | null = null;
 
 export function getBedrockClient(): BedrockRuntimeClient {
   if (!cachedClient) {
-    // Bedrock Claude 3.7 Sonnet cross-region inference profiles use us-east-1 or us-west-2
-    const region = process.env.AWS_BEDROCK_REGION || process.env.AWS_REGION || 'us-east-1';
+    // Bedrock Anthropic Claude cross-region inference profiles use us-east-1
+    const region = process.env.AWS_BEDROCK_REGION || 'us-east-1';
     const config: any = { region };
 
     if (process.env.AWS_ACCESS_KEY_ID && process.env.AWS_SECRET_ACCESS_KEY) {
