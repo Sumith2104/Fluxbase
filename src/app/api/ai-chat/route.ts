@@ -413,7 +413,7 @@ AVAILABLE ACTION TAGS (append at the end of response):
 - Type: [TYPE:<value>:<field_or_placeholder>]
 - Goal Finished: [GOAL_ACCOMPLISHED:<summary>]`;
 
-        // Format conversation history
+        // Format conversation history with Anti-Contamination (Purge off-topic history)
         const recentMessages = messages.slice(-10);
         const modelMessages: ModelMessage[] = [
             { role: 'system', content: systemPrompt }
@@ -421,6 +421,29 @@ AVAILABLE ACTION TAGS (append at the end of response):
 
         for (const msg of recentMessages) {
             if (msg.hidden) continue;
+
+            const rawContentStr = typeof msg.content === 'string'
+                ? msg.content
+                : (Array.isArray(msg.content) ? (msg.content.find((p: any) => p?.type === 'text')?.text || '') : '');
+
+            // Anti-Contamination: Skip prior turns containing off-topic Flask/Django/ML code or leaf disease
+            if (msg.role === 'assistant' && (
+                rawContentStr.includes('Flask application') ||
+                rawContentStr.includes('UserRegistration') ||
+                rawContentStr.includes('UserLogin') ||
+                rawContentStr.includes('Flask-SQLAlchemy') ||
+                rawContentStr.includes('MAIN APPLICATION FILE') ||
+                /\b(?:flask|django|fastapi|pytorch|opencv|leaf\s+disease|powdery\s+mildew|blight)\b/i.test(rawContentStr)
+            )) {
+                continue;
+            }
+
+            if (msg.role === 'user') {
+                const check = checkOffTopicPolicy(rawContentStr, Array.isArray(msg.images) && msg.images.length > 0);
+                if (check.isOffTopic) {
+                    continue;
+                }
+            }
 
             const images = Array.isArray(msg.images) ? msg.images : [];
             if (images.length > 0) {

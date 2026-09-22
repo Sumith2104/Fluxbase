@@ -117,4 +117,25 @@ describe('Fluxbase AI Policy Guard', () => {
             expect(res.isOffTopic).toBe(false);
         });
     });
+
+    describe('Immediate Stop & Cancellation Handling', () => {
+        it('immediately halts when user says "stop"', () => {
+            const res = checkOffTopicPolicy('stop');
+            expect(res.isOffTopic).toBe(true);
+            expect(res.reason).toBe('stop_command');
+            expect(res.refusalText).toContain('Generation stopped');
+        });
+
+        it('immediately halts when user says "stop it" or "please stop"', () => {
+            const res = checkOffTopicPolicy('please stop');
+            expect(res.isOffTopic).toBe(true);
+            expect(res.reason).toBe('stop_command');
+        });
+
+        it('immediately halts when user says "cancel" or "abort"', () => {
+            const res = checkOffTopicPolicy('cancel');
+            expect(res.isOffTopic).toBe(true);
+            expect(res.reason).toBe('stop_command');
+        });
+    });
 });

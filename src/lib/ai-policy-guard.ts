@@ -16,8 +16,15 @@
 
 export interface PolicyCheckResult {
     isOffTopic: boolean;
-    reason?: 'leaf_or_plant_disease_diagnosis' | 'standalone_python_or_ml_request' | 'non_database_image_upload' | 'general_off_topic';
+    reason?: 'leaf_or_plant_disease_diagnosis' | 'standalone_python_or_ml_request' | 'non_database_image_upload' | 'general_off_topic' | 'stop_command';
     refusalText?: string;
+}
+
+export const STOP_COMMAND_RESPONSE = `Generation stopped. What Fluxbase operation, SQL query, or navigation task can I help you with?`;
+
+export function isStopCommand(text: string): boolean {
+    const trimmed = (text || '').trim().toLowerCase().replace(/[!?.,]/g, '');
+    return /^(stop|stop it|please stop|cancel|halt|abort|pause|quit|reset|exit|nevermind|don't|dont|terminate|clear)$/i.test(trimmed);
 }
 
 export const FLUXBASE_SCOPE_REFUSAL = `I am Flux AI, the specialized Database Architect and Developer Assistant strictly dedicated to **Fluxbase** (https://fluxbasedb.me).
@@ -62,6 +69,15 @@ export function checkOffTopicPolicy(userText: string, hasAttachedImages: boolean
     const text = (userText || '').trim().toLowerCase();
     if (!text && !hasAttachedImages) {
         return { isOffTopic: false };
+    }
+
+    // ── 0. Immediate Stop / Cancellation Command ──
+    if (isStopCommand(text)) {
+        return {
+            isOffTopic: true,
+            reason: 'stop_command',
+            refusalText: STOP_COMMAND_RESPONSE
+        };
     }
 
     // ── Safe Exceptions (Database Operations & Fluxbase Connection Requests) ──

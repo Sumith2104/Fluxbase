@@ -528,6 +528,23 @@ ${docsContext.substring(0, 10000)}
 
 Provide your response in Markdown formatting. Do NOT use HTML. Keep code snippets short and sweet.`;
 
+                const sanitizedMessages = clientMessages.slice(-6).filter((m: any) => {
+                    const contentStr = typeof m.content === 'string' ? m.content : '';
+                    if (m.role === 'assistant' && (
+                        contentStr.includes('Flask application') ||
+                        contentStr.includes('UserRegistration') ||
+                        contentStr.includes('Flask-SQLAlchemy') ||
+                        contentStr.includes('MAIN APPLICATION FILE') ||
+                        /\b(?:flask|django|fastapi|pytorch|opencv|leaf\s+disease)\b/i.test(contentStr)
+                    )) {
+                        return false;
+                    }
+                    if (m.role === 'user' && checkOffTopicPolicy(contentStr).isOffTopic) {
+                        return false;
+                    }
+                    return true;
+                });
+
                 try {
                     const response = await fetch('https://open.bigmodel.cn/api/paas/v4/chat/completions', {
                         method: 'POST',
@@ -539,7 +556,7 @@ Provide your response in Markdown formatting. Do NOT use HTML. Keep code snippet
                             model: 'glm-5.2',
                             messages: [
                                 { role: 'system', content: systemPrompt },
-                                ...clientMessages.slice(-6).map((m: any) => ({
+                                ...sanitizedMessages.map((m: any) => ({
                                     role: m.role === 'assistant' ? 'assistant' : 'user',
                                     content: m.content
                                 }))
