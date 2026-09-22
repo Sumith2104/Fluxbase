@@ -66,6 +66,51 @@ fluxbasedb.me, www.fluxbasedb.me {
     }
 }
 
+# FluxPay Payment Gateway Subdomain with Automatic SSL
+payments.fluxbasedb.me {
+    encode zstd gzip
+
+    # Static Assets Caching (Next.js immutable hashed assets)
+    @static {
+        path /_next/static/* /favicon.ico /logo.png
+    }
+    handle @static {
+        header Cache-Control "public, max-age=31536000, immutable"
+        reverse_proxy gateway:3001 {
+            header_up Host {host}
+            header_up X-Real-IP {remote_host}
+            header_up X-Forwarded-For {remote_host}
+            header_up X-Forwarded-Proto {scheme}
+        }
+    }
+
+    # High-speed streaming routes (Order SSE stream)
+    @streaming {
+        path /api/v1/orders/*/stream
+    }
+    handle @streaming {
+        reverse_proxy gateway:3001 {
+            header_up Host {host}
+            header_up X-Real-IP {remote_host}
+            header_up X-Forwarded-For {remote_host}
+            header_up X-Forwarded-Proto {scheme}
+            flush_interval -1
+        }
+    }
+
+    handle {
+        reverse_proxy gateway:3001 {
+            header_up Host {host}
+            header_up X-Real-IP {remote_host}
+            header_up X-Forwarded-For {remote_host}
+            header_up X-Forwarded-Proto {scheme}
+            lb_try_duration 30s
+            lb_try_interval 250ms
+        }
+    }
+}
+
+
 # Fallback for Direct IP Access (for testing before DNS cutover)
 :80 {
     @websockets {

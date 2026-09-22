@@ -74,6 +74,7 @@ services:
     depends_on:
       - app
       - websocket
+      - gateway
     networks:
       - fluxbase-network
 
@@ -91,6 +92,36 @@ services:
     environment:
       - PORT=8080
       - NODE_ENV=production
+    networks:
+      - fluxbase-network
+
+  # 6. FluxPay Payment Gateway & Checkout Engine
+  gateway:
+    build:
+      context: .
+      dockerfile: Dockerfile.gateway
+    container_name: fluxbase-gateway
+    restart: unless-stopped
+    expose:
+      - "3001"
+    env_file:
+      - .env.production
+    environment:
+      - PORT=3001
+      - HOSTNAME=0.0.0.0
+      - NODE_ENV=production
+      - NEXT_PUBLIC_GATEWAY_URL=https://payments.fluxbasedb.me
+      - DEFAULT_UPI_ID=sumith0909@ibl
+      - DEFAULT_UPI_SUFFIX=9749
+      - UPI_VPAS=sumith0909@ibl,8310870493@ibl,sumith0909@axl,8310870493@axl,sumith0909@ybl,8310870493@ybl
+      - GATEWAY_ADMIN_SECRET=fluxpay_admin_master_key
+      - PAYMENT_WEBHOOK_SECRET=sumith@fluxbase
+      - SMS_WEBHOOK_SECRET=sumith@fluxbase
+      - FLUXBASE_PROJECT_ID=0e3d63b989b94d08
+      - FLUXBASE_PROJECT_SCHEMA=flux_tenant_0e3d63b989b94d08
+    depends_on:
+      redis:
+        condition: service_healthy
     networks:
       - fluxbase-network
 

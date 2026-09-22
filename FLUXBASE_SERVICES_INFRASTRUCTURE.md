@@ -62,6 +62,7 @@ All containers run inside `/opt/fluxbase/app` orchestrated by `docker-compose.pr
 | **`fluxbase-redis`** | `redis` | `redis:7-alpine` | `6379` | `127.0.0.1:6379` | In-memory cache, rate limiting, and table row query caching (512 MB LRU policy). |
 | **`fluxbase-proxy`** | `caddy` | `caddy:2-alpine` | `80`, `443` | `0.0.0.0:80`, `443` (TCP/UDP) | Reverse proxy, automatic SSL/TLS certificate management, HTTP/3 QUIC protocol, and static asset caching. |
 | **`fluxbase-scraper-engine`**| `scraper-engine`| `node:20-bookworm-slim` (Playwright) | `8080` | Internal `8080` | Autonomous web scraping worker. Executes scheduled scraping jobs and writes results to PostgreSQL. |
+| **`fluxbase-gateway`** | `gateway` | `node:20-alpine` (Next.js 15.5) | `3001` | Internal `3001` | FluxPay UPI & Payment Gateway engine, hosted checkout pages (`payments.fluxbasedb.me`), merchant portal, and SMS webhook ingestion. |
 
 ---
 
