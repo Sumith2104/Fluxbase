@@ -29,6 +29,20 @@ const timezones = Intl.supportedValuesOf ? Intl.supportedValuesOf('timeZone') : 
 type UserRoleOption = 'student' | 'employee' | 'org_owner';
 type BillingOption = 'monthly' | 'pay_as_you_go' | 'hybrid';
 
+const resolveRoleFromPlan = (plan: string): UserRoleOption => {
+  const p = (plan || '').toLowerCase();
+  if (p === 'org_owner' || p === 'org') return 'org_owner';
+  if (p === 'employee' || p === 'emp') return 'employee';
+  return 'student';
+};
+
+const resolveStudentPlanFromPlan = (plan: string): 'free' | 'pro' | 'max' => {
+  const p = (plan || '').toLowerCase();
+  if (p === 'max') return 'max';
+  if (p === 'pro') return 'pro';
+  return 'free';
+};
+
 export default function SelectProjectPage() {
   const queryClient = useQueryClient();
 
@@ -108,9 +122,17 @@ export default function SelectProjectPage() {
   const [importProjectName, setImportProjectName] = useState('');
   const [importDialect, setImportDialect] = useState<'postgresql' | 'mysql'>('postgresql');
   const [importTimezone, setImportTimezone] = useState(Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC');
-  const [importRole, setImportRole] = useState<UserRoleOption | null>('student');
-  const [studentPlan, setStudentPlan] = useState<'free' | 'pro' | 'max'>('free');
+  const [importRole, setImportRole] = useState<UserRoleOption | null>(resolveRoleFromPlan(currentPlan));
+  const [studentPlan, setStudentPlan] = useState<'free' | 'pro' | 'max'>(resolveStudentPlanFromPlan(currentPlan));
   const [importBillingPreference, setImportBillingPreference] = useState<BillingOption>('monthly');
+
+  // Auto-sync import role & plan when active user subscription loads
+  useEffect(() => {
+    if (currentPlan) {
+      setImportRole(resolveRoleFromPlan(currentPlan));
+      setStudentPlan(resolveStudentPlanFromPlan(currentPlan));
+    }
+  }, [currentPlan]);
 
   // Execution & Logs state
   const [isImporting, setIsImporting] = useState(false);
@@ -178,6 +200,8 @@ export default function SelectProjectPage() {
     if (isConnected) {
       setIsGithubModalOpen(true);
       setGithubConnected(true);
+      setImportRole(resolveRoleFromPlan(currentPlan));
+      setStudentPlan(resolveStudentPlanFromPlan(currentPlan));
       const username = searchParams.get('github_username');
       if (username) setGithubUsername(username);
       setGithubStep('repos');
@@ -189,10 +213,12 @@ export default function SelectProjectPage() {
       // Clean up search param from URL
       window.history.replaceState({}, '', window.location.pathname);
     }
-  }, [searchParams]);
+  }, [searchParams, currentPlan]);
 
   const handleOpenGithubModal = async () => {
     setIsGithubModalOpen(true);
+    setImportRole(resolveRoleFromPlan(currentPlan));
+    setStudentPlan(resolveStudentPlanFromPlan(currentPlan));
     const connected = await checkConnection();
     if (connected) {
       setGithubStep('repos');
@@ -308,9 +334,9 @@ export default function SelectProjectPage() {
           projectName: importProjectName.trim(),
           dialect: importDialect,
           timezone: importTimezone,
-          userRole: importRole === 'student' ? studentPlan : (importRole || 'student'),
-          plan: studentPlan,
-          billingPreference: importBillingPreference
+          userRole: importRole === 'student' ? studentPlan : (importRole || resolveRoleFromPlan(currentPlan)),
+          plan: importRole === 'student' ? studentPlan : (importRole || currentPlan || 'free'),
+          billingPreference: hasAvailableQuota ? 'monthly' : importBillingPreference
         })
       });
 
@@ -1509,7 +1535,7 @@ export default function SelectProjectPage() {
                     id: 'configure',
                     title: 'Configure Project',
                     sub: importProjectName
-                      ? `✓ ${importProjectName} (${importRole === 'student' ? studentPlan.toUpperCase() : importRole})`
+                      ? `✓ ${importProjectName} (${(importRole === 'student' ? studentPlan : importRole || currentPlan || 'student').replace('_', ' ').toUpperCase()})`
                       : 'Name, dialect & plan'
                   },
                   {
@@ -1615,7 +1641,11 @@ export default function SelectProjectPage() {
                 {githubStep === 'connect' && 'Authorize Fluxbase to inspect your repositories and detect database schemas.'}
                 {githubStep === 'repos' && 'Choose a repository containing your database migration SQL files.'}
                 {githubStep === 'discover' && 'Discovered SQL migrations and dialect analysis from your repo.'}
-                {githubStep === 'configure' && 'Set your project name, dialect engine, role, and student plan tier.'}
+                {githubStep === 'configure' && (
+                  hasAvailableQuota
+                    ? `Set your project name, dialect engine, and database options under your active ${currentPlan === 'org_owner' || currentPlan === 'org' ? 'Organization Owner' : 'Employee'} plan.`
+                    : 'Set your project name, dialect engine, role, and student plan tier.'
+                )}
                 {githubStep === 'preview' && 'Review detected tables and SQL statements before provisioning.'}
                 {githubStep === 'executing' && 'Executing SQL migrations into your isolated tenant database workspace.'}
                 {githubStep === 'success' && 'Your database has been bootstrapped and is ready for queries.'}
@@ -2036,6 +2066,72 @@ export default function SelectProjectPage() {
                 </div>
               </div>
 
+              {/* Active Plan Banner for Upgraded Accounts (Org Owner / Employee / Max / Pro) */}
+              {hasAvailableQuota && (
+                <div className="rounded-xl p-3.5 bg-emerald-500/10 border border-emerald-500/30 space-y-2 animate-in fade-in duration-300">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2.5">
+                      <div className="p-2 rounded-lg bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+                        <ShieldCheck className="h-5 w-5" />
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-bold text-foreground">
+                            {currentPlan === 'org_owner' || currentPlan === 'org'
+                              ? 'Organization Owner Tier'
+                              : currentPlan === 'employee'
+                              ? 'Employee Tier'
+                              : currentPlan === 'max'
+                              ? 'Student Max Tier'
+                              : currentPlan === 'pro'
+                              ? 'Student Pro Tier'
+                              : 'Student Free Tier'}
+                          </span>
+                          <Badge variant="secondary" className="text-[10px] font-mono uppercase bg-emerald-500/20 text-emerald-300 border-emerald-500/40">
+                            Active Subscription
+                          </Badge>
+                        </div>
+                        <p className="text-[11px] text-muted-foreground mt-0.5">
+                          {maxAllowedProjects >= 999999
+                            ? `Unlimited projects included under your ${currentPlan === 'org_owner' || currentPlan === 'org' ? 'Org Owner' : 'Employee'} plan (${projects.length} provisioned)`
+                            : `Project ${projects.length + 1} of ${maxAllowedProjects} included under your active subscription`}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-3 gap-2 pt-2 border-t border-border/50 text-[11px] text-muted-foreground">
+                    <div>
+                      <span className="text-foreground font-medium">Compute: </span>
+                      {currentPlan === 'org_owner' || currentPlan === 'org'
+                        ? '8 vCPU Xeon (32GB)'
+                        : currentPlan === 'employee'
+                        ? '2 vCPU Dedicated (4GB)'
+                        : currentPlan === 'max'
+                        ? 'Shared High-Memory (8GB)'
+                        : currentPlan === 'pro'
+                        ? 'Shared Cloud (4GB)'
+                        : 'Shared Micro Sandbox'}
+                    </div>
+                    <div>
+                      <span className="text-foreground font-medium">Storage: </span>
+                      {currentPlan === 'org_owner' || currentPlan === 'org'
+                        ? '100GB NVMe'
+                        : currentPlan === 'employee'
+                        ? '10GB SSD'
+                        : currentPlan === 'max'
+                        ? '50GB Storage'
+                        : currentPlan === 'pro'
+                        ? '8GB Storage'
+                        : '500MB Storage'}
+                    </div>
+                    <div>
+                      <span className="text-foreground font-medium">Cost: </span>
+                      <span className="text-emerald-400 font-semibold">₹0 (Included)</span>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {/* Role & Server Tier Selection */}
               <div className="space-y-2 pt-1">
                 <div className="flex items-center justify-between">
@@ -2046,9 +2142,27 @@ export default function SelectProjectPage() {
                 </div>
                 <div className="grid grid-cols-3 gap-2">
                   {[
-                    { id: 'student', title: 'Student', price: (importRole || 'student') === 'student' ? `Plan: ${studentPlan.toUpperCase()}` : 'Free / Pro / Max', desc: 'Academic & Sandbox', icon: GraduationCap },
-                    { id: 'employee', title: 'Employee', price: '₹500 / mo', desc: 'High Performance', icon: Briefcase },
-                    { id: 'org_owner', title: 'Org Owner', price: '₹5,000 / mo', desc: 'Enterprise Scaling', icon: Building2 },
+                    { 
+                      id: 'student', 
+                      title: 'Student', 
+                      price: (currentPlan === 'max' || currentPlan === 'pro' || currentPlan === 'free') && (importRole || 'student') === 'student' ? `Active (${studentPlan.toUpperCase()})` : 'Free / Pro / Max', 
+                      desc: 'Academic & Sandbox', 
+                      icon: GraduationCap 
+                    },
+                    { 
+                      id: 'employee', 
+                      title: 'Employee', 
+                      price: (currentPlan === 'employee' || currentPlan === 'emp') ? 'Active Plan' : '₹500 / mo', 
+                      desc: 'High Performance', 
+                      icon: Briefcase 
+                    },
+                    { 
+                      id: 'org_owner', 
+                      title: 'Org Owner', 
+                      price: (currentPlan === 'org_owner' || currentPlan === 'org') ? 'Active Plan' : '₹5,000 / mo', 
+                      desc: 'Enterprise Scaling', 
+                      icon: Building2 
+                    },
                   ].map((tier) => {
                     const isSel = (importRole || 'student') === tier.id;
                     const Icon = tier.icon;
@@ -2139,46 +2253,58 @@ export default function SelectProjectPage() {
               )}
 
               {/* Billing Preference Selection */}
-              <div className="space-y-2 pt-1">
-                <div className="flex items-center justify-between">
-                  <Label className="text-xs font-semibold text-foreground">Billing Preference</Label>
-                  <span className="text-[10px] text-muted-foreground font-mono uppercase">
-                    {importBillingPreference.replace(/_/g, ' ')}
-                  </span>
+              {hasAvailableQuota ? (
+                <div className="p-3 rounded-xl bg-secondary/30 border border-border/60 text-xs text-muted-foreground flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Check className="h-4 w-4 text-emerald-400 shrink-0" />
+                    <span>Billing covered by your active <strong className="text-foreground">{currentPlan === 'org_owner' || currentPlan === 'org' ? 'Organization Owner' : 'Employee'}</strong> subscription.</span>
+                  </div>
+                  <Badge variant="outline" className="text-[10px] font-mono bg-emerald-500/10 text-emerald-400 border-emerald-500/30 uppercase font-semibold shrink-0">
+                    Included
+                  </Badge>
                 </div>
-                <div className="grid grid-cols-3 gap-2">
-                  {[
-                    { id: 'monthly', title: 'Monthly Fixed', desc: 'Predictable pricing' },
-                    { id: 'pay_as_you_go', title: 'Pay As You Go', desc: 'Metered compute & rows' },
-                    { id: 'hybrid', title: 'Hybrid Model', desc: 'Base quota + overage' },
-                  ].map((bp) => {
-                    const isSel = importBillingPreference === bp.id;
-                    return (
-                      <button
-                        key={bp.id}
-                        type="button"
-                        onClick={() => setImportBillingPreference(bp.id as any)}
-                        className={cn(
-                          "flex flex-col p-2.5 rounded-xl border text-left transition-all relative",
-                          isSel
-                            ? "border-emerald-500 bg-emerald-500/10 shadow-sm shadow-emerald-950/40 ring-1 ring-emerald-500/50 text-emerald-400"
-                            : "border-border bg-secondary/30 hover:bg-secondary/60 hover:border-border text-muted-foreground"
-                        )}
-                      >
-                        {isSel && (
-                          <div className="absolute top-2 right-2 h-4 w-4 rounded-full bg-emerald-500 text-black flex items-center justify-center">
-                            <Check className="h-2.5 w-2.5 stroke-[3]" />
-                          </div>
-                        )}
-                        <span className={cn("text-xs font-semibold", isSel ? "text-emerald-300" : "text-foreground")}>
-                          {bp.title}
-                        </span>
-                        <span className="text-[10px] text-muted-foreground/80 mt-0.5">{bp.desc}</span>
-                      </button>
-                    );
-                  })}
+              ) : (
+                <div className="space-y-2 pt-1">
+                  <div className="flex items-center justify-between">
+                    <Label className="text-xs font-semibold text-foreground">Billing Preference</Label>
+                    <span className="text-[10px] text-muted-foreground font-mono uppercase">
+                      {importBillingPreference.replace(/_/g, ' ')}
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-3 gap-2">
+                    {[
+                      { id: 'monthly', title: 'Monthly Fixed', desc: 'Predictable pricing' },
+                      { id: 'pay_as_you_go', title: 'Pay As You Go', desc: 'Metered compute & rows' },
+                      { id: 'hybrid', title: 'Hybrid Model', desc: 'Base quota + overage' },
+                    ].map((bp) => {
+                      const isSel = importBillingPreference === bp.id;
+                      return (
+                        <button
+                          key={bp.id}
+                          type="button"
+                          onClick={() => setImportBillingPreference(bp.id as any)}
+                          className={cn(
+                            "flex flex-col p-2.5 rounded-xl border text-left transition-all relative",
+                            isSel
+                              ? "border-emerald-500 bg-emerald-500/10 shadow-sm shadow-emerald-950/40 ring-1 ring-emerald-500/50 text-emerald-400"
+                              : "border-border bg-secondary/30 hover:bg-secondary/60 hover:border-border text-muted-foreground"
+                          )}
+                        >
+                          {isSel && (
+                            <div className="absolute top-2 right-2 h-4 w-4 rounded-full bg-emerald-500 text-black flex items-center justify-center">
+                              <Check className="h-2.5 w-2.5 stroke-[3]" />
+                            </div>
+                          )}
+                          <span className={cn("text-xs font-semibold", isSel ? "text-emerald-300" : "text-foreground")}>
+                            {bp.title}
+                          </span>
+                          <span className="text-[10px] text-muted-foreground/80 mt-0.5">{bp.desc}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
-              </div>
+              )}
 
               <DialogFooter className="pt-3 flex flex-row items-center justify-between w-full">
                 <Button
@@ -2228,7 +2354,7 @@ export default function SelectProjectPage() {
                 <div className="p-3 rounded-xl bg-secondary/40 border border-border">
                   <span className="text-[10px] font-mono text-muted-foreground uppercase">Plan Tier</span>
                   <div className="text-lg font-bold text-emerald-400 mt-0.5 capitalize truncate">
-                    {importRole === 'student' ? studentPlan : importRole}
+                    {(importRole === 'student' ? studentPlan : importRole || currentPlan || 'org_owner').replace('_', ' ')}
                   </div>
                 </div>
               </div>
