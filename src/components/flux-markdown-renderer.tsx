@@ -5,6 +5,7 @@ import { Copy, Check, Play, Table, Terminal, ExternalLink, ChevronDown } from 'l
 import { FluxAiIcon } from '@/components/ui/flux-ai-icon';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
+import { stripChartTags } from '@/lib/chart-tag-parser';
 
 interface FluxMarkdownRendererProps {
   content: string;
@@ -16,8 +17,11 @@ interface FluxMarkdownRendererProps {
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
 function stripActionTags(text: string): string {
-  return text
-    .replace(/\[(?:NAVIGATE|CLICK|TYPE|CONFIRM_ACTION|EXECUTE_SQL|REQUEST_APPROVAL|CALL_MCP|GOAL_ACCOMPLISHED)[^\]]*\]/g, '')
+  // Strip [RENDER_CHART:...] and any orphan chart fragments (e.g. ,"xKey":"day","yKey":"sales"}])
+  const withoutCharts = stripChartTags(text);
+
+  return withoutCharts
+    .replace(/\[(?:NAVIGATE|CLICK|TYPE|CONFIRM_ACTION|EXECUTE_SQL|REQUEST_APPROVAL|CALL_MCP|GOAL_ACCOMPLISHED)[^\]]*?(?:\]|$)/gi, '')
     .replace(/^ACTIONS:\s*$/mi, '')
     .replace(/^\s*[-•]\s*(?:Go to|Click|Type|Create|Head to|Load|Run)\s+.*/gim, '')
     .replace(/\n{3,}/g, '\n\n')

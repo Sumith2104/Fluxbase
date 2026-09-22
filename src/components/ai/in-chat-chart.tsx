@@ -8,17 +8,9 @@ import { useToast } from '@/hooks/use-toast';
 import { createWidgetsAction } from '@/app/(app)/analytics/actions';
 import { BorderBeam } from '@/components/ui/border-beam';
 
-export interface InChatChartData {
-  type: string;
-  title: string;
-  data: any[];
-  config?: {
-    xAxisKey?: string;
-    dataKeys?: string[];
-  };
-  query?: string;
-  projectId?: string;
-}
+import { InChatChartData } from '@/lib/chart-tag-parser';
+
+export type { InChatChartData };
 
 export function InChatChart({ chart, projectId }: { chart: InChatChartData; projectId?: string }) {
   const [pinned, setPinned] = useState(false);
@@ -30,13 +22,35 @@ export function InChatChart({ chart, projectId }: { chart: InChatChartData; proj
   // Infer xAxisKey and dataKeys if not explicitly supplied
   const firstRow = chart.data?.[0] || {};
   const keys = Object.keys(firstRow);
-  const inferredXKey = chart.config?.xAxisKey || keys[0] || 'name';
-  const inferredDataKeys = chart.config?.dataKeys?.length ? chart.config.dataKeys : keys.slice(1).filter(k => typeof firstRow[k] === 'number');
+  const inferredXKey = chart.config?.xAxisKey || chart.xKey || (chart as any).xAxisKey || keys[0] || 'name';
+  const rawYKeys = chart.config?.dataKeys?.length
+    ? chart.config.dataKeys
+    : chart.yKey
+      ? [chart.yKey]
+      : chart.yKeys?.length
+        ? chart.yKeys
+        : (chart as any).yAxisKey
+          ? [(chart as any).yAxisKey]
+          : keys.filter(k => k !== inferredXKey && (typeof firstRow[k] === 'number' || (!isNaN(Number(firstRow[k])) && firstRow[k] !== '')));
 
   const finalConfig = {
     xAxisKey: inferredXKey,
-    dataKeys: inferredDataKeys.length ? inferredDataKeys : [keys[1] || 'value']
+    dataKeys: rawYKeys.length ? rawYKeys : [keys.find(k => k !== inferredXKey) || 'value']
   };
+
+  const chartData = React.useMemo(() => {
+    if (!Array.isArray(chart.data)) return [];
+    return chart.data.map(row => {
+      if (!row || typeof row !== 'object') return row;
+      const cleanRow = { ...row };
+      for (const key of finalConfig.dataKeys) {
+        if (typeof cleanRow[key] === 'string' && !isNaN(Number(cleanRow[key])) && cleanRow[key].trim() !== '') {
+          cleanRow[key] = Number(cleanRow[key]);
+        }
+      }
+      return cleanRow;
+    });
+  }, [chart.data, finalConfig.dataKeys]);
 
   const handlePin = async () => {
     if (!targetProjectId) {
@@ -106,7 +120,7 @@ export function InChatChart({ chart, projectId }: { chart: InChatChartData; proj
           <div className="h-48 w-full">
             <UniversalChartRenderer
               type={chart.type || 'bar'}
-              data={chart.data}
+              data={chartData}
               config={finalConfig}
             />
           </div>

@@ -15,6 +15,7 @@ import { Button } from "@/components/ui/button";
 import { FluxAiIcon } from "@/components/ui/flux-ai-icon";
 import { AgenticThinkBlock } from "@/components/ai/agentic-think-block";
 import { InChatChart } from "@/components/ai/in-chat-chart";
+import { extractChartTag } from "@/lib/chart-tag-parser";
 
 // --- Types ---
 
@@ -147,6 +148,11 @@ const parseWorkflow = (text: string, currentProjectId?: string): { steps: Workfl
     workingText = workingText.replace(thinkMatch[0], '').trim();
   }
 
+  // Extract RENDER_CHART tag first with balanced JSON parser so nested data: [...] arrays don't break regex
+  const chartExtraction = extractChartTag(workingText);
+  chart = chartExtraction.chart;
+  workingText = chartExtraction.cleanedText;
+
   const codeBlockRanges: [number, number][] = [];
   const codeBlockRegex = /```[\s\S]*?```/g;
   let cbMatch;
@@ -159,7 +165,7 @@ const parseWorkflow = (text: string, currentProjectId?: string): { steps: Workfl
     codeBlockRanges.push([icMatch.index, icMatch.index + icMatch[0].length]);
   }
 
-  const tagRegex = /\[(NAVIGATE|CLICK|TYPE|CONFIRM_ACTION|EXECUTE_SQL|REQUEST_APPROVAL|CALL_MCP|GOAL_ACCOMPLISHED|RENDER_CHART)(?::([^\]]*?))?\]/g;
+  const tagRegex = /\[(NAVIGATE|CLICK|TYPE|CONFIRM_ACTION|EXECUTE_SQL|REQUEST_APPROVAL|CALL_MCP|GOAL_ACCOMPLISHED)(?::([^\]]*?))?\]/g;
   let match;
   while ((match = tagRegex.exec(workingText)) !== null) {
     const inCode = codeBlockRanges.some(([start, end]) => match!.index >= start && match!.index < end);
@@ -202,10 +208,6 @@ const parseWorkflow = (text: string, currentProjectId?: string): { steps: Workfl
       if (query && !query.startsWith('<') && !query.toLowerCase().includes('rawsqlquery') && query !== '<query>' && isValidSql(query)) {
         steps.push({ type: 'EXECUTE_SQL', query });
       }
-    } else if (type === 'RENDER_CHART') {
-      try {
-        chart = JSON.parse(argsStr.trim());
-      } catch {}
     } else if (type === 'REQUEST_APPROVAL') {
       const parts = argsStr.split(':');
       const id = parts[0]?.trim() || `appr_${Date.now()}`;
@@ -284,7 +286,7 @@ const parseWorkflow = (text: string, currentProjectId?: string): { steps: Workfl
     }
   }
 
-  const cleanText = workingText.replace(/\[(?:NAVIGATE|CLICK|TYPE|CONFIRM_ACTION|EXECUTE_SQL|REQUEST_APPROVAL|CALL_MCP|GOAL_ACCOMPLISHED|RENDER_CHART)[^\]]*?(?:\]|$)/g, '').trim();
+  const cleanText = workingText.replace(/\[(?:NAVIGATE|CLICK|TYPE|CONFIRM_ACTION|EXECUTE_SQL|REQUEST_APPROVAL|CALL_MCP|GOAL_ACCOMPLISHED)[^\]]*?(?:\]|$)/gi, '').trim();
   return { steps, cleanText, approvalRequest, chart, thought };
 };
 
@@ -556,7 +558,28 @@ export function FluxAiAssistant({ userId, isOpen, onOpenChange }: { userId: stri
     if (isRestored.current) return;
     const saved = localStorage.getItem(storageKey);
     let parsed: Message[] = [];
-    if (saved) { try { parsed = JSON.parse(saved); } catch { parsed = []; } parsed = Array.isArray(parsed) ? parsed.filter((m: any) => m && typeof m.content === 'string') : []; }
+    if (saved) {
+      try {
+        parsed = JSON.parse(saved);
+      } catch {
+        parsed = [];
+      }
+      parsed = Array.isArray(parsed)
+        ? parsed
+            .filter((m: any) => m && typeof m.content === 'string')
+            .map((m: any) => {
+              if (m.role === 'assistant') {
+                const { chart: extractedChart, cleanedText } = extractChartTag(m.content);
+                return {
+                  ...m,
+                  content: cleanedText,
+                  chart: m.chart || extractedChart
+                };
+              }
+              return m;
+            })
+        : [];
+    }
     setMessages(parsed.length > 0 ? parsed : [{ role: "assistant", content: "Hi! I'm Flux AI. I can write SQL, create tables, analyze data, and navigate the app for you. What do you need?", timestamp: Date.now() }]);
     isRestored.current = true;
   }, [storageKey]);
