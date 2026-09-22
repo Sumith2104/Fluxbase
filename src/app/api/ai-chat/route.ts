@@ -9,6 +9,7 @@ import { getSqlCapabilityPrompt } from '@/lib/sql-capabilities';
 import { ModelGateway, ModelMessage } from '@/lib/agent-core/gateway';
 import { createAgentSseTransformStream } from '@/lib/agent-core/stream';
 import { recordAiUsage } from '@/lib/ai-gateway/usage-ledger';
+import { checkOffTopicPolicy } from '@/lib/ai-policy-guard';
 
 // ── Schema Cache ──────────────────────────────────────────────────────────────
 // Avoids querying information_schema on every chat message.
@@ -158,6 +159,47 @@ export async function POST(req: Request) {
         const hasAttachedImages = messages.some((m: any) => (Array.isArray(m.images) && m.images.length > 0) || (Array.isArray(m.content) && m.content.some((p: any) => p?.type === 'image_url')));
         const dialect = activeProject?.dialect || 'postgresql';
 
+        // ── Deterministic Scope Policy Guard (Layer 1) ───────────────────────
+        const policyCheck = checkOffTopicPolicy(userLastMsg, hasAttachedImages);
+        if (policyCheck.isOffTopic && policyCheck.refusalText) {
+            logger.info('[AI Chat] Request intercepted by Fluxbase Policy Guard:', {
+                userId: auth.userId,
+                reason: policyCheck.reason,
+                queryPreview: userLastMsg.slice(0, 100)
+            });
+
+            const refusalText = policyCheck.refusalText;
+            const wantsStream = Boolean(stream) || req.headers.get('accept')?.includes('text/event-stream');
+
+            if (wantsStream) {
+                const encoder = new TextEncoder();
+                const customStream = new ReadableStream({
+                    start(controller) {
+                        controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'text', token: refusalText })}\n\n`));
+                        controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'done', fullText: refusalText })}\n\n`));
+                        controller.close();
+                    }
+                });
+
+                return new Response(customStream, {
+                    headers: {
+                        'Content-Type': 'text/event-stream; charset=utf-8',
+                        'Cache-Control': 'no-cache, no-transform',
+                        'Connection': 'keep-alive',
+                        'X-Accel-Buffering': 'no',
+                    }
+                });
+            }
+
+            return NextResponse.json({
+                success: true,
+                text: refusalText,
+                sources: [],
+                provider: 'fluxbase-guard',
+                model: 'scope-policy-guard'
+            });
+        }
+
         const isGreeting = !hasAttachedImages && isCasualOrGreeting(userLastMsg);
 
         let rawSchema = '';
@@ -212,14 +254,27 @@ ${rag.errorMemorySnippet}
 CURRENT PATH: ${currentPath}
 
 CRITICAL RULES:
-0. STRICT FLUXBASE-ONLY SCOPE & APPLICATION-SPECIFIC MANDATE:
+0. STRICT FLUXBASE-ONLY SCOPE (FOUR PERMITTED PILLARS ONLY):
    - You are STRICTLY AND EXCLUSIVELY the dedicated AI Database Architect, Engineer, and Developer Assistant for FLUXBASE (https://fluxbasedb.me).
-   - You MUST ONLY generate responses that are directly specific to Fluxbase: its database engines, schemas, SQL queries, REST APIs, SDKs, File Storage, Real-time streams, Web Scraper, AI Gateway, MCP Server, Billing, and applications built with or connected to Fluxbase.
-   - STRICTLY REFUSE any off-topic, generic, or non-Fluxbase queries (e.g., cooking recipes, creative writing, non-Fluxbase coding, general trivia, politics, sports, entertainment, or software completely unrelated to Fluxbase).
-   - If the user asks an unrelated or off-topic question, politely decline:
-     "I am Flux AI, the specialized database architect and developer assistant for Fluxbase. I can only assist with Fluxbase platform operations, database queries, SQL architecture, storage, webhooks, and integrating your applications with Fluxbase. How can I help you with your Fluxbase workspace today?"
-   - When providing backend integration or application code, ALWAYS provide implementations using Fluxbase (PostgreSQL/MySQL connections, @fluxbase/client SDK, https://fluxbasedb.me/api/v1/sql, https://fluxbasedb.me/api/storage/upload, https://fluxbasedb.me/api/realtime/subscribe).
-   - NEVER recommend external competitors (e.g. Supabase, Firebase, AWS DynamoDB) for capabilities that Fluxbase natively provides.
+   - You MUST ONLY assist with and generate responses for the following FOUR PERMITTED PILLARS:
+     1) FLUXBASE OPERATIONS: Database tables, schema DDL, columns, data types, primary/foreign keys, indexes, AWS S3 storage buckets, file uploads, webhooks, API keys, project configurations, and settings.
+     2) QUERY: Formulating, explaining, optimizing, diagnosing, and executing PostgreSQL and MySQL queries via [EXECUTE_SQL:...], analyzing query plans, and generating visual analytics charts via [RENDER_CHART:...].
+     3) NAVIGATION: Teleporting the user across Fluxbase dashboard pages via [NAVIGATE:/path], clicking UI buttons via [CLICK:<label>], and typing form inputs via [TYPE:<val>:<input>].
+     4) AUTOMATION TASKS: Auto-Pilot multi-step database workflows, high-speed set-based mock data seeding via generate_series, table triggers, web scraper ingestion into database tables, and goal completion via [GOAL_ACCOMPLISHED:<summary>].
+
+   - ABSOLUTE PROHIBITION ON LEAF/PLANT & NON-DATABASE IMAGES:
+     * Multimodal vision is strictly restricted to database ER diagrams, relational schemas, database architecture diagrams, and SQL/UI error screenshots.
+     * You are STRICTLY FORBIDDEN from analyzing photos of leaves, plants, crops, diseases, biology, animals, food, or general photography.
+     * If the user provides a picture of a leaf, plant, crop, or any non-database/non-UI photo, or asks to diagnose plant diseases, you MUST IMMEDIATELY DECLINE:
+       "I am Flux AI, strictly dedicated to Fluxbase database management, SQL queries, UI navigation, and workspace automation. I cannot analyze plant or leaf images, diagnose agricultural diseases, or process non-database media. Please provide database ER diagrams, relational schemas, or SQL error screenshots."
+
+   - ABSOLUTE PROHIBITION ON STANDALONE / GENERAL PYTHON SCRIPTS:
+     * You are STRICTLY FORBIDDEN from generating general Python programs, standalone scripts, or machine learning code (e.g. leaf disease classifiers, OpenCV image processing, PyTorch, TensorFlow, CNNs, web frameworks, games, or general utility scripts).
+     * The ONLY Python code permitted is establishing a database connection to Fluxbase (e.g. SQLAlchemy, psycopg2, asyncpg connecting to postgresql://postgres:...@fluxbasedb.me:5432) or calling Fluxbase REST SQL / Storage APIs.
+     * If asked to write general Python code or machine learning scripts, decline and reiterate that you only handle Fluxbase database operations, queries, navigation, and workspace automations.
+
+   - STRICT REFUSAL OF ALL OFF-TOPIC TASKS:
+     * Strictly decline creative writing, poetry, trivia, non-database coding, farming, medical or agricultural diagnosis, or software unrelated to Fluxbase.
 1. REASONING PROTOCOL: Put your internal thinking and query planning inside <think>...</think> tags.
 2. ACCURATE TABLE ROW COUNTS:
    - Live row counts are ALREADY PROVIDED in "=== LIVE DATABASE SCHEMA ===".
@@ -329,12 +384,19 @@ CRITICAL RULES:
       b. NEVER output raw ASCII boxes with vertical bar lifelines.
       c. If Auto-Pilot is active: conclude with [GOAL_ACCOMPLISHED:Data flow explained successfully].
 
-13. MULTIMODAL COMPUTER VISION & IMAGE ATTACHMENTS:
-    - You possess multimodal computer vision capabilities. When users attach screenshots, architecture diagrams, ERD diagrams, schema photos, whiteboard sketches, or SQL error dialogs:
-      a. Thoroughly inspect and extract all visible database entities, table names, column definitions, data types, primary/foreign keys, and constraints.
-      b. If the image is a screenshot of an error, extract the exact error message, identify the broken line or column, and immediately provide the diagnosis and corrected SQL.
-      c. If the image is an ERD or schema diagram, explain the relationships and offer to create the corresponding tables in Fluxbase with [EXECUTE_SQL:...].
-      d. Keep image responses clear, direct, and actionable.
+13. MULTIMODAL COMPUTER VISION (STRICT DATABASE & UI CONTEXT ONLY):
+    - When an image is attached, you MUST first inspect what the image depicts:
+      a. REJECT LEAF, PLANT, CROP & NON-DATABASE PHOTOS:
+         If the image depicts a leaf, plant, crop, disease symptom, animal, person, food, or general photography:
+         DO NOT analyze the disease! DO NOT identify plant species! DO NOT provide agricultural advice or Python ML code!
+         IMMEDIATELY output the refusal:
+         "I am Flux AI, strictly dedicated to Fluxbase database management, SQL queries, UI navigation, and workspace automation. I cannot analyze plant or leaf images, diagnose agricultural diseases, or process non-database media. Please provide database ER diagrams, relational schemas, or SQL error screenshots."
+      b. ACCEPT DATABASE ERDs, SCHEMAS & ERROR SCREENSHOTS:
+         If and only if the image is a database ER diagram, schema sketch, architecture diagram, or SQL/UI error dialog:
+         - Inspect and extract all visible database entities, table names, columns, data types, and primary/foreign keys.
+         - Offer to create the tables in Fluxbase with [EXECUTE_SQL:...].
+         - If it's a SQL error screenshot, extract the error message and provide the corrected SQL query.
+      c. Keep image responses clear, direct, and actionable.
 
 AVAILABLE ACTION TAGS (append at the end of response):
 - Execute SQL (Read / Insert / Create / Update): [EXECUTE_SQL:<exact_sql_query>]
@@ -364,7 +426,7 @@ AVAILABLE ACTION TAGS (append at the end of response):
                 if (textContent && textContent.trim()) {
                     parts.push({ type: 'text', text: textContent });
                 } else {
-                    parts.push({ type: 'text', text: 'Please analyze the attached image(s) in the context of our database schema and project.' });
+                    parts.push({ type: 'text', text: 'Please inspect the attached image(s). Note: If this is a database ER diagram, schema blueprint, or SQL error dialog, extract the database structure or diagnose the error. If this is a leaf, plant, crop, or non-database image, decline to analyze it per Fluxbase policy.' });
                 }
 
                 for (const imgUrl of images) {

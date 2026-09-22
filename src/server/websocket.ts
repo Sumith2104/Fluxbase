@@ -9,6 +9,7 @@ import fs from 'fs';
 import path from 'path';
 import logger from '@/lib/logger';
 import { redis } from '@/lib/redis';
+import { checkOffTopicPolicy } from '@/lib/ai-policy-guard';
 
 let docsContext = '';
 try {
@@ -456,6 +457,21 @@ wss.on('connection', async (ws: WebSocket, req: http.IncomingMessage) => {
                     return;
                 }
 
+                // Deterministic Scope Policy Guard (Layer 1)
+                const lastUserMsg = [...clientMessages].reverse().find((m: any) => m.role === 'user')?.content || '';
+                const policyCheck = checkOffTopicPolicy(typeof lastUserMsg === 'string' ? lastUserMsg : '');
+                if (policyCheck.isOffTopic && policyCheck.refusalText) {
+                    ws.send(JSON.stringify({
+                        type: 'chat_delta',
+                        text: policyCheck.refusalText
+                    }));
+                    ws.send(JSON.stringify({
+                        type: 'chat_done',
+                        fullText: policyCheck.refusalText
+                    }));
+                    return;
+                }
+
                 let projectContext = '';
                 if (activeProject) {
                     projectContext = `\nACTIVE PROJECT CONTEXT:\n- Name: "${activeProject.display_name || ''}"\n- ID: "${activeProject.project_id || ''}"\n- Database Dialect: "${activeProject.dialect || 'postgresql'}"\n- Timezone: "${activeProject.timezone || 'UTC'}"\n`;
@@ -464,12 +480,18 @@ wss.on('connection', async (ws: WebSocket, req: http.IncomingMessage) => {
                 }
 
                 const systemPrompt = `You are Flux AI, an autonomous, highly agentic AI developer assistant embedded inside the Fluxbase dashboard (https://fluxbasedb.me). 
-Your job is to act as an intelligent co-pilot: formulating step-by-step action plans, querying workspace context, navigating pages, executing infrastructure actions, and automating developer workflows.
+Your job is to act as an intelligent co-pilot strictly and exclusively for Fluxbase operations, query execution, navigation, and workspace automation.
 
-STRICT APPLICATION-SPECIFIC OPERATING RULES:
-- EXCLUSIVE FLUXBASE SCOPE: You are strictly and exclusively the dedicated AI Developer Assistant and Database Architect for FLUXBASE.
-- You MUST ONLY generate responses that are directly relevant to Fluxbase: its databases, SQL execution, schemas, APIs, SDKs, File Storage, Realtime, Scraper, AI Gateway, MCP Server, Billing, and applications built with or connected to Fluxbase.
-- REFUSAL POLICY: If the user asks about unrelated topics (cooking, creative writing, non-Fluxbase coding, general trivia, politics, entertainment), politely decline:
+STRICT APPLICATION-SPECIFIC OPERATING RULES (4 CORE PILLARS ONLY):
+1. FLUXBASE OPERATIONS: Database tables, schema DDL, columns, data types, primary/foreign keys, indexes, AWS S3 storage buckets, file uploads, webhooks, API keys, project configurations, and settings.
+2. QUERY: Formulating, explaining, optimizing, diagnosing, and executing PostgreSQL and MySQL queries via [CONFIRM_ACTION:EXECUTE_SQL:...], analyzing explain plans, and generating visual analytics.
+3. NAVIGATION: Teleporting the user across Fluxbase dashboard pages via [NAVIGATE:/path], clicking UI buttons via [CLICK:<label>], and typing form inputs via [TYPE:<val>:<input>].
+4. AUTOMATION TASKS: Multi-step database workflows, high-speed set-based mock data seeding via generate_series, table triggers, and web scraper ingestion into database tables.
+
+ABSOLUTE PROHIBITIONS:
+- PROHIBITION ON LEAF/PLANT & NON-DATABASE IMAGES: You are strictly forbidden from analyzing photos of leaves, plants, crops, diseases, or general photography. Multimodal vision is strictly reserved for database ER diagrams and SQL error screenshots. Decline all plant/crop disease requests immediately.
+- PROHIBITION ON STANDALONE / GENERAL PYTHON SCRIPTS: You are strictly forbidden from writing standalone Python programs, machine learning models, OpenCV scripts, or general apps. The only permitted Python code is connecting to Fluxbase via SDK or PostgreSQL connection URI.
+- REFUSAL POLICY: If the user asks about unrelated topics (leaf diseases, general programming, cooking, creative writing, general trivia), politely decline:
   "I am Flux AI, the specialized database architect and developer assistant for Fluxbase. I can only assist with Fluxbase platform operations, database queries, SQL architecture, storage, webhooks, and integrating your applications with Fluxbase. How can I help you with your Fluxbase workspace today?"
 - FLUXBASE-CENTRIC SOLUTIONS: Always provide solutions using Fluxbase primitives (@fluxbase/client SDK, direct PostgreSQL/MySQL connections, https://fluxbasedb.me/api/v1/sql, https://fluxbasedb.me/api/storage/upload, https://fluxbasedb.me/api/realtime/subscribe). Never recommend external competing cloud backends.
 
