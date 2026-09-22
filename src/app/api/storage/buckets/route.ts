@@ -4,7 +4,7 @@ import { getAuthContextFromRequest } from '@/lib/auth';
 import { getProjectById } from '@/lib/data';
 import { ERROR_CODES } from '@/lib/error-codes';
 import crypto from 'crypto';
-import { requireWriteScope } from '@/lib/require-scope';
+import { requireWriteScope, requireReadScope } from '@/lib/require-scope';
 
 // GET /api/storage/buckets?projectId=xxx  - list buckets
 // POST /api/storage/buckets               - create bucket
@@ -14,8 +14,13 @@ export async function GET(req: NextRequest) {
     if (!projectId) return NextResponse.json({ success: false, error: { message: 'projectId required', code: ERROR_CODES.BAD_REQUEST } }, { status: 400 });
 
     const auth = await getAuthContextFromRequest(req);
-  requireWriteScope(auth);
+    const scopeErr = requireReadScope(auth);
+    if (scopeErr) return scopeErr;
     if (!auth?.userId) return NextResponse.json({ success: false, error: { message: 'Unauthorized', code: ERROR_CODES.UNAUTHORIZED } }, { status: 401 });
+
+    if (auth.allowedProjectId && auth.allowedProjectId !== projectId) {
+        return NextResponse.json({ success: false, error: { message: 'This API key is not allowed to access the requested project.', code: ERROR_CODES.FORBIDDEN } }, { status: 403 });
+    }
 
     const project = await getProjectById(projectId, auth.userId);
     if (!project) return NextResponse.json({ success: false, error: { message: 'Project not found', code: ERROR_CODES.PROJECT_NOT_FOUND } }, { status: 404 });
@@ -41,11 +46,17 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
     const auth = await getAuthContextFromRequest(req);
+    const scopeErr = requireWriteScope(auth);
+    if (scopeErr) return scopeErr;
     if (!auth?.userId) return NextResponse.json({ success: false, error: { message: 'Unauthorized', code: ERROR_CODES.UNAUTHORIZED } }, { status: 401 });
 
     const body = await req.json();
     const { projectId, name, isPublic = false } = body;
     if (!projectId || !name) return NextResponse.json({ success: false, error: { message: 'projectId and name required', code: ERROR_CODES.BAD_REQUEST } }, { status: 400 });
+
+    if (auth.allowedProjectId && auth.allowedProjectId !== projectId) {
+        return NextResponse.json({ success: false, error: { message: 'This API key is not allowed to access the requested project.', code: ERROR_CODES.FORBIDDEN } }, { status: 403 });
+    }
 
     // Validate bucket name
     if (!/^[a-z0-9][a-z0-9\-_]{0,62}$/.test(name)) {
@@ -76,11 +87,17 @@ export async function POST(req: NextRequest) {
 
 export async function PATCH(req: NextRequest) {
     const auth = await getAuthContextFromRequest(req);
+    const scopeErr = requireWriteScope(auth);
+    if (scopeErr) return scopeErr;
     if (!auth?.userId) return NextResponse.json({ success: false, error: { message: 'Unauthorized', code: ERROR_CODES.UNAUTHORIZED } }, { status: 401 });
 
     const body = await req.json();
     const { bucketId, projectId, name } = body;
     if (!bucketId || !projectId || !name) return NextResponse.json({ success: false, error: { message: 'bucketId, projectId, and name required', code: ERROR_CODES.BAD_REQUEST } }, { status: 400 });
+
+    if (auth.allowedProjectId && auth.allowedProjectId !== projectId) {
+        return NextResponse.json({ success: false, error: { message: 'This API key is not allowed to access the requested project.', code: ERROR_CODES.FORBIDDEN } }, { status: 403 });
+    }
 
     if (!/^[a-z0-9][a-z0-9\-_]{0,62}$/.test(name)) {
         return NextResponse.json({ success: false, error: { message: 'Invalid bucket name', code: ERROR_CODES.BAD_REQUEST } }, { status: 400 });
@@ -105,11 +122,17 @@ export async function PATCH(req: NextRequest) {
 
 export async function DELETE(req: NextRequest) {
     const auth = await getAuthContextFromRequest(req);
+    const scopeErr = requireWriteScope(auth);
+    if (scopeErr) return scopeErr;
     if (!auth?.userId) return NextResponse.json({ success: false, error: { message: 'Unauthorized', code: ERROR_CODES.UNAUTHORIZED } }, { status: 401 });
 
     const body = await req.json();
     const { bucketId, projectId } = body;
     if (!bucketId || !projectId) return NextResponse.json({ success: false, error: { message: 'bucketId and projectId required', code: ERROR_CODES.BAD_REQUEST } }, { status: 400 });
+
+    if (auth.allowedProjectId && auth.allowedProjectId !== projectId) {
+        return NextResponse.json({ success: false, error: { message: 'This API key is not allowed to access the requested project.', code: ERROR_CODES.FORBIDDEN } }, { status: 403 });
+    }
 
     const project = await getProjectById(projectId, auth.userId);
     if (!project) return NextResponse.json({ success: false, error: { message: 'Project not found', code: ERROR_CODES.PROJECT_NOT_FOUND } }, { status: 404 });

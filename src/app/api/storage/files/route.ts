@@ -4,7 +4,7 @@ import { getAuthContextFromRequest } from '@/lib/auth';
 import { deleteFromS3 } from '@/lib/storage';
 import { ERROR_CODES } from '@/lib/error-codes';
 import { jsonError, requireProjectAccess } from '@/lib/project-auth';
-import { requireWriteScope } from '@/lib/require-scope';
+import { requireWriteScope, requireReadScope } from '@/lib/require-scope';
 import logger from '@/lib/logger';
 
 // GET /api/storage/files?bucketId=xxx&projectId=xxx
@@ -18,7 +18,8 @@ export async function GET(req: NextRequest) {
     }
 
     const auth = await getAuthContextFromRequest(req);
-  requireWriteScope(auth);
+    const scopeErr = requireReadScope(auth);
+    if (scopeErr) return scopeErr;
     if (!auth?.userId) return NextResponse.json({ success: false, error: { message: 'Unauthorized', code: ERROR_CODES.UNAUTHORIZED } }, { status: 401 });
 
     try {
@@ -60,6 +61,8 @@ export async function GET(req: NextRequest) {
 // DELETE /api/storage/files  body: { fileId, projectId }
 export async function DELETE(req: NextRequest) {
     const auth = await getAuthContextFromRequest(req);
+    const scopeErr = requireWriteScope(auth);
+    if (scopeErr) return scopeErr;
     if (!auth?.userId) return NextResponse.json({ success: false, error: { message: 'Unauthorized', code: ERROR_CODES.UNAUTHORIZED } }, { status: 401 });
 
     const body = await req.json();

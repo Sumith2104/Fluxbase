@@ -53,10 +53,28 @@ export function isAllowedOrigin(origin: string): boolean {
     }
 }
 
+/**
+ * Strict validation for safe internal application redirects.
+ * Rejects external URLs, protocol-relative URLs (//evil.com), backslash tricks (/\evil.com), and control characters.
+ */
+export function isSafeRedirectPath(path: unknown): path is string {
+    if (typeof path !== 'string') return false;
+    const trimmed = path.trim();
+    if (!trimmed.startsWith('/')) return false;
+    if (trimmed.startsWith('//')) return false;
+    if (trimmed.includes('\\')) return false;
+    if (/[\u0000-\u001F\u007F]/.test(trimmed)) return false;
+    return true;
+}
+
+export function sanitizeRedirectPath(path: unknown, fallback: string = '/dashboard/projects'): string {
+    return isSafeRedirectPath(path) ? path.trim() : fallback;
+}
+
 export function encodeOAuthState(origin: string, returnTo?: string, extra?: Record<string, any>): string {
     const payload = JSON.stringify({
         origin,
-        returnTo: returnTo || '/dashboard/projects',
+        returnTo: sanitizeRedirectPath(returnTo, '/dashboard/projects'),
         t: Date.now(),
         ...(extra || {})
     });
@@ -70,7 +88,7 @@ export function decodeOAuthState(stateParam: string | null): { origin?: string; 
         const parsed = JSON.parse(decoded);
         if (parsed && typeof parsed === 'object') {
             const origin = typeof parsed.origin === 'string' && isAllowedOrigin(parsed.origin) ? parsed.origin : undefined;
-            const returnTo = typeof parsed.returnTo === 'string' && parsed.returnTo.startsWith('/') ? parsed.returnTo : undefined;
+            const returnTo = isSafeRedirectPath(parsed.returnTo) ? parsed.returnTo : '/dashboard/projects';
             return { ...parsed, origin, returnTo };
         }
     } catch {

@@ -3,7 +3,7 @@ import { getPgPool, handleDatabaseError } from '@/lib/pg';
 import { getAuthContextFromRequest } from '@/lib/auth';
 import { sendTeamInviteEmail } from '@/lib/email';
 import crypto from 'crypto';
-import { requireWriteScope } from '@/lib/require-scope';
+import { requireWriteScope, requireReadScope } from '@/lib/require-scope';
 import logger from '@/lib/logger';
 
 export const dynamic = 'force-dynamic';
@@ -13,7 +13,8 @@ export async function GET(req: NextRequest) {
     const projectId = searchParams.get('projectId');
     const scope = searchParams.get('scope'); // 'project' or 'my-invites'
     const auth = await getAuthContextFromRequest(req);
-  requireWriteScope(auth);
+    const scopeErr = requireReadScope(auth);
+    if (scopeErr) return scopeErr;
     if (!auth?.userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
     try {
@@ -76,7 +77,13 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const { projectId, email, role } = body;
     const auth = await getAuthContextFromRequest(req);
+    const scopeErr = requireWriteScope(auth);
+    if (scopeErr) return scopeErr;
     if (!auth?.userId || !projectId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
+    if (auth.allowedProjectId && auth.allowedProjectId !== projectId) {
+        return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
 
     try {
         const pool = getPgPool();
@@ -149,7 +156,13 @@ export async function DELETE(req: NextRequest) {
     const projectId = searchParams.get('projectId');
     const userId = searchParams.get('userId');
     const auth = await getAuthContextFromRequest(req);
+    const scopeErr = requireWriteScope(auth);
+    if (scopeErr) return scopeErr;
     if (!auth?.userId || !projectId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
+    if (auth.allowedProjectId && auth.allowedProjectId !== projectId) {
+        return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
 
     try {
         const pool = getPgPool();

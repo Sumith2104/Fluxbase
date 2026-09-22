@@ -3,9 +3,6 @@
  * Supabase-style: given a project and table name, returns list/create/update/delete functionality.
  */
 
-import { NextResponse } from 'next/server';
-import { getAuthContextFromRequest } from '@/lib/auth';
-import { requireWriteScope } from '@/lib/require-scope';
 import { getTenantPgPool } from '@/lib/tenant-pools';
 
 export interface RestListOptions {

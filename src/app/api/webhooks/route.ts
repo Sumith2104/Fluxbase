@@ -5,12 +5,13 @@ import { ERROR_CODES } from '@/lib/error-codes';
 import crypto from 'crypto';
 import { requireProjectAccess } from '@/lib/project-auth';
 import { validatePublicWebhookUrl } from '@/lib/url-safety';
-import { requireWriteScope } from '@/lib/require-scope';
+import { requireWriteScope, requireReadScope } from '@/lib/require-scope';
 import logger from '@/lib/logger';
 
 export async function POST(req: NextRequest) {
     const auth = await getAuthContextFromRequest(req);
-  requireWriteScope(auth);
+    const scopeErr = requireWriteScope(auth);
+    if (scopeErr) return scopeErr;
     if (!auth?.userId) {
         return NextResponse.json(
             { success: false, error: { message: 'Unauthorized', code: ERROR_CODES.UNAUTHORIZED } },
@@ -93,6 +94,8 @@ export async function POST(req: NextRequest) {
 
 export async function GET(req: NextRequest) {
     const auth = await getAuthContextFromRequest(req);
+    const scopeErr = requireReadScope(auth);
+    if (scopeErr) return scopeErr;
     if (!auth?.userId) {
         return NextResponse.json(
             { success: false, error: { message: 'Unauthorized', code: ERROR_CODES.UNAUTHORIZED } },
@@ -142,6 +145,8 @@ export async function GET(req: NextRequest) {
 
 export async function DELETE(req: NextRequest) {
     const auth = await getAuthContextFromRequest(req);
+    const scopeErr = requireWriteScope(auth);
+    if (scopeErr) return scopeErr;
     if (!auth?.userId) {
         return NextResponse.json(
             { success: false, error: { message: 'Unauthorized', code: ERROR_CODES.UNAUTHORIZED } },

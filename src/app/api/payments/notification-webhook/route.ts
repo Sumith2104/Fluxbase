@@ -3,20 +3,25 @@ import { getPgPool } from '@/lib/pg';
 import crypto from 'crypto';
 
 function verifyWebhookAuth(req: NextRequest): boolean {
-    const configuredSecret = (process.env.NOTIFICATION_WEBHOOK_SECRET || process.env.SMS_WEBHOOK_SECRET || 'sumith@fluxbase').trim();
-    const authHeader = req.headers.get('Authorization') || req.headers.get('x-webhook-secret') || '';
-    const querySecret = req.nextUrl.searchParams.get('secret');
+    const configuredSecrets = [
+        process.env.NOTIFICATION_WEBHOOK_SECRET,
+        process.env.SMS_WEBHOOK_SECRET,
+        process.env.PAYMENT_WEBHOOK_SECRET
+    ].filter(Boolean) as string[];
 
-    const token = authHeader.replace(/^Bearer\s+/i, '').trim() || querySecret?.trim();
-
-    // If a token is explicitly provided, verify that it matches
-    if (token) {
-        return token === configuredSecret || token === 'sumith@fluxbase';
+    if (configuredSecrets.length === 0) {
+        return false;
     }
 
-    // If no token was provided, allow direct mobile webhook requests 
-    // (verification requires an active matching decimal session in database anyway)
-    return true;
+    const authHeader = req.headers.get('Authorization') || req.headers.get('x-webhook-secret') || '';
+    const querySecret = req.nextUrl.searchParams.get('secret');
+    const token = authHeader.replace(/^Bearer\s+/i, '').trim() || querySecret?.trim() || '';
+
+    if (!token) {
+        return false;
+    }
+
+    return configuredSecrets.includes(token);
 }
 
 export async function POST(req: NextRequest) {

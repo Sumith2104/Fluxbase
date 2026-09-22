@@ -50,7 +50,7 @@ export async function middleware(request: NextRequest) {
         pathname.startsWith('/_next/') || 
         pathname.startsWith('/static/') || 
         pathname === '/favicon.ico' || 
-        pathname.includes('.')
+        /\.(?:png|jpg|jpeg|gif|webp|svg|ico|css|js|map|woff2?|ttf|eot)$/i.test(pathname)
     ) {
         return NextResponse.next();
     }

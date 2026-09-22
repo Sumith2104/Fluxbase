@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getPgPool } from '@/lib/pg';
 import { createSessionToken, invalidateAuthCache, getCurrentUserId } from '@/lib/auth';
 import { getSessionCookieDomain } from '@/lib/cookie-domain';
+import { isSafeRedirectPath } from '@/lib/oauth-config';
 import logger from '@/lib/logger';
 
 export const dynamic = 'force-dynamic';
@@ -139,7 +140,7 @@ export async function POST(req: NextRequest) {
     }
 
     let targetUrl = '/dashboard/projects';
-    if (returnTo && returnTo.startsWith('/')) {
+    if (isSafeRedirectPath(returnTo)) {
       targetUrl = returnTo;
     } else if (activeProject) {
       targetUrl = `/dashboard?projectId=${activeProject.project_id}`;

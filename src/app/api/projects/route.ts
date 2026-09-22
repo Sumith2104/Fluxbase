@@ -3,6 +3,8 @@ import { getAuthContextFromRequest } from '@/lib/auth';
 import { getProjectsForCurrentUser } from '@/lib/data';
 import logger from '@/lib/logger';
 
+import { requireWriteScope } from '@/lib/require-scope';
+
 export async function GET(req: Request) {
     try {
         const auth = await getAuthContextFromRequest(req);
@@ -10,7 +12,10 @@ export async function GET(req: Request) {
             return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
         }
 
-        const projects = await getProjectsForCurrentUser();
+        const allProjects = await getProjectsForCurrentUser(auth.userId);
+        const projects = auth.allowedProjectId
+            ? allProjects.filter(p => p.project_id === auth.allowedProjectId)
+            : allProjects;
         return NextResponse.json({ success: true, projects });
     } catch (error: any) {
         logger.error('API /api/projects error:', error);
@@ -27,6 +32,9 @@ export async function POST(req: Request) {
                 error: 'Unauthorized: Authentication required to create a project.' 
             }, { status: 401 });
         }
+
+        const scopeErr = requireWriteScope(auth);
+        if (scopeErr) return scopeErr;
 
         const body = await req.json().catch(() => ({}));
         const projectName = body.projectName || body.name || body.display_name;

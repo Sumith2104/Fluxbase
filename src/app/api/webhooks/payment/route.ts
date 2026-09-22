@@ -6,16 +6,17 @@ import logger from '@/lib/logger';
 export async function POST(req: Request) {
     try {
         const authHeader = req.headers.get('authorization') || req.headers.get('x-webhook-secret') || '';
-        const token = authHeader.replace('Bearer ', '').trim();
-        const validSecrets = [
+        const token = authHeader.replace(/^Bearer\s+/i, '').trim();
+        const configuredSecrets = [
             process.env.PAYMENT_WEBHOOK_SECRET,
             process.env.SMS_WEBHOOK_SECRET,
-            'sumith@fluxbase',
-            'whsec_de4e5ac069b1e05aebb098ee343e396a'
-        ].filter(Boolean);
+            process.env.NOTIFICATION_WEBHOOK_SECRET,
+        ].filter(Boolean) as string[];
 
-        if (token && validSecrets.length > 0 && !validSecrets.includes(token)) {
-            return NextResponse.json({ error: 'Unauthorized webhook request' }, { status: 401 });
+        // Strictly reject if token is missing or does not match configured secrets
+        if (!token || configuredSecrets.length === 0 || !configuredSecrets.includes(token)) {
+            logger.warn('[Payment Webhook] Rejected unauthorized webhook call.');
+            return NextResponse.json({ error: 'Unauthorized webhook request: valid secret required' }, { status: 401 });
         }
 
         let body: any = {};

@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAuthContextFromRequest } from '@/lib/auth';
-import { requireWriteScope } from '@/lib/require-scope';
+import { requireWriteScope, requireReadScope } from '@/lib/require-scope';
+import { assertProjectScope } from '@/lib/project-auth';
 import { getProjectById, logAuditAction, type Project } from '@/lib/data';
 import { trackApiRequest } from '@/lib/analytics';
+import { FluxbaseError } from '@/lib/error-codes';
 import {
     listRows,
     getRow,
@@ -44,6 +46,11 @@ export async function GET(
             return NextResponse.json({ success: false, error: { message: 'Unauthorized', code: 'UNAUTHORIZED' } }, { status: 401 });
         }
 
+        assertProjectScope(authContext, projectId);
+
+        const scopeErr = requireReadScope(authContext);
+        if (scopeErr) return scopeErr;
+
         const project = await getProjectById(projectId, authContext.userId);
         if (!project) {
             return NextResponse.json({ success: false, error: { message: 'Project not found', code: 'NOT_FOUND' } }, { status: 404 });
@@ -72,6 +79,9 @@ export async function GET(
         trackRestCall(projectId, authContext.userId, 'GET', table);
         return NextResponse.json(result);
     } catch (error: any) {
+        if (error instanceof FluxbaseError) {
+            return NextResponse.json(error.toJSON(), { status: error.status });
+        }
         logger.error('[REST GET] Error:', error);
         return NextResponse.json({
             success: false,
@@ -95,7 +105,10 @@ export async function POST(
             return NextResponse.json({ success: false, error: { message: 'Unauthorized', code: 'UNAUTHORIZED' } }, { status: 401 });
         }
 
-        requireWriteScope(authContext);
+        assertProjectScope(authContext, projectId);
+
+        const scopeErr = requireWriteScope(authContext);
+        if (scopeErr) return scopeErr;
 
         const project = await getProjectById(projectId, authContext.userId);
         if (!project) {
@@ -113,8 +126,8 @@ export async function POST(
         trackRestCall(projectId, authContext.userId, 'POST', table);
         return NextResponse.json(row, { status: 201 });
     } catch (error: any) {
-        if (error.message === 'FORBIDDEN') {
-            return NextResponse.json({ success: false, error: { message: 'Insufficient permissions', code: 'FORBIDDEN' } }, { status: 403 });
+        if (error instanceof FluxbaseError) {
+            return NextResponse.json(error.toJSON(), { status: error.status });
         }
         logger.error('[REST POST] Error:', error);
         return NextResponse.json({
@@ -139,7 +152,10 @@ export async function PUT(
             return NextResponse.json({ success: false, error: { message: 'Unauthorized', code: 'UNAUTHORIZED' } }, { status: 401 });
         }
 
-        requireWriteScope(authContext);
+        assertProjectScope(authContext, projectId);
+
+        const scopeErr = requireWriteScope(authContext);
+        if (scopeErr) return scopeErr;
 
         const project = await getProjectById(projectId, authContext.userId);
         if (!project) {
@@ -161,8 +177,8 @@ export async function PUT(
         trackRestCall(projectId, authContext.userId, 'PUT', table);
         return NextResponse.json(row);
     } catch (error: any) {
-        if (error.message === 'FORBIDDEN') {
-            return NextResponse.json({ success: false, error: { message: 'Insufficient permissions', code: 'FORBIDDEN' } }, { status: 403 });
+        if (error instanceof FluxbaseError) {
+            return NextResponse.json(error.toJSON(), { status: error.status });
         }
         logger.error('[REST PUT] Error:', error);
         return NextResponse.json({
@@ -187,7 +203,10 @@ export async function DELETE(
             return NextResponse.json({ success: false, error: { message: 'Unauthorized', code: 'UNAUTHORIZED' } }, { status: 401 });
         }
 
-        requireWriteScope(authContext);
+        assertProjectScope(authContext, projectId);
+
+        const scopeErr = requireWriteScope(authContext);
+        if (scopeErr) return scopeErr;
 
         const project = await getProjectById(projectId, authContext.userId);
         if (!project) {
@@ -209,8 +228,8 @@ export async function DELETE(
         trackRestCall(projectId, authContext.userId, 'DELETE', table);
         return NextResponse.json({ success: true });
     } catch (error: any) {
-        if (error.message === 'FORBIDDEN') {
-            return NextResponse.json({ success: false, error: { message: 'Insufficient permissions', code: 'FORBIDDEN' } }, { status: 403 });
+        if (error instanceof FluxbaseError) {
+            return NextResponse.json(error.toJSON(), { status: error.status });
         }
         logger.error('[REST DELETE] Error:', error);
         return NextResponse.json({

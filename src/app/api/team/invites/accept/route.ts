@@ -7,7 +7,8 @@ export const dynamic = 'force-dynamic';
 
 export async function POST(req: NextRequest) {
     const auth = await getAuthContextFromRequest(req);
-  requireWriteScope(auth);
+    const scopeErr = requireWriteScope(auth);
+    if (scopeErr) return scopeErr;
     if (!auth?.userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
     const body = await req.json();

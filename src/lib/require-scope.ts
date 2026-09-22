@@ -36,7 +36,7 @@ export function requireScope(
         return null;
     }
 
-    const hasScope = requiredScopes.some(scope => auth.scopes!.includes(scope));
+    const hasScope = requiredScopes.some(scope => auth.scopes!.includes(scope) || auth.scopes!.includes('*') || auth.scopes!.includes('admin'));
     if (!hasScope) {
         return NextResponse.json(
             { success: false, error: { message: 'Insufficient permissions. Your API key requires one of these scopes: ' + requiredScopes.join(', '), code: ERROR_CODES.FORBIDDEN } },
@@ -45,6 +45,13 @@ export function requireScope(
     }
 
     return null;
+}
+
+/**
+ * Convenience: require read access.
+ */
+export function requireReadScope(auth: AuthContext | null): NextResponse | null {
+    return requireScope(auth, 'read', 'admin');
 }
 
 /**
@@ -59,4 +66,43 @@ export function requireWriteScope(auth: AuthContext | null): NextResponse | null
  */
 export function requireAdminScope(auth: AuthContext | null): NextResponse | null {
     return requireScope(auth, 'admin');
+}
+
+/**
+ * Throws FluxbaseError if auth is missing or does not have required scope.
+ * Designed for API routes using try/catch blocks with jsonError().
+ */
+export function assertScope(auth: AuthContext | null, ...requiredScopes: string[]): void {
+    if (!auth) {
+        throw new FluxbaseError('Authentication required.', ERROR_CODES.UNAUTHORIZED, 401);
+    }
+
+    if (auth.status === 'suspended') {
+        throw new FluxbaseError('Organization suspended. Please resume in Settings.', ERROR_CODES.FORBIDDEN, 403);
+    }
+
+    if (!auth.scopes || auth.scopes.length === 0) {
+        return;
+    }
+
+    const hasScope = requiredScopes.some(scope => auth.scopes!.includes(scope) || auth.scopes!.includes('*') || auth.scopes!.includes('admin'));
+    if (!hasScope) {
+        throw new FluxbaseError(
+            'Insufficient permissions. Your API key requires one of these scopes: ' + requiredScopes.join(', '),
+            ERROR_CODES.FORBIDDEN,
+            403
+        );
+    }
+}
+
+export function assertWriteScope(auth: AuthContext | null): void {
+    assertScope(auth, 'write', 'admin');
+}
+
+export function assertReadScope(auth: AuthContext | null): void {
+    assertScope(auth, 'read', 'admin');
+}
+
+export function assertAdminScope(auth: AuthContext | null): void {
+    assertScope(auth, 'admin');
 }

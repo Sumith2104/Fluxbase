@@ -5,6 +5,7 @@ import { trackApiRequest } from '@/lib/analytics';
 import { getAuthContextFromRequest } from '@/lib/auth';
 import logger from '@/lib/logger';
 import { getCorsOrigin, corsPreflightResponse } from '@/lib/cors';
+import { requireReadScope } from '@/lib/require-scope';
 
 export const maxDuration = 60; // 1 minute
 export const dynamic = 'force-dynamic';
@@ -13,6 +14,8 @@ export const revalidate = 0;
 export async function GET(request: Request) {
   try {
     const auth = await getAuthContextFromRequest(request);
+    const scopeErr = requireReadScope(auth);
+    if (scopeErr) return scopeErr;
     if (!auth) {
       return NextResponse.json({ error: 'User not authenticated' }, { status: 401 });
     }

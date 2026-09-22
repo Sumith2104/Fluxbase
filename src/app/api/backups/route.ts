@@ -8,7 +8,7 @@ import {
     quotePgIdentifier,
 } from '@/lib/sql-safety';
 import { ERROR_CODES, FluxbaseError } from '@/lib/error-codes';
-import { requireWriteScope } from '@/lib/require-scope';
+import { assertReadScope, assertWriteScope } from '@/lib/require-scope';
 import logger from '@/lib/logger';
 
 export const dynamic = 'force-dynamic';
@@ -46,7 +46,7 @@ export async function GET(req: NextRequest) {
         const projectId = searchParams.get('projectId');
         const backupId = searchParams.get('backupId');
         const auth = await getAuthContextFromRequest(req);
-  requireWriteScope(auth);
+        assertReadScope(auth);
         if (!projectId) throw new FluxbaseError('projectId is required', ERROR_CODES.MISSING_FIELD, 400);
 
         await requireProjectAccess(projectId, auth);
@@ -83,6 +83,7 @@ export async function POST(req: NextRequest) {
         const body = await req.json();
         const { projectId } = body;
         const auth = await getAuthContextFromRequest(req);
+        assertWriteScope(auth);
         if (!projectId) throw new FluxbaseError('projectId is required', ERROR_CODES.MISSING_FIELD, 400);
 
         const globalPool = getPgPool();
@@ -221,6 +222,7 @@ export async function DELETE(req: NextRequest) {
         const projectId = searchParams.get('projectId');
         const backupId = searchParams.get('backupId');
         const auth = await getAuthContextFromRequest(req);
+        assertWriteScope(auth);
 
         if (!projectId || !backupId) {
             throw new FluxbaseError('projectId and backupId are required', ERROR_CODES.MISSING_FIELD, 400);

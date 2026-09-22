@@ -8,7 +8,7 @@ import {
     quotePgIdentifier,
 } from '@/lib/sql-safety';
 import { ERROR_CODES, FluxbaseError } from '@/lib/error-codes';
-import { requireWriteScope } from '@/lib/require-scope';
+import { assertAdminScope } from '@/lib/require-scope';
 import logger from '@/lib/logger';
 
 export const dynamic = 'force-dynamic';
@@ -57,7 +57,7 @@ export async function POST(req: NextRequest) {
         const body = await req.json();
         const { projectId, backupId } = body;
         const auth = await getAuthContextFromRequest(req);
-  requireWriteScope(auth);
+        assertAdminScope(auth);
 
         if (!projectId || !backupId) {
             throw new FluxbaseError('projectId and backupId are required', ERROR_CODES.MISSING_FIELD, 400);

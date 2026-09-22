@@ -10,10 +10,15 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const { projectId, userId, role } = body;
     const auth = await getAuthContextFromRequest(req);
-  requireWriteScope(auth);
+    const scopeErr = requireWriteScope(auth);
+    if (scopeErr) return scopeErr;
 
     if (!auth?.userId || !projectId || !userId || !role) {
         return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
+    }
+
+    if (auth.allowedProjectId && auth.allowedProjectId !== projectId) {
+        return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
     try {

@@ -12,7 +12,8 @@ export const maxDuration = 60;
 
 export async function POST(req: NextRequest) {
     const auth = await getAuthContextFromRequest(req);
-  requireWriteScope(auth);
+    const scopeErr = requireWriteScope(auth);
+    if (scopeErr) return scopeErr;
     if (!auth?.userId) return NextResponse.json({ success: false, error: { message: 'Unauthorized', code: ERROR_CODES.UNAUTHORIZED } }, { status: 401 });
 
     let formData: FormData;
@@ -28,6 +29,10 @@ export async function POST(req: NextRequest) {
 
     if (!file || !bucketId || !projectId) {
         return NextResponse.json({ success: false, error: { message: 'file, bucketId and projectId are required', code: ERROR_CODES.MISSING_FIELD } }, { status: 400 });
+    }
+
+    if (auth.allowedProjectId && auth.allowedProjectId !== projectId) {
+        return NextResponse.json({ success: false, error: { message: 'This API key is not allowed to access the requested project.', code: ERROR_CODES.FORBIDDEN } }, { status: 403 });
     }
 
     // Validate project access

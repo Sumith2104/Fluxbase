@@ -9,7 +9,8 @@ import logger from '@/lib/logger';
 
 export async function POST(req: NextRequest) {
     const auth = await getAuthContextFromRequest(req);
-  requireWriteScope(auth);
+    const scopeErr = requireWriteScope(auth);
+    if (scopeErr) return scopeErr;
     if (!auth?.userId) {
         return NextResponse.json({ success: false, error: { message: 'Unauthorized', code: ERROR_CODES.UNAUTHORIZED } }, { status: 401 });
     }
@@ -24,6 +25,10 @@ export async function POST(req: NextRequest) {
     const { fileName, fileSize, mimeType, bucketId, projectId, s3Key } = body;
     if (!fileName || fileSize === undefined || !mimeType || !bucketId || !projectId || !s3Key) {
         return NextResponse.json({ success: false, error: { message: 'fileName, fileSize, mimeType, bucketId, projectId and s3Key are required', code: ERROR_CODES.MISSING_FIELD } }, { status: 400 });
+    }
+
+    if (auth.allowedProjectId && auth.allowedProjectId !== projectId) {
+        return NextResponse.json({ success: false, error: { message: 'This API key is not allowed to access the requested project.', code: ERROR_CODES.FORBIDDEN } }, { status: 403 });
     }
 
     // Validate project access

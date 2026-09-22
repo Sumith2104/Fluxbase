@@ -1,20 +1,28 @@
-
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { resetProjectData } from '@/lib/data';
-import { getCurrentUserId } from '@/lib/auth';
+import { getAuthContextFromRequest } from '@/lib/auth';
+import { requireProjectAccess, jsonError } from '@/lib/project-auth';
+import { requireAdminScope } from '@/lib/require-scope';
 import logger from '@/lib/logger';
 
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
     try {
-        const userId = await getCurrentUserId();
-        if (!userId) {
-            return NextResponse.json({ error: 'User not authenticated' }, { status: 401 });
+        const auth = await getAuthContextFromRequest(request);
+        if (!auth?.userId) {
+            return NextResponse.json({ success: false, error: 'User not authenticated' }, { status: 401 });
         }
 
-        const { projectId } = await request.json();
+        const scopeErr = requireAdminScope(auth);
+        if (scopeErr) return scopeErr;
+
+        const body = await request.json().catch(() => ({}));
+        const { projectId } = body;
         if (!projectId) {
-            return NextResponse.json({ error: 'Missing projectId' }, { status: 400 });
+            return NextResponse.json({ success: false, error: 'Missing projectId' }, { status: 400 });
         }
+
+        // Enforce project ownership and admin role: only project admin/owner can wipe database
+        await requireProjectAccess(projectId, auth, ['admin']);
 
         await resetProjectData(projectId);
 
@@ -22,6 +30,7 @@ export async function POST(request: Request) {
 
     } catch (error: any) {
         logger.error('Failed to reset database:', error);
-        return NextResponse.json({ error: error.message || 'Failed to reset database' }, { status: 500 });
+        const { body, status } = jsonError(error);
+        return NextResponse.json(body, { status });
     }
 }

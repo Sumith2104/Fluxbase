@@ -3,7 +3,7 @@ import { getAuthContextFromRequest } from '@/lib/auth';
 import { createDatabaseSnapshot, listDatabaseSnapshots } from '@/lib/aws-rds';
 import { jsonError, requireProjectAccess } from '@/lib/project-auth';
 import { ERROR_CODES, FluxbaseError } from '@/lib/error-codes';
-import { requireWriteScope } from '@/lib/require-scope';
+import { assertReadScope, assertWriteScope } from '@/lib/require-scope';
 
 function instancePrefixForProject(projectId: string): string {
     return `fluxbase-tenant-${projectId.toLowerCase().replace(/[^a-z0-9-]/g, '')}-`;
@@ -12,7 +12,7 @@ function instancePrefixForProject(projectId: string): string {
 export async function GET(request: Request) {
     try {
         const auth = await getAuthContextFromRequest(request);
-  requireWriteScope(auth);
+        assertReadScope(auth);
         const { searchParams } = new URL(request.url);
         const identifier = searchParams.get('identifier');
         const projectId = searchParams.get('projectId') || auth?.allowedProjectId;
@@ -46,6 +46,7 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
     try {
         const auth = await getAuthContextFromRequest(request);
+        assertWriteScope(auth);
 
         const body = await request.json();
         const { identifier } = body;

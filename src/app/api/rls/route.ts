@@ -9,7 +9,7 @@ import {
     validateRlsExpression,
 } from '@/lib/sql-safety';
 import { ERROR_CODES, FluxbaseError } from '@/lib/error-codes';
-import { requireWriteScope } from '@/lib/require-scope';
+import { assertReadScope, assertWriteScope } from '@/lib/require-scope';
 import logger from '@/lib/logger';
 
 export const dynamic = 'force-dynamic';
@@ -45,7 +45,7 @@ export async function GET(req: NextRequest) {
         const { searchParams } = new URL(req.url);
         const projectId = searchParams.get('projectId');
         const auth = await getAuthContextFromRequest(req);
-  requireWriteScope(auth);
+        assertReadScope(auth);
         if (!projectId) throw new FluxbaseError('projectId is required', ERROR_CODES.MISSING_FIELD, 400);
 
         const project = await requireProjectAccess(projectId, auth);
@@ -88,6 +88,7 @@ export async function POST(req: NextRequest) {
         const body = await req.json();
         const { projectId, tableName, policyName } = body;
         const auth = await getAuthContextFromRequest(req);
+        assertWriteScope(auth);
         if (!projectId || !tableName || !policyName) {
             throw new FluxbaseError('projectId, tableName, and policyName are required', ERROR_CODES.MISSING_FIELD, 400);
         }
@@ -143,6 +144,7 @@ export async function DELETE(req: NextRequest) {
         const tableName = searchParams.get('tableName');
         const policyName = searchParams.get('policyName');
         const auth = await getAuthContextFromRequest(req);
+        assertWriteScope(auth);
         if (!projectId || !tableName || !policyName) {
             throw new FluxbaseError('projectId, tableName, and policyName are required', ERROR_CODES.MISSING_FIELD, 400);
         }

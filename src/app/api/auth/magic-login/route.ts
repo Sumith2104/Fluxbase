@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getPgPool } from '@/lib/pg';
 import { createSessionCookie, createSessionToken, createRefreshToken } from '@/lib/auth';
 import { getSessionCookieDomain } from '@/lib/cookie-domain';
-import { getBaseOrigin } from '@/lib/oauth-config';
+import { getBaseOrigin, sanitizeRedirectPath } from '@/lib/oauth-config';
 import crypto from 'crypto';
 import logger from '@/lib/logger';
 
@@ -10,7 +10,8 @@ export async function GET(req: NextRequest) {
     const { searchParams } = new URL(req.url);
     const token = searchParams.get('token');
     const email = searchParams.get('email');
-    const returnTo = searchParams.get('returnTo') || '/dashboard/projects';
+    const rawReturnTo = searchParams.get('returnTo');
+    const returnTo = sanitizeRedirectPath(rawReturnTo, '/dashboard/projects');
     const baseUrl = getBaseOrigin(req) || req.nextUrl.origin || process.env.NEXT_PUBLIC_APP_URL || 'https://www.fluxbasedb.me';
 
     if (!token || !email) {

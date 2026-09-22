@@ -4,7 +4,7 @@ import { getAuthContextFromRequest } from '@/lib/auth';
 import { jsonError, requireProjectAccess } from '@/lib/project-auth';
 import { quotePgProjectSchema } from '@/lib/sql-safety';
 import { ERROR_CODES, FluxbaseError } from '@/lib/error-codes';
-import { requireWriteScope } from '@/lib/require-scope';
+import { assertWriteScope } from '@/lib/require-scope';
 
 export const dynamic = 'force-dynamic';
 
@@ -16,7 +16,7 @@ export async function POST(req: NextRequest) {
         const { projectId, migrationId: bodyMigrationId, direction } = await req.json();
         migrationId = bodyMigrationId;
         const auth = await getAuthContextFromRequest(req);
-  requireWriteScope(auth);
+        assertWriteScope(auth);
         if (!projectId || !migrationId) {
             throw new FluxbaseError('projectId and migrationId are required', ERROR_CODES.MISSING_FIELD, 400);
         }

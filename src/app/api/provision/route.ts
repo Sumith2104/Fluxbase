@@ -5,7 +5,7 @@ import crypto from 'crypto';
 import { jsonError, requireProjectAccess } from '@/lib/project-auth';
 import { checkInstanceSizeLimit } from '@/lib/limits';
 import { ERROR_CODES, FluxbaseError } from '@/lib/error-codes';
-import { requireWriteScope } from '@/lib/require-scope';
+import { assertAdminScope, assertReadScope } from '@/lib/require-scope';
 import logger from '@/lib/logger';
 
 function instancePrefixForProject(projectId: string): string {
@@ -15,7 +15,7 @@ function instancePrefixForProject(projectId: string): string {
 export async function POST(request: Request) {
     try {
         const auth = await getAuthContextFromRequest(request);
-  requireWriteScope(auth);
+        assertAdminScope(auth);
         const body = await request.json();
         const { engine } = body;
         const size = body.size || 'db.t3.micro';
@@ -61,6 +61,7 @@ export async function POST(request: Request) {
 export async function GET(request: Request) {
     try {
         const auth = await getAuthContextFromRequest(request);
+        assertReadScope(auth);
         const { searchParams } = new URL(request.url);
         const identifier = searchParams.get('identifier');
         const projectId = searchParams.get('projectId') || auth?.allowedProjectId;

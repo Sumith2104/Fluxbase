@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getAuthContextFromRequest } from '@/lib/auth';
+import { requireReadScope } from '@/lib/require-scope';
 import { SqlEngine } from '@/lib/sql-engine';
 import { getProjectById } from '@/lib/data';
 import { redis } from '@/lib/redis';
@@ -15,13 +16,18 @@ const inFlightRequests = new Map<string, Promise<any>>();
 export async function GET(request: Request) {
     try {
         const auth = await getAuthContextFromRequest(request);
+        const scopeErr = requireReadScope(auth);
+        if (scopeErr) return scopeErr;
         if (!auth) return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
 
         const { searchParams } = new URL(request.url);
         let projectId = searchParams.get('projectId');
         const refresh = searchParams.get('refresh') === 'true';
 
-        if (auth.allowedProjectId && projectId !== auth.allowedProjectId) {
+        if (auth.allowedProjectId && projectId && projectId !== auth.allowedProjectId) {
+            return NextResponse.json({ success: false, error: 'This API key is not allowed to access the requested project.' }, { status: 403 });
+        }
+        if (!projectId && auth.allowedProjectId) {
             projectId = auth.allowedProjectId;
         }
 
