@@ -141,3 +141,34 @@ payments.fluxbasedb.me {
         }
     }
 }
+
+# SuperFarmer AI Agricultural Intelligence Platform Subdomain with Automatic SSL
+superfarmer.fluxbasedb.me {
+    encode zstd gzip
+
+    # Static Assets Caching
+    @static {
+        path /static/* /favicon.ico /logo.png
+    }
+    handle @static {
+        header Cache-Control "public, max-age=31536000, immutable"
+        reverse_proxy superfarmer-app:5000 {
+            header_up Host {host}
+            header_up X-Real-IP {remote_host}
+            header_up X-Forwarded-For {remote_host}
+            header_up X-Forwarded-Proto {scheme}
+        }
+    }
+
+    handle {
+        reverse_proxy superfarmer-app:5000 {
+            header_up Host {host}
+            header_up X-Real-IP {remote_host}
+            header_up X-Forwarded-For {remote_host}
+            header_up X-Forwarded-Proto {scheme}
+            lb_try_duration 30s
+            lb_try_interval 250ms
+        }
+    }
+}
+
