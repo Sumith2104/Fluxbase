@@ -46,6 +46,30 @@ describe('Fluxbase AI Policy Guard', () => {
             const res = checkOffTopicPolicy('Write python code to train a model');
             expect(res.isOffTopic).toBe(true);
         });
+
+        it('rejects "can you create py code?"', () => {
+            const res = checkOffTopicPolicy('can you create py code?');
+            expect(res.isOffTopic).toBe(true);
+            expect(res.reason).toBe('standalone_python_or_ml_request');
+            expect(res.refusalText).toContain('I cannot generate standalone Python applications');
+        });
+
+        it('rejects "can you write python?"', () => {
+            const res = checkOffTopicPolicy('can you write python?');
+            expect(res.isOffTopic).toBe(true);
+            expect(res.reason).toBe('standalone_python_or_ml_request');
+        });
+
+        it('rejects requests to create Flask/Django apps', () => {
+            const res = checkOffTopicPolicy('Create a flask app with registration and login endpoints');
+            expect(res.isOffTopic).toBe(true);
+            expect(res.reason).toBe('standalone_python_or_ml_request');
+        });
+
+        it('rejects generic app creation without database context', () => {
+            const res = checkOffTopicPolicy('Can you write code for a login system?');
+            expect(res.isOffTopic).toBe(true);
+        });
     });
 
     describe('Off-Topic: General Non-Fluxbase Inquiries', () => {

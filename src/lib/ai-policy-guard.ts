@@ -9,7 +9,7 @@
  * 
  * Explicitly rejects:
  * - Plant/crop/leaf disease identification and agricultural diagnosis
- * - General standalone Python code (ML models, OpenCV, classifiers, general apps)
+ * - General standalone Python / Flask / Django / general software code
  * - Non-database image analysis (leaves, plants, crops, animals, general photos)
  * - General off-topic tasks (creative writing, recipes, trivia)
  */
@@ -34,11 +34,18 @@ Please let me know how I can assist you with your **Fluxbase database, SQL queri
 
 export const PYTHON_CODE_REFUSAL = `I am Flux AI, strictly dedicated to Fluxbase database management, SQL queries, UI navigation, and workspace automation.
 
-I cannot generate standalone Python machine learning models, image classification scripts, OpenCV code, or general non-database software. The only Python snippets I can provide are:
-- Connecting to your Fluxbase database via \`psycopg2\`, \`asyncpg\`, or \`SQLAlchemy\`
-- Calling Fluxbase REST SQL, Storage, or Realtime APIs
+I cannot generate standalone Python applications, web frameworks (such as Flask or Django), machine learning models, or general software. I am strictly confined to:
+1. **Fluxbase Operations**: Table management, schema DDL, columns, foreign keys, indexes, S3 storage, webhooks, API keys, and settings.
+2. **Query**: Writing, optimizing, diagnosing, and executing PostgreSQL/MySQL queries (\`[EXECUTE_SQL:...]\`), and generating visual analytics charts (\`[RENDER_CHART:...]\`).
+3. **Navigation**: Teleporting to dashboard pages (\`[NAVIGATE:... any route]\`), clicking UI buttons (\`[CLICK:...]\`), and typing form inputs (\`[TYPE:...]\`).
+4. **Automation Tasks**: Auto-Pilot multi-step database workflows, bulk mock data generation via \`generate_series\`, table triggers, and web scraper ingestion into database tables.
 
-If you need to connect your application to Fluxbase or manage tables and queries, let me know and I will gladly provide the database schema and connection code!`;
+The only code I can provide for external applications is establishing a database connection to Fluxbase:
+- Connection URI: \`postgresql://postgres:<PASSWORD>@fluxbasedb.me:5432/<DATABASE>\`
+- Python DB libraries: \`SQLAlchemy\`, \`asyncpg\`, or \`psycopg2\`
+- Official Client SDK: \`@fluxbase/client\`
+
+If you would like to create tables, write SQL queries, or connect your application to Fluxbase, please let me know!`;
 
 export const NON_DB_IMAGE_REFUSAL = `I am Flux AI, strictly dedicated to Fluxbase database management, SQL queries, UI navigation, and workspace automation.
 
@@ -84,11 +91,21 @@ export function checkOffTopicPolicy(userText: string, hasAttachedImages: boolean
             };
         }
 
-        // ── 2. Standalone Python / Machine Learning / Image Processing Scripts ──
-        const isGeneralPythonOrMl = /\b(?:python\s+(?:code|script|program|app|function|file)|pytorch|tensorflow|keras|opencv|cv2|scikit|yolo|cnn|resnet|image\s+classification|object\s+detection|machine\s+learning\s+model|train\s+(?:a\s+)?model)\b/i.test(text);
-        const isAskingToWriteGeneralCode = /\b(?:write|create|generate|give\s+me|provide|show\s+me|code\s+for|script\s+for)\b/i.test(text) && isGeneralPythonOrMl;
+        // ── 2. Standalone Python / General Coding / Web Framework / ML Scripts ──
+        const hasPythonKeyword = /\b(?:python|py)\b/i.test(text);
+        const hasGeneralFrameworkOrLib = /\b(?:flask|django|fastapi|tkinter|streamlit|opencv|cv2|pytorch|tensorflow|keras|scikit|sklearn|yolo|cnn|resnet)\b/i.test(text);
+        const hasCodeNoun = /\b(?:code|script|program|app|application|bot|crawler|scraper|software|function|endpoint|login|auth\s+system)\b/i.test(text);
+        const hasCreationVerb = /\b(?:create|write|generate|make|build|give\s+me|provide|show\s+me|can\s+you\s+(?:create|write|make|generate|give|provide|do|code)|do\s+you\s+(?:write|code|create))\b/i.test(text);
 
-        if (isAskingToWriteGeneralCode && !isFluxbaseConnection) {
+        // Matches queries like:
+        // "can you create py code?", "can you write python?", "create py code", "write python script",
+        // "create a flask app", "python code for...", "write a python program", "code in py"
+        const isAskingForPythonCode = (hasPythonKeyword && (hasCodeNoun || hasCreationVerb || /\b(?:in\s+py(?:thon)?|with\s+py(?:thon)?)\b/i.test(text))) || hasGeneralFrameworkOrLib;
+
+        // Matches general non-Fluxbase coding requests like "write a login page", "create a web app", "build an app for me"
+        const isGeneralAppCreation = (hasCreationVerb && hasCodeNoun && !/\b(?:table|schema|query|sql|database|migration|trigger|view|index|column|mock\s+data|bucket|s3|storage|webhook|api\s*key)\b/i.test(text));
+
+        if (isAskingForPythonCode || isGeneralAppCreation) {
             return {
                 isOffTopic: true,
                 reason: 'standalone_python_or_ml_request',
