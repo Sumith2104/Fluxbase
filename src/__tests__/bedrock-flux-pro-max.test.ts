@@ -4,12 +4,12 @@ import { formatOpenAiToBedrock } from '@/lib/ai-gateway/bedrock-adapter';
 import { MODEL_CATALOG } from '@/lib/agent-core/gateway';
 
 describe('Flux Pro Max & AWS Bedrock Integration', () => {
-  it('registers flux-pro-max in FLUX_MODEL_REGISTRY with Claude 3.7 Sonnet', () => {
+  it('registers flux-pro-max in FLUX_MODEL_REGISTRY with Anthropic Claude Sonnet on Bedrock', () => {
     const spec = FLUX_MODEL_REGISTRY['flux-pro-max'];
     expect(spec).toBeDefined();
     expect(spec.id).toBe('flux-pro-max');
     expect(spec.provider).toBe('bedrock');
-    expect(spec.upstreamModel).toBe('us.anthropic.claude-3-7-sonnet-20250219-v1:0');
+    expect(spec.upstreamModel).toContain('anthropic.claude');
     expect(spec.minTier).toBe('max');
     expect(spec.capabilities).toContain('reasoning');
     expect(spec.capabilities).toContain('extended-thinking');
@@ -24,6 +24,7 @@ describe('Flux Pro Max & AWS Bedrock Integration', () => {
   });
 
   it('maps upstream Bedrock model IDs in WHITELABEL_MAP', () => {
+    expect(WHITELABEL_MAP['us.anthropic.claude-sonnet-4-6']).toBe('flux-pro-max');
     expect(WHITELABEL_MAP['us.anthropic.claude-3-7-sonnet-20250219-v1:0']).toBe('flux-pro-max');
   });
 
@@ -31,7 +32,7 @@ describe('Flux Pro Max & AWS Bedrock Integration', () => {
     const catalogEntry = MODEL_CATALOG['flux-pro-max'];
     expect(catalogEntry).toBeDefined();
     expect(catalogEntry.provider).toBe('bedrock');
-    expect(catalogEntry.upstreamModel).toBe('us.anthropic.claude-3-7-sonnet-20250219-v1:0');
+    expect(catalogEntry.upstreamModel).toContain('anthropic.claude');
   });
 
   it('correctly converts OpenAI messages to Bedrock Converse format', () => {

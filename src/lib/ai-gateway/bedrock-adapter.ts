@@ -40,6 +40,18 @@ export interface BedrockChatOptions {
 }
 
 /**
+ * Resolves requested model ID to active Bedrock cross-region inference profile
+ */
+export function resolveBedrockModelId(modelId: string): string {
+  const envModel = process.env.AWS_BEDROCK_CLAUDE_MODEL;
+  if (envModel) return envModel;
+  if (!modelId || modelId.includes('3-7-sonnet') || modelId.includes('3.7') || modelId.includes('legacy') || modelId === 'us.anthropic.claude-3-7-sonnet-20250219-v1:0') {
+    return 'us.anthropic.claude-sonnet-4-6';
+  }
+  return modelId;
+}
+
+/**
  * Transforms standard OpenAI formatted messages to AWS Bedrock Converse API format
  */
 export function formatOpenAiToBedrock(messages: any[]): {
@@ -165,15 +177,32 @@ export async function executeBedrockConverse(opts: BedrockChatOptions) {
     };
   }
 
+  const targetModelId = resolveBedrockModelId(opts.modelId);
   const command = new ConverseCommand({
-    modelId: opts.modelId,
+    modelId: targetModelId,
     system: system.length > 0 ? system : undefined,
     messages,
     inferenceConfig,
     additionalModelRequestFields: Object.keys(additionalModelRequestFields).length > 0 ? additionalModelRequestFields : undefined,
   });
 
-  const response = await client.send(command);
+  let response;
+  try {
+    response = await client.send(command);
+  } catch (err: any) {
+    if (err?.name === 'ResourceNotFoundException' || err?.message?.includes('end of its life') || err?.name === 'AccessDeniedException') {
+      const fallbackCommand = new ConverseCommand({
+        modelId: 'us.anthropic.claude-sonnet-4-6',
+        system: system.length > 0 ? system : undefined,
+        messages,
+        inferenceConfig,
+        additionalModelRequestFields: Object.keys(additionalModelRequestFields).length > 0 ? additionalModelRequestFields : undefined,
+      });
+      response = await client.send(fallbackCommand);
+    } else {
+      throw err;
+    }
+  }
 
   let responseText = '';
   if (response.output?.message?.content) {
@@ -238,15 +267,32 @@ export async function executeBedrockConverseStream(opts: BedrockChatOptions): Pr
     };
   }
 
+  const targetModelId = resolveBedrockModelId(opts.modelId);
   const command = new ConverseStreamCommand({
-    modelId: opts.modelId,
+    modelId: targetModelId,
     system: system.length > 0 ? system : undefined,
     messages,
     inferenceConfig,
     additionalModelRequestFields: Object.keys(additionalModelRequestFields).length > 0 ? additionalModelRequestFields : undefined,
   });
 
-  const response = await client.send(command);
+  let response;
+  try {
+    response = await client.send(command);
+  } catch (err: any) {
+    if (err?.name === 'ResourceNotFoundException' || err?.message?.includes('end of its life') || err?.name === 'AccessDeniedException') {
+      const fallbackCommand = new ConverseStreamCommand({
+        modelId: 'us.anthropic.claude-sonnet-4-6',
+        system: system.length > 0 ? system : undefined,
+        messages,
+        inferenceConfig,
+        additionalModelRequestFields: Object.keys(additionalModelRequestFields).length > 0 ? additionalModelRequestFields : undefined,
+      });
+      response = await client.send(fallbackCommand);
+    } else {
+      throw err;
+    }
+  }
   const streamId = `chatcmpl-bedrock-${Date.now()}`;
   const encoder = new TextEncoder();
 
