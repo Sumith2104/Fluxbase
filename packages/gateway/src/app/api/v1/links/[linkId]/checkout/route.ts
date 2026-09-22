@@ -88,7 +88,7 @@ export async function POST(
       `INSERT INTO orders (
           id, merchant_id, base_amount, offset_cents, final_amount,
           vpa_id, tier, status, customer_name, customer_email, customer_phone,
-          metadata, callback_url, webhook_url, expires_at
+          metadata, callback_url, merchant_webhook_url, expires_at
        ) VALUES ($1, $2, $3, $4, $5, $6, $7, 'pending', $8, $9, $10, $11, $12, $13, $14)`,
       [
         orderId,

@@ -116,6 +116,11 @@ export function getBaseOrigin(request: NextRequest): string {
     const host = request.headers.get('x-forwarded-host') || request.headers.get('host') || 'localhost:3000';
     const proto = request.headers.get('x-forwarded-proto') || (host.includes('localhost') ? 'http' : 'https');
     
+    // Canonicalize fluxbasedb.me domains to https://fluxbasedb.me so OAuth apps always match
+    if (host.includes('fluxbasedb.me')) {
+        return 'https://fluxbasedb.me';
+    }
+
     let origin = `${proto}://${host}`;
 
     // 3. Fallback/Sync: Ensure protocol matches the environment strictly
@@ -152,6 +157,10 @@ export function getOAuthConfig(request: NextRequest, provider: 'github' | 'googl
         if (localOverride && (localOverride.includes('localhost') || localOverride.includes('127.0.0.1'))) {
             explicitRedirect = localOverride;
         }
+    } else if (envPrefix === 'MAINAPP') {
+        explicitRedirect = provider === 'github'
+            ? (process.env.GITHUB_REDIRECT_URI_MAINAPP || process.env.GITHUB_REDIRECT_URI || 'https://fluxbasedb.me/api/auth/github/callback')
+            : (process.env.GOOGLE_REDIRECT_URI_MAINAPP || process.env.GOOGLE_REDIRECT_URI || 'https://fluxbasedb.me/api/auth/google/callback');
     } else {
         explicitRedirect = provider === 'github' 
             ? (process.env[`GITHUB_REDIRECT_URI_${envPrefix}`] || process.env.GITHUB_REDIRECT_URI_MAINAPP || process.env.GITHUB_REDIRECT_URI)
@@ -194,9 +203,9 @@ export function getGitHubImportOAuthConfig(request: NextRequest): OAuthConfig & 
         envPrefix = 'NETLIFY';
     }
 
-    const explicitRedirect = process.env[`GITHUB_IMPORT_REDIRECT_URI_${envPrefix}`] || 
-                             process.env.GITHUB_IMPORT_REDIRECT_URI_MAINAPP || 
-                             process.env.GITHUB_IMPORT_REDIRECT_URI;
+    const explicitRedirect = envPrefix === 'MAINAPP'
+        ? (process.env[`GITHUB_IMPORT_REDIRECT_URI_MAINAPP`] || process.env.GITHUB_IMPORT_REDIRECT_URI || process.env.GITHUB_REDIRECT_URI_MAINAPP || 'https://fluxbasedb.me/api/auth/github/callback')
+        : (process.env[`GITHUB_IMPORT_REDIRECT_URI_${envPrefix}`] || process.env.GITHUB_IMPORT_REDIRECT_URI_MAINAPP || process.env.GITHUB_IMPORT_REDIRECT_URI);
 
     // Default to the standard registered callback URL: ${baseOrigin}/api/auth/github/callback
     // This allows using the existing GitHub OAuth App without requiring a 2nd OAuth App or changing GitHub Settings

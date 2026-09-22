@@ -34,6 +34,8 @@ export function AgenticThinkBlock({
   useEffect(() => {
     if (isThinking) {
       setIsOpen(true);
+    } else {
+      setIsOpen(false);
     }
   }, [isThinking]);
 

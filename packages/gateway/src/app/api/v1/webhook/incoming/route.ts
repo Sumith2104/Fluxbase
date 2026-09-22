@@ -8,15 +8,12 @@ export async function POST(req: NextRequest) {
     const querySecret = req.nextUrl.searchParams.get('secret') || '';
     const token = (authHeader.replace(/^Bearer\s+/i, '').trim() || querySecret).trim();
 
-    const validSecrets = [
+    const configuredSecrets = [
       process.env.PAYMENT_WEBHOOK_SECRET,
       process.env.SMS_WEBHOOK_SECRET,
-      'sumith@fluxbase',
-      'whsec_de4e5ac069b1e05aebb098ee343e396a',
-    ].filter(Boolean);
+    ].filter(Boolean) as string[];
 
-    // If token provided, verify. If no secret configured or valid secret matches, allow.
-    if (token && validSecrets.length > 0 && !validSecrets.includes(token)) {
+    if (!token || (configuredSecrets.length > 0 && !configuredSecrets.includes(token))) {
       return NextResponse.json({ error: 'Unauthorized webhook request' }, { status: 401 });
     }
 

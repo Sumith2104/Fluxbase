@@ -718,7 +718,7 @@ export function FluxAiAssistant({ userId, isOpen, onOpenChange }: { userId: stri
             pendingWorkflow: options?.pendingWorkflow,
             approvalRequest: options?.approvalRequest,
             sources: options?.sources,
-            taskLabel: options?.taskLabel || last.taskLabel
+            taskLabel: options?.taskLabel && !/thinking/i.test(options.taskLabel) ? options.taskLabel : "Flux AI"
           };
           return updated;
         }
@@ -730,7 +730,7 @@ export function FluxAiAssistant({ userId, isOpen, onOpenChange }: { userId: stri
           pendingWorkflow: options?.pendingWorkflow,
           approvalRequest: options?.approvalRequest,
           sources: options?.sources,
-          taskLabel: options?.taskLabel,
+          taskLabel: options?.taskLabel && !/thinking/i.test(options.taskLabel) ? options.taskLabel : "Flux AI",
           timestamp: Date.now()
         }];
       });
@@ -788,7 +788,11 @@ export function FluxAiAssistant({ userId, isOpen, onOpenChange }: { userId: stri
           pendingWorkflow: options?.pendingWorkflow,
           approvalRequest: options?.approvalRequest,
           sources: options?.sources,
-          taskLabel: options?.taskLabel || updated[lastIdx].taskLabel
+          taskLabel: options?.taskLabel && !/thinking/i.test(options.taskLabel)
+            ? options.taskLabel
+            : (updated[lastIdx].taskLabel && !/thinking/i.test(updated[lastIdx].taskLabel)
+                ? updated[lastIdx].taskLabel
+                : "Flux AI")
         };
         return updated;
       });
@@ -1469,6 +1473,9 @@ export function FluxAiAssistant({ userId, isOpen, onOpenChange }: { userId: stri
             pendingWorkflow: steps.length > 0 ? { steps } : undefined,
             approvalRequest,
             sources: streamSources,
+            taskLabel: updated[lastIdx].taskLabel && !/thinking/i.test(updated[lastIdx].taskLabel)
+              ? updated[lastIdx].taskLabel
+              : "Flux AI",
             isStreaming: false
           };
           return updated;
@@ -1893,9 +1900,11 @@ export function FluxAiAssistant({ userId, isOpen, onOpenChange }: { userId: stri
                                       {/* Task Status Header */}
                                       <div className="flex items-center justify-between pb-2 border-b border-border/40 text-[11px] text-muted-foreground font-mono">
                                         <div className="flex items-center gap-1.5">
-                                          <span className="w-1.5 h-1.5 rounded-full bg-primary shrink-0" />
+                                          <span className={cn("w-1.5 h-1.5 rounded-full shrink-0", msg.isStreaming ? "bg-amber-400 animate-pulse" : "bg-primary")} />
                                           <span className="font-semibold text-foreground/85 tracking-tight">
-                                            {msg.taskLabel?.replace(/\.\.\.$/, '') || "Flux AI"}
+                                            {msg.isStreaming
+                                              ? (msg.taskLabel?.replace(/\.\.\.$/, '') || "Thinking")
+                                              : (msg.taskLabel && !/thinking/i.test(msg.taskLabel) ? msg.taskLabel.replace(/\.\.\.$/, '') : "Flux AI")}
                                           </span>
                                         </div>
                                         {msg.isStreaming && (
