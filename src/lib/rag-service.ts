@@ -22,120 +22,292 @@ export interface RagContextResult {
 
 const STATIC_DOC_CHUNKS: RagDocChunk[] = [
     {
-        id: 'app_connection_guide',
-        source: 'Developer Guide',
-        title: 'How to Connect and Use Fluxbase in Your Application',
-        content: `Fluxbase provides 4 primary integration options for any backend, web, or mobile application:
-
-CANONICAL DOMAIN & LINKS:
-All Fluxbase API endpoints and web console URLs strictly use: https://fluxbasedb.me
-
-1. DIRECT POSTGRESQL CONNECTION (Best for ORMs & Server Backends):
-   - Connection URI:
-     postgresql://postgres:<PASSWORD>@fluxbasedb.me:5432/<DATABASE_NAME>
-   - Compatible with Prisma, Drizzle ORM, TypeORM, 'pg' (Node.js), asyncpg/SQLAlchemy (Python), Go pgx/GORM, etc.
-   - Example with Prisma (schema.prisma):
+        id: 'fluxbase_app_scope_rules',
+        source: 'Operating Rules',
+        title: 'Fluxbase Application-Specific Operating Rules & Scope Guardrails',
+        content: `STRICT APPLICATION-SPECIFIC OPERATING RULES:
+1. EXCLUSIVE FLUXBASE SCOPE:
+   - You are strictly the dedicated intelligence engine, database architect, and technical co-pilot for FLUXBASE.
+   - You must ONLY generate responses that are directly relevant to Fluxbase: its database engines, schemas, SQL queries, REST APIs, SDKs, File Storage, Real-time streams, Web Scraper, AI Gateway, MCP Server, Billing, and applications built with or connected to Fluxbase.
+2. REFUSAL OF UNRELATED / OFF-TOPIC QUERIES:
+   - If the user asks general questions unrelated to Fluxbase (e.g., cooking recipes, creative writing, political discussions, general trivia, weather, or software completely independent of Fluxbase), you MUST politely decline:
+     "I am Flux AI, the specialized database architect and developer assistant for Fluxbase. I can only assist with Fluxbase platform operations, database queries, SQL architecture, storage, webhooks, and integrating your applications with Fluxbase. How can I help you with your Fluxbase workspace today?"
+3. FLUXBASE-NATIVE SOLUTIONS:
+   - Always formulate developer solutions using Fluxbase primitives: PostgreSQL/MySQL direct connections, @fluxbase/client SDK, Fluxbase REST SQL (/api/v1/sql), Fluxbase Table CRUD (/api/v1/rest/...), Fluxbase S3 Storage (/api/storage/...), and Fluxbase Realtime SSE (/api/realtime/subscribe).
+   - Do NOT recommend competing cloud backends (e.g. Supabase, Firebase, AWS DynamoDB) for tasks natively handled by Fluxbase.
+4. CANONICAL DOMAIN ENFORCEMENT:
+   - Strictly and exclusively use https://fluxbasedb.me for all endpoints, docs, links, and code snippets.
+   - Payment gateway domain is strictly https://payments.fluxbasedb.me.`,
+        keywords: ['rules', 'scope', 'app specific', 'guardrails', 'fluxbase rules', 'system rules', 'who are you', 'capabilities', 'off topic', 'refusal', 'app-specific', 'policy']
+    },
+    {
+        id: 'fluxbase_master_architecture',
+        source: 'System Architecture',
+        title: 'Fluxbase Infrastructure, Microservices & Network Topology',
+        content: `FLUXBASE ARCHITECTURAL SPECIFICATION:
+- Production Domain: https://fluxbasedb.me (Port 80/443, Caddy 2 Reverse Proxy with Let's Encrypt TLS & HTTP/3 QUIC).
+- Server Environment: AWS EC2 Graviton t4g.large (2 vCPU, 8 GB RAM, ap-south-1 Mumbai, IP: 13.206.125.88).
+- Docker Microservices (Internal Network: fluxbase-network):
+  1. fluxbase-app (Port 3000): Next.js 15.5 App Router standalone web app, SQL REST execution engine, Table CRUD, auth, MCP gateway.
+  2. fluxbase-websocket (Port 4000, mapped to /ws*): Real-time WebSocket gateway listening to PostgreSQL LISTEN flux_realtime triggers.
+  3. fluxbase-redis (Port 6379): Redis 7 Alpine, LRU cache (512MB limit), rate limiting, query caching.
+  4. fluxbase-proxy (Ports 80/443): Caddy 2 reverse proxy with automatic SSL for fluxbasedb.me and payments.fluxbasedb.me.
+  5. fluxbase-scraper-engine (Port 8080): Headless Playwright autonomous web scraper engine.
+  6. fluxbase-gateway (Port 3001, payments.fluxbasedb.me): FluxPay hosted UPI payment gateway, QR codes, bank SMS webhook ingestion.
+- AWS Cloud Infrastructure:
+  - Primary RDS: PostgreSQL 17.9 (fluxbase-master-db-new).
+  - Multi-Tenant RDS: MySQL 8.4.8 (database-1-new).
+  - Object Storage: Amazon S3 (fluxbase-storage) with 15-min presigned URLs.
+  - Transactional Email: Amazon SES (support@fluxbasedb.me).
+  - DNS: AWS Route 53 Public Hosted Zone (Z00637411I9ALMVMC5GBN).`,
+        keywords: ['architecture', 'infrastructure', 'services', 'docker', 'caddy', 'ports', 'aws', 'rds', 'ec2', 'topology', 'microservices', 'production', 'server']
+    },
+    {
+        id: 'fluxbase_database_engines_full',
+        source: 'Database Guide',
+        title: 'PostgreSQL 17 & MySQL 8 Multi-Tenant Database Engines',
+        content: `DATABASE ENGINES & DIRECT CONNECTIONS:
+1. PostgreSQL 17.9 (Primary Enterprise Dialect):
+   - Port: 5432
+   - Connection URI: postgresql://postgres:<PASSWORD>@fluxbasedb.me:5432/<DATABASE_NAME>
+   - Multi-Tenant Isolation: Each project is isolated in its dedicated PostgreSQL schema named 'flux_tenant_<projectId>'.
+   - Automatic Search Path: Queries and client connections automatically search 'flux_tenant_<projectId>, public'.
+   - Capabilities: Full support for JSONB, Generated Columns, Triggers, Views, Foreign Keys, LISTEN/NOTIFY, UUIDs, Full-Text Search.
+2. MySQL 8.4.8 (High-Throughput Relational Dialect):
+   - Port: 3306
+   - Connection URI: mysql://user:<PASSWORD>@fluxbasedb.me:3306/<DATABASE_NAME>
+   - Dedicated MySQL tenant databases with InnoDB engine.
+3. ORM & Language Connection Recipes:
+   - Prisma (schema.prisma):
      datasource db {
        provider = "postgresql"
        url      = env("DATABASE_URL")
      }
-
-2. REST SQL API (Best for Serverless, Edge, & Webhooks):
-   - POST https://fluxbasedb.me/api/v1/sql (or https://fluxbasedb.me/api/execute-sql)
-   - Headers:
-     Authorization: Bearer <YOUR_API_KEY>
-     Content-Type: application/json
-   - Body:
-     {
-       "projectId": "<PROJECT_ID>",
-       "query": "SELECT * FROM users WHERE status = 'active' LIMIT 50;"
-     }
-   - Response: { "success": true, "rows": [...], "rowCount": 50 }
-
-3. REST TABLE CRUD API (Instant Auto-generated Table Endpoints):
-   - List rows: GET https://fluxbasedb.me/api/v1/rest/<projectId>/<table>?page=1&limit=50
-   - Insert row: POST https://fluxbasedb.me/api/v1/rest/<projectId>/<table>
-   - Update row: PUT https://fluxbasedb.me/api/v1/rest/<projectId>/<table>
-   - Delete row: DELETE https://fluxbasedb.me/api/v1/rest/<projectId>/<table>?id=<row_id>
-   - Headers: Authorization: Bearer <YOUR_API_KEY>
-
-4. FLUXBASE CLIENT SDK (@fluxbase/client):
-   - Type-safe, Supabase-compatible client:
-     import { createClient } from '@fluxbase/client';
-     const flux = createClient({
-       apiKey: process.env.FLUX_API_KEY,
-       projectId: process.env.FLUX_PROJECT_ID
-     });
-     const { data, error } = await flux.from('users').select('*').limit(20);
-
-5. FLUX AI API (/api/v1/chat/completions):
-   - OpenAI SDK drop-in replacement with baseURL 'https://fluxbasedb.me/api/v1':
-     client = OpenAI(base_url="https://fluxbasedb.me/api/v1", api_key="<KEY>")
-
-6. REAL-TIME SUBSCRIPTIONS & STORAGE:
-   - Real-time SSE: GET https://fluxbasedb.me/api/realtime/subscribe?projectId=<projectId>&table=<table>
-   - S3-compatible file storage: POST https://fluxbasedb.me/api/storage/upload
-   - Presigned download URL: GET https://fluxbasedb.me/api/storage/url?projectId=<projectId>&key=<key>
-
-KEY WEB CONSOLE LINKS:
-- Documentation: [Fluxbase Documentation](https://fluxbasedb.me/docs)
-- Query Editor: [SQL Query Editor](https://fluxbasedb.me/query)
-- Interactive Data Grid: [Data Grid Editor](https://fluxbasedb.me/editor)
-- Schema Explorer: [Database Explorer](https://fluxbasedb.me/database)
-- Dashboard: [Analytics Dashboard](https://fluxbasedb.me/dashboard)
-- Storage: [S3 Storage Browser](https://fluxbasedb.me/storage)
-- API Keys & Settings: [Project Settings](https://fluxbasedb.me/settings)`,
-        keywords: ['app', 'application', 'connect', 'how to use', 'integration', 'use fluxbase', 'backend', 'frontend', 'connect to app', 'connect to my app', 'use fluxbase to my app', 'prisma', 'drizzle', 'database url', 'connection string', 'how can i use', 'integrate', 'endpoint', 'endpoints', 'api url', 'links']
+   - Drizzle ORM:
+     import { drizzle } from 'drizzle-orm/postgres-js';
+     import postgres from 'postgres';
+     const db = drizzle(postgres(process.env.DATABASE_URL));
+   - Node.js pg:
+     import { Pool } from 'pg';
+     const pool = new Pool({ connectionString: process.env.DATABASE_URL, ssl: { rejectUnauthorized: false } });
+   - Python (SQLAlchemy + asyncpg):
+     from sqlalchemy.ext.asyncio import create_async_engine
+     engine = create_async_engine("postgresql+asyncpg://postgres:PASS@fluxbasedb.me:5432/DB")
+   - Go (pgx):
+     conn, err := pgx.Connect(context.Background(), "postgres://postgres:PASS@fluxbasedb.me:5432/DB")`,
+        keywords: ['postgresql', 'mysql', 'database', 'connection', 'connection string', 'prisma', 'drizzle', 'typeorm', 'sqlalchemy', 'asyncpg', 'pgx', 'schema', 'tenant', 'flux_tenant', 'search_path', 'orm']
     },
     {
-        id: 'sql_execution_api',
+        id: 'fluxbase_rest_and_crud_api',
         source: 'API Reference',
-        title: 'SQL Execution Endpoint',
-        content: `POST https://fluxbasedb.me/api/v1/sql (or https://fluxbasedb.me/api/execute-sql)
-Headers: Content-Type: application/json, Authorization: Bearer <API_KEY>
-Body: { "projectId": "<PROJECT_UUID>", "query": "SELECT * FROM users LIMIT 10;" }
-Response: { "success": true, "columns": ["id", "name"], "rows": [...], "rowCount": 10 }
-Note: Safe queries (SELECT, SHOW, EXPLAIN, WITH) execute directly. Destructive operations (DROP, DELETE, TRUNCATE) require approval.`,
-        keywords: ['sql', 'query', 'execute', 'select', 'api', 'endpoint', 'rows', 'columns', 'read']
-    },
-    {
-        id: 'storage_api',
-        source: 'Storage Guide',
-        title: 'S3-Compatible Storage Upload & Presigned URLs',
-        content: `Upload file: POST https://fluxbasedb.me/api/storage/upload
-Multipart form data: file (binary), projectId (<UUID>), bucket (optional)
-Get presigned URL: GET https://fluxbasedb.me/api/storage/url?projectId=<UUID>&key=<file_key>
-List files: GET https://fluxbasedb.me/api/storage/files?projectId=<UUID>
-Storage handles AWS S3 backend, presigned URLs, MIME detection, and multi-tenant bucket prefixes.`,
-        keywords: ['storage', 's3', 'upload', 'file', 'presigned', 'download', 'bucket', 'asset', 'image']
-    },
-    {
-        id: 'realtime_api',
-        source: 'Realtime Guide',
-        title: 'Server-Sent Events (SSE) Realtime Subscriptions',
-        content: `SSE Endpoint: GET https://fluxbasedb.me/api/realtime/subscribe?projectId=<UUID>&table=<TABLE_NAME>
-Headers: Accept: text/event-stream
-Events:
-- event: INSERT -> data: { "type": "INSERT", "table": "...", "record": {...} }
-- event: UPDATE -> data: { "type": "UPDATE", "table": "...", "record": {...}, "old": {...} }
-- event: DELETE -> data: { "type": "DELETE", "table": "...", "id": "..." }
-Supports client-side listening via standard EventSource API or Fluxbase SDK.`,
-        keywords: ['realtime', 'sse', 'subscribe', 'eventsource', 'live', 'websocket', 'stream', 'listen']
-    },
-    {
-        id: 'sdk_integration',
-        source: 'SDK Guide',
-        title: 'Client SDK Integration (JavaScript / TypeScript / Python)',
-        content: `JavaScript / TypeScript:
-import { createClient } from '@fluxbase/client';
-const flux = createClient({ apiKey: 'flx_live_xxx', projectId: 'uuid-xxx' });
-const { data, error } = await flux.from('users').select('*').eq('role', 'admin');
+        title: 'Fluxbase REST SQL & Auto-Generated Table CRUD APIs',
+        content: `REST & CRUD API SPECIFICATION:
+1. REST SQL Endpoint (Parameterized & Raw Query Execution):
+   - URL: POST https://fluxbasedb.me/api/v1/sql (or /api/execute-sql)
+   - Headers:
+     Authorization: Bearer <FLUX_API_KEY>
+     Content-Type: application/json
+   - Request Body:
+     {
+       "projectId": "<PROJECT_UUID>",
+       "query": "SELECT id, name, email FROM users WHERE status = $1 LIMIT 50;",
+       "params": ["active"]
+     }
+   - Response: { "success": true, "columns": ["id", "name", "email"], "rows": [...], "rowCount": 50 }
 
-Python:
-from fluxbase import FluxbaseClient
-flux = FluxbaseClient(api_key="flx_live_xxx", project_id="uuid-xxx")
-users = flux.table("users").select("id, name, email").execute()`,
-        keywords: ['sdk', 'javascript', 'typescript', 'python', 'client', 'install', 'import', 'code', 'library']
+2. Instant Auto-Generated Table CRUD Endpoints:
+   - List Rows: GET https://fluxbasedb.me/api/v1/rest/<projectId>/<table>?page=1&limit=50&sort=created_at&order=desc
+   - Insert Row: POST https://fluxbasedb.me/api/v1/rest/<projectId>/<table>
+     Body: { "name": "Jane Doe", "email": "jane@example.com" }
+   - Update Row: PUT https://fluxbasedb.me/api/v1/rest/<projectId>/<table>
+     Body: { "id": "123", "name": "Jane Smith" }
+   - Delete Row: DELETE https://fluxbasedb.me/api/v1/rest/<projectId>/<table>?id=123
+   - All CRUD endpoints require 'Authorization: Bearer <API_KEY>' and enforce project row limits and tenant boundaries.`,
+        keywords: ['rest', 'crud', 'api', 'execute-sql', 'sql api', 'rest api', 'endpoints', 'insert row', 'delete row', 'update row', 'table api', 'table crud']
+    },
+    {
+        id: 'fluxbase_client_sdk_full',
+        source: 'SDK Reference',
+        title: 'Fluxbase Client SDK (@fluxbase/client & Python Client)',
+        content: `FLUXBASE CLIENT SDK REFERENCE:
+1. TypeScript / JavaScript Installation:
+   npm install @fluxbase/client
+2. Client Initialization:
+   import { createClient } from '@fluxbase/client';
+   const flux = createClient({
+     apiKey: process.env.FLUX_API_KEY,
+     projectId: process.env.FLUX_PROJECT_ID,
+     endpoint: 'https://fluxbasedb.me'
+   });
+3. Querying Tables:
+   const { data, error } = await flux
+     .from('users')
+     .select('id, name, email, created_at')
+     .eq('status', 'active')
+     .order('created_at', { ascending: false })
+     .limit(25);
+4. Mutation Methods:
+   - Insert: await flux.from('orders').insert({ customer_id: 'c1', total: 49.99 });
+   - Update: await flux.from('users').update({ role: 'admin' }).eq('id', 'u123');
+   - Delete: await flux.from('logs').delete().lt('created_at', '2026-01-01');
+5. Realtime Subscriptions via SDK:
+   const subscription = flux
+     .from('notifications')
+     .on('INSERT', (payload) => console.log('New notification:', payload.record))
+     .subscribe();
+6. Python Client:
+   from fluxbase import FluxbaseClient
+   flux = FluxbaseClient(api_key="flx_live_...", project_id="...")
+   users = flux.table("users").select("*").limit(20).execute()`,
+        keywords: ['sdk', 'client', '@fluxbase/client', 'javascript', 'typescript', 'python', 'npm', 'createclient', 'from', 'select', 'insert', 'mutation']
+    },
+    {
+        id: 'fluxbase_storage_engine_v2',
+        source: 'Storage Guide',
+        title: 'AWS S3 File Storage Engine, Presigned URLs & Quotas',
+        content: `FLUXBASE FILE STORAGE V2 (AWS S3-BACKED):
+- Architecture: Backed by Amazon S3 ('fluxbase-storage') in ap-south-1 with private-by-default access and multi-tenant project isolation.
+- File Upload:
+  POST https://fluxbasedb.me/api/storage/upload
+  Content-Type: multipart/form-data
+  Fields:
+    file: <binary>
+    projectId: <UUID>
+    bucketId: <optional bucket name, defaults to 'default'>
+  Response: { "success": true, "key": "...", "url": "...", "size": 1048576, "mimeType": "image/png" }
+- Presigned Download URL (15-Minute Expiry):
+  GET https://fluxbasedb.me/api/storage/url?projectId=<UUID>&key=<s3Key>
+  Response: { "url": "https://fluxbase-storage.s3.ap-south-1.amazonaws.com/..." }
+- List Files & Buckets:
+  GET https://fluxbasedb.me/api/storage/files?projectId=<UUID>
+  GET https://fluxbasedb.me/api/storage/buckets?projectId=<UUID>
+- Plan Storage Quotas:
+  - Free: 1 GB total storage
+  - Pro: 10 GB total storage
+  - Max: 100 GB total storage
+  - Pay-As-You-Go / Unlimited: 500 GB total storage`,
+        keywords: ['storage', 's3', 'upload', 'presigned', 'download', 'bucket', 'file', 'files', 'image', 'assets', 'quotas', 'storage limits']
+    },
+    {
+        id: 'fluxbase_realtime_and_websockets',
+        source: 'Realtime Guide',
+        title: 'Real-Time SSE, WebSockets & Database Mutation Broadcasts',
+        content: `FLUXBASE REAL-TIME EVENT STREAMING:
+1. Server-Sent Events (SSE):
+   - Endpoint: GET https://fluxbasedb.me/api/realtime/subscribe?projectId=<UUID>&table=<TABLE_NAME>
+   - Header: Accept: text/event-stream
+   - Event Types:
+     - event: INSERT -> data: { "type": "INSERT", "table": "orders", "record": {...} }
+     - event: UPDATE -> data: { "type": "UPDATE", "table": "orders", "record": {...}, "old": {...} }
+     - event: DELETE -> data: { "type": "DELETE", "table": "orders", "id": "..." }
+2. Real-Time WebSocket Gateway:
+   - WebSocket URL: wss://fluxbasedb.me/ws
+   - Sub-second latency powered by 'fluxbase-websocket' container on port 4000.
+   - Internal Mechanism: PostgreSQL triggers invoke 'pg_notify('flux_realtime', payload)'. The standalone WebSocket server listens to 'flux_realtime', publishes to Redis channels, and fans out directly to connected client sockets.`,
+        keywords: ['realtime', 'sse', 'websocket', 'wss', 'eventsource', 'subscribe', 'stream', 'live updates', 'listeners', 'triggers', 'mutation']
+    },
+    {
+        id: 'fluxbase_ai_and_vision_gateway',
+        source: 'AI Gateway Reference',
+        title: 'Flux AI Multimodal Gateway, Computer Vision & Models',
+        content: `FLUX AI MULTIMODAL GATEWAY:
+- Production Base URL: https://fluxbasedb.me/api/v1
+- OpenAI SDK Parity: Use standard OpenAI SDK by changing baseURL to 'https://fluxbasedb.me/api/v1' and setting your Fluxbase API Key as api_key.
+  Example:
+  import OpenAI from 'openai';
+  const client = new OpenAI({ baseURL: 'https://fluxbasedb.me/api/v1', apiKey: process.env.FLUX_API_KEY });
+  const res = await client.chat.completions.create({ model: 'flux', messages: [{ role: 'user', content: 'Explain schema' }] });
+- Model Catalog:
+  - 'flux' (Default): General reasoning, SQL generation (GLM-4 Flash / Groq)
+  - 'flux-flash': Fast autocomplete, low latency
+  - 'flux-pro': Complex schema design, JSON mode
+  - 'flux-ultra': Deep reasoning, multi-step system audits (GLM-4 Plus)
+  - 'flux-omni': Multimodal vision, image analysis (Gemini 2.0 Flash)
+- Multimodal Computer Vision:
+  Supports uploading ERD diagrams, schema whiteboard sketches, system architectures, and error dialog screenshots. The vision pipeline uses 'glm-4v-flash' to automatically extract database entities, columns, primary/foreign keys, and diagnose SQL errors.`,
+        keywords: ['ai', 'flux ai', 'gateway', 'openai', 'models', 'vision', 'multimodal', 'glm-4', 'gemini', 'chat completions', 'embeddings', 'images']
+    },
+    {
+        id: 'fluxbase_mcp_server_reference',
+        source: 'MCP Protocol Reference',
+        title: 'Fluxbase Model Context Protocol (MCP) Server for Agents',
+        content: `FLUXBASE MODEL CONTEXT PROTOCOL (MCP) SERVER:
+- Gateway Endpoint: https://fluxbasedb.me/api/mcp
+- Protocol: JSON-RPC 2.0
+- Integration: Compatible with Cursor, Claude Desktop, Windsurf, and custom autonomous agents.
+- Core MCP Tools:
+  1. create_project: { projectName, dialect: "postgresql" | "mysql", userRole?, description? }
+  2. list_projects: {}
+  3. get_schema: { projectId }
+  4. run_sql: { projectId, query }
+- Security: MCP Guard intercepts incoming tool calls and verifies workspace API permissions.`,
+        keywords: ['mcp', 'model context protocol', 'cursor', 'claude desktop', 'mcp server', 'json-rpc', 'agent tools', 'mcp tools']
+    },
+    {
+        id: 'fluxbase_fluxpay_payment_gateway',
+        source: 'FluxPay Payment Guide',
+        title: 'FluxPay Automated UPI Payment Gateway & Checkout Engine',
+        content: `FLUXPAY PAYMENT GATEWAY SPECIFICATION:
+- Production Subdomain: https://payments.fluxbasedb.me
+- Architecture: Autonomous UPI payment gateway container ('fluxbase-gateway' on port 3001).
+- Key Features:
+  1. Instant UPI Dynamic QR generation via slot-engine (allocateSlot with 90-second atomic TTL).
+  2. Automated Bank SMS Webhook Parser: POST https://payments.fluxbasedb.me/api/v1/webhook/incoming parses bank SMS UTR references and matches orders instantaneously.
+  3. Hosted Checkout Pages: https://payments.fluxbasedb.me/pay/<orderId> and payment links /pay/link/<linkId>.
+  4. Merchant Portal: /dashboard/apikeys, /dashboard/links, /dashboard/coupons, /dashboard/withdrawals.
+  5. Multi-Tenant Settlements: Instant payout tracking, UTR matching, and automated balance ledger.`,
+        keywords: ['fluxpay', 'payment', 'gateway', 'upi', 'qr code', 'checkout', 'merchant', 'orders', 'sms webhook', 'settlements', 'payout']
+    },
+    {
+        id: 'fluxbase_web_scraper_engine',
+        source: 'Scraper Guide',
+        title: 'Headless Playwright Web Scraper Engine',
+        content: `FLUXBASE HEADLESS WEB SCRAPER ENGINE:
+- Container: fluxbase-scraper-engine on port 8080 (node:20-bookworm-slim with Chromium).
+- Capabilities: Autonomous web page crawling, JavaScript rendering, CSS selector and XPath extraction.
+- Database Integration: Extracted records are automatically structured and inserted into designated project tables.
+- Web Console: Configurable directly from https://fluxbasedb.me/scraper with scheduled cron runs and execution status monitors.`,
+        keywords: ['scraper', 'web scraper', 'playwright', 'crawling', 'extraction', 'scraping', 'automation', 'crawler']
+    },
+    {
+        id: 'fluxbase_plans_billing_and_meters',
+        source: 'Billing Reference',
+        title: 'Subscription Plans, Resource Quotas & PAYG Ledger',
+        content: `FLUXBASE PLANS & RESOURCE QUOTAS:
+- Free Tier ($0/mo): 1 Project, 500 MB Database, 1 GB Storage, 50,000 API calls/month, community support.
+- Pro Tier ($29/mo): 5 Projects, 5 GB Database, 10 GB Storage, 500,000 API calls/month, priority email support.
+- Max Tier ($99/mo): 20 Projects, 25 GB Database, 100 GB Storage, 5,000,000 API calls/month, 24/7 dedicated support.
+- Pay-As-You-Go (PAYG) & Unlimited Tier:
+  - Unlimited access for 'employee', 'org_owner', and 'pay_as_you_go' subscriptions.
+  - Dynamically tracked via high-performance Redis cache with RDS checkpointing.
+  - Itemized real-time API Bills and resource meters accessible directly in [Project Settings](https://fluxbasedb.me/settings).`,
+        keywords: ['pricing', 'plans', 'billing', 'quota', 'free', 'pro', 'max', 'payg', 'pay-as-you-go', 'bills', 'api calls', 'meters', 'limits']
+    },
+    {
+        id: 'fluxbase_navigation_and_actions',
+        source: 'Navigation & Action Guide',
+        title: 'In-App Navigation Map & Agentic Action Tags',
+        content: `FLUXBASE IN-APP NAVIGATION & ACTION PROTOCOL:
+1. Canonical Navigation Routes:
+   - [Fluxbase Home](https://fluxbasedb.me/) - Platform overview
+   - [Analytics Dashboard](https://fluxbasedb.me/dashboard) - Queries, latency, API throughput
+   - [Project Switcher & Manager](https://fluxbasedb.me/dashboard/projects) - Create/manage databases
+   - [Data Grid Editor](https://fluxbasedb.me/editor) - Spreadsheet-style table view & row mutations
+   - [SQL Query Editor](https://fluxbasedb.me/query) - Monaco IDE with query history and explain plans
+   - [Database Schema Explorer](https://fluxbasedb.me/database) - Visual ER diagrams, foreign keys
+   - [S3 Storage Browser](https://fluxbasedb.me/storage) - Bucket explorer and file uploader
+   - [Web Data Scraper](https://fluxbasedb.me/scraper) - Autonomous scraper manager
+   - [Fluxbase Documentation](https://fluxbasedb.me/docs) - API and SDK guides
+   - [Project Settings & API Keys](https://fluxbasedb.me/settings) - Manage keys, webhooks, bills
+2. Agentic Action Tags:
+   - SQL Execution: [EXECUTE_SQL:<exact_sql_query>]
+   - Destructive Operations: [REQUEST_APPROVAL:appr_<id>:EXECUTE_SQL:<summary>:<sql>]
+   - Data Visualizations: [RENDER_CHART:{"type":"bar"|"line"|"pie"|"area","title":"...","data":[...],"xKey":"...","yKey":"..."}]
+   - Navigation: [NAVIGATE:/path]
+   - Button Click: [CLICK:<label>]
+   - Form Fill: [TYPE:<value>:<input_name>]
+   - Goal Conclusion: [GOAL_ACCOMPLISHED:<summary>]`,
+        keywords: ['navigation', 'routes', 'pages', 'actions', 'action tags', 'navigate', 'click', 'type', 'execute_sql', 'render_chart', 'sitemap']
     },
     {
         id: 'foreign_keys_and_relations',
@@ -246,19 +418,6 @@ SYNTAX RULES:
    DON'T: ), SELECT MAX(...) -- (Syntax Error!)
 3. In PostgreSQL and MySQL, Fluxbase supports timestamp arithmetic even when the timestamp column is VARCHAR/string.`,
         keywords: ['shutdown', 'shutdown time', 'downtime', 'gap', 'longest gap', 'longest shutdown', 'time difference', 'time diff', 'lag timestamp', 'consecutive timestamp', 'epoch']
-    },
-    {
-        id: 'mcp_integration',
-        source: 'MCP Protocol Reference',
-        title: 'Fluxbase Model Context Protocol (MCP) Server',
-        content: `Fluxbase exposes an MCP compliant JSON-RPC 2.0 gateway at https://fluxbasedb.me/api/mcp.
-Standard Tools:
-1. create_project: { projectName, dialect: "postgresql"|"mysql", userRole?, description? }
-2. list_projects: {}
-3. get_schema: { projectId }
-4. run_sql: { projectId, query }
-MCP Guard intercepts incoming connection requests and requires explicit user review.`,
-        keywords: ['mcp', 'model context protocol', 'cursor mcp', 'claude desktop mcp', 'mcp server', 'mcp tools', 'call_mcp']
     }
 ];
 
@@ -270,6 +429,9 @@ function loadExternalDocChunks(): RagDocChunk[] {
     const chunks: RagDocChunk[] = [];
 
     const possiblePaths = [
+        path.join(process.cwd(), 'FLUXBASE_SERVICES_INFRASTRUCTURE.md'),
+        path.join(process.cwd(), 'docs', 'flux-ai-gateway.md'),
+        path.join(process.cwd(), 'docs', 'supabase_comparison.md'),
         path.join(process.cwd(), 'packages', 'gateway', 'docs', 'INTEGRATION_GUIDE.md'),
         path.join(process.cwd(), 'fluxbase-client', 'INTEGRATION_GUIDE.md'),
         path.join(process.cwd(), 'README.md')
@@ -469,12 +631,31 @@ export async function getRagContext(
     // 2. Documentation & Guides RAG
     let docSnippet = '';
     try {
-        const matchingDocs = searchDocumentation(userPrompt, 2);
+        const matchingDocs = searchDocumentation(userPrompt, 4);
+
+        const manifest = `=== FLUXBASE CORE PLATFORM MANIFEST & APPLICATION SCOPE ===\n` +
+            `Domain: https://fluxbasedb.me | Payments: https://payments.fluxbasedb.me\n` +
+            `Fluxbase is the Unified Developer Database & AI Platform.\n` +
+            `- Databases: PostgreSQL 17 (:5432) & MySQL 8 (:3306) with multi-tenant schema isolation ('flux_tenant_<projectId>').\n` +
+            `- APIs: REST SQL (POST /api/v1/sql) and Auto Table CRUD (/api/v1/rest/<projectId>/<table>) with Bearer token authentication.\n` +
+            `- SDK: @fluxbase/client (npm) & Python FluxbaseClient with full ORM, mutation, and realtime support.\n` +
+            `- File Storage: AWS S3-backed storage (POST /api/storage/upload, GET /api/storage/url 15-min presigned URLs).\n` +
+            `- Realtime: Server-Sent Events (/api/realtime/subscribe) & WebSockets (wss://fluxbasedb.me/ws) with Postgres LISTEN/NOTIFY.\n` +
+            `- AI Gateway: OpenAI-compatible completions (/api/v1/chat/completions) with multimodal computer vision (glm-4v-flash).\n` +
+            `- Web Scraper: Headless Playwright autonomous web scraper (/scraper) ingesting directly into database tables.\n` +
+            `- FluxPay: Hosted UPI payment gateway (https://payments.fluxbasedb.me) with instant QR and bank SMS matching.\n` +
+            `- MCP: Model Context Protocol server (/api/mcp) for Cursor, Claude Desktop, and autonomous agents.\n` +
+            `CRITICAL RULE: Answer ONLY Fluxbase-related and Fluxbase-integrated application questions. Strictly decline unrelated queries.\n` +
+            `============================================================\n`;
+
         if (matchingDocs.length > 0) {
-            docSnippet = `\n--- RELEVANT DOCUMENTATION & INTEGRATION RECIPES ---\n` +
+            docSnippet = `\n` + manifest +
+                `\n--- RELEVANT FLUXBASE DOCUMENTATION & RECIPES ---\n` +
                 matchingDocs.map(d => `[${d.source} - ${d.title}]\n${d.content}`).join('\n\n') +
-                `\n--- END DOCUMENTATION ---\n`;
+                `\n--- END FLUXBASE DOCUMENTATION ---\n`;
             matchingDocs.forEach(d => sources.push(`${d.source}: ${d.title}`));
+        } else {
+            docSnippet = `\n` + manifest;
         }
     } catch (e) {
         logger.warn('[RAG] Doc retrieval error:', e);
