@@ -39,7 +39,7 @@ fluxbasedb.me, www.fluxbasedb.me {
 
     # High-speed streaming routes (AI chat & realtime SSE)
     @streaming {
-        path /api/ai/* /api/v1/chat/* /api/realtime/subscribe*
+        path /api/ai-chat* /api/ai/* /api/v1/chat/* /api/realtime/subscribe*
     }
     handle @streaming {
         reverse_proxy app:3000 {
@@ -53,7 +53,12 @@ fluxbasedb.me, www.fluxbasedb.me {
 
     # Next.js Application, REST SQL Engine, Flux AI Gateway & MCP Gateway
     handle {
-        encode zstd gzip
+        encode zstd gzip {
+            match {
+                header Content-Type text/*
+                not header Content-Type text/event-stream*
+            }
+        }
 
         reverse_proxy app:3000 {
             header_up Host {host}
@@ -118,6 +123,15 @@ payments.fluxbasedb.me {
     }
     handle @websockets {
         reverse_proxy websocket:4000
+    }
+
+    @streaming {
+        path /api/ai-chat* /api/ai/* /api/v1/chat/* /api/realtime/subscribe*
+    }
+    handle @streaming {
+        reverse_proxy app:3000 {
+            flush_interval -1
+        }
     }
 
     handle {

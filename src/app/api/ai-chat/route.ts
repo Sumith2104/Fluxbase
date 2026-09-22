@@ -501,7 +501,8 @@ AVAILABLE ACTION TAGS (append at the end of response):
             const { stream: upstreamStream, provider: streamProvider, model: streamModel } = await ModelGateway.stream({
                 model: model || 'flux-fast',
                 messages: modelMessages,
-                temperature: 0.2
+                temperature: 0.2,
+                max_tokens: 4096
             });
 
             const transformStream = createAgentSseTransformStream(rag.sources, (stats) => {
@@ -544,7 +545,8 @@ AVAILABLE ACTION TAGS (append at the end of response):
         const result = await ModelGateway.generate({
             model: model || 'flux-fast',
             messages: modelMessages,
-            temperature: 0.2
+            temperature: 0.2,
+            max_tokens: 4096
         });
 
         const latencyMs = Date.now() - callStartTime;

@@ -393,7 +393,7 @@ export class ModelGateway {
         'Authorization': `Bearer ${config.apiKey}`,
         'Content-Type': 'application/json'
       },
-      signal: AbortSignal.timeout(45000),
+      signal: AbortSignal.timeout(120000),
       body: JSON.stringify(payload)
     });
 

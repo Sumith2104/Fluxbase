@@ -1533,12 +1533,6 @@ export function FluxAiAssistant({ userId, isOpen, onOpenChange }: { userId: stri
           const reachedTurnLimit = autoPilotTurnsRef.current >= 4;
 
           if (isInformationalGoal || hasSubstantialAnswer || reachedTurnLimit) {
-            const summarySnippet = cleaned.slice(0, 100).replace(/[\r\n]+/g, ' ').trim() || `Goal "${goal}" accomplished.`;
-            setMessages(prev => [...prev, {
-              role: 'assistant',
-              content: `**Auto-Pilot Task Complete:** ${summarySnippet}`,
-              timestamp: Date.now()
-            }]);
             setAutoPilotActive(false);
             setAutoPilotGoal("");
             autoPilotTurnsRef.current = 0;
@@ -1601,12 +1595,6 @@ export function FluxAiAssistant({ userId, isOpen, onOpenChange }: { userId: stri
                 const reachedTurnLimit = autoPilotTurnsRef.current >= 4;
 
                 if (isInformationalGoal || hasSubstantialAnswer || reachedTurnLimit) {
-                  const summarySnippet = cleaned.slice(0, 100).replace(/[\r\n]+/g, ' ').trim() || `Goal "${goal}" accomplished.`;
-                  setMessages(prev => [...prev, {
-                    role: 'assistant',
-                    content: `**Auto-Pilot Task Complete:** ${summarySnippet}`,
-                    timestamp: Date.now()
-                  }]);
                   setAutoPilotActive(false);
                   setAutoPilotGoal("");
                   autoPilotTurnsRef.current = 0;
