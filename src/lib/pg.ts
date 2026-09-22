@@ -36,8 +36,12 @@ export const pool: Pool = global._pool || new Pool({
 
 global._pool = pool;
 
-// Trap idle connection errors and handle shutdown only on initial instantiation to prevent MaxListenersExceededWarning
 if (isNewPool) {
+    // Pre-warm connection pool immediately in background so first query does not suffer cold TLS handshake
+    if (connectionString) {
+        pool.query('SELECT 1').catch(() => {});
+    }
+
     pool.on('error', (err: any) => {
         console.warn('[PostgreSQL Pool] Idle client warning (handled safely):', err?.message || err);
     });

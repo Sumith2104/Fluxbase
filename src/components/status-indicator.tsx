@@ -1,12 +1,13 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { cn } from '@/lib/utils';
 import {
     Popover,
     PopoverContent,
     PopoverTrigger,
 } from '@/components/ui/popover';
+import { Cpu } from 'lucide-react';
 
 type HealthStatus = 'checking' | 'healthy' | 'degraded' | 'offline';
 
@@ -34,10 +35,11 @@ export function StatusIndicator() {
         { name: 'API', status: 'checking' },
     ]);
     const [overall, setOverall] = useState<HealthStatus>('checking');
+    const [open, setOpen] = useState(false);
     // Phase 7: Live JS heap memory gauge
     const [heapMB, setHeapMB] = useState<{ used: number; total: number } | null>(null);
 
-    const check = async () => {
+    const check = useCallback(async () => {
         try {
             const start = Date.now();
             const res = await fetch('/api/health', { cache: 'no-store' });
@@ -46,6 +48,7 @@ export function StatusIndicator() {
 
             const dbLatency = (typeof data.dbLatencyMs === 'number' && data.dbLatencyMs >= 0) ? data.dbLatencyMs : fetchLatency;
             const redisLatency = (typeof data.redisLatencyMs === 'number' && data.redisLatencyMs >= 0) ? data.redisLatencyMs : undefined;
+            const apiLatency = (typeof data.serverTimeMs === 'number' && data.serverTimeMs >= 0) ? data.serverTimeMs : fetchLatency;
 
             const dbStatus: HealthStatus = data.database === true ? (dbLatency > 800 ? 'degraded' : 'healthy') : 'offline';
             const redisStatus: HealthStatus = data.redis === true ? 'healthy' : 'degraded';
@@ -54,7 +57,7 @@ export function StatusIndicator() {
             const updated = [
                 { name: 'Database', status: dbStatus, latency: dbLatency },
                 { name: 'Redis', status: redisStatus, latency: redisLatency },
-                { name: 'API', status: apiStatus, latency: fetchLatency },
+                { name: 'API', status: apiStatus, latency: apiLatency },
             ];
             setServices(updated);
 
@@ -65,13 +68,18 @@ export function StatusIndicator() {
             setServices(prev => prev.map(s => ({ ...s, status: 'offline' })));
             setOverall('offline');
         }
-    };
+    }, []);
 
     useEffect(() => {
         check();
-        const interval = setInterval(check, 300000); // re-check services every 5 mins (slow heartbeat)
-        return () => clearInterval(interval);
-    }, []);
+        // Warm-up check after 2s so initial post-boot cold measurement is quickly refreshed
+        const warmTimer = setTimeout(check, 2000);
+        const interval = setInterval(check, 30000); // re-check services every 30s
+        return () => {
+            clearTimeout(warmTimer);
+            clearInterval(interval);
+        };
+    }, [check]);
 
     // Phase 7: Sample JS heap memory every 5 seconds
     useEffect(() => {
@@ -100,7 +108,10 @@ export function StatusIndicator() {
     const memPct = heapMB && heapMB.total > 0 ? Math.min(100, Math.round((heapMB.used / heapMB.total) * 100)) : 0;
 
     return (
-        <Popover>
+        <Popover open={open} onOpenChange={(isOpen) => {
+            setOpen(isOpen);
+            if (isOpen) check();
+        }}>
             <PopoverTrigger asChild>
                 <button
                     id="status-indicator"
@@ -114,7 +125,9 @@ export function StatusIndicator() {
                     </span>
                     {/* Show orange memory warning text when over 80% capacity */}
                     {memWarning ? (
-                        <span className="hidden lg:block text-xs text-amber-400 font-medium">ðŸ§  {heapMB!.used} MB</span>
+                        <span className="hidden lg:flex items-center gap-1 text-xs text-amber-400 font-medium">
+                            <Cpu size={12} /> {heapMB!.used} MB
+                        </span>
                     ) : (
                         <span className="hidden lg:block text-xs text-muted-foreground">Status</span>
                     )}
@@ -136,8 +149,8 @@ export function StatusIndicator() {
                                 <span className="text-xs text-foreground/85">{svc.name}</span>
                             </div>
                             <div className="flex items-center gap-2">
-                                {svc.latency && (
-                                    <span className="text-[10px] text-muted-foreground/75">{svc.latency}ms</span>
+                                {svc.latency !== undefined && (
+                                    <span className="text-[10px] text-muted-foreground/75 font-mono">{svc.latency}ms</span>
                                 )}
                                 <span className={cn(
                                     'text-[10px] capitalize font-medium',
@@ -154,7 +167,9 @@ export function StatusIndicator() {
                     {/* Phase 7: Browser JS Heap Memory Gauge */}
                     <div className="mt-2 pt-2 border-t border-border px-1">
                         <div className="flex items-center justify-between mb-1.5">
-                            <span className="text-[10px] text-muted-foreground font-medium">ðŸ§  Browser Memory</span>
+                            <span className="text-[10px] text-muted-foreground font-medium flex items-center gap-1">
+                                <Cpu size={11} /> Browser Memory
+                            </span>
                             {heapMB ? (
                                 <span className={cn(
                                     'text-[10px] font-mono font-semibold',
