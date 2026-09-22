@@ -68,7 +68,6 @@ export function createAgentSseTransformStream(
       }, 10000);
     },
     transform(chunk, controller) {
-      if (loopBroken) return;
       buffer += textDecoder.decode(chunk, { stream: true });
       const lines = buffer.split('\n');
       buffer = lines.pop() || '';
