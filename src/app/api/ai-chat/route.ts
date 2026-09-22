@@ -136,6 +136,17 @@ export async function POST(req: Request) {
             return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
         }
 
+        // Strict Scope Enforcement: API keys must have 'ai' or 'admin' scope to access AI Chat
+        if (auth.scopes && Array.isArray(auth.scopes)) {
+            const hasAiScope = auth.scopes.includes('ai') || auth.scopes.includes('admin') || auth.scopes.includes('*');
+            if (!hasAiScope) {
+                return NextResponse.json({
+                    success: false,
+                    error: "Access denied: This API key does not have the 'AI Gateway Access' (ai) scope. Please enable 'AI Gateway Access' for this key in Project Settings > API Keys."
+                }, { status: 403 });
+            }
+        }
+
         const body = await req.json();
         const { currentPath = '/', model, activeProject, screenContext, stream = false } = body;
 

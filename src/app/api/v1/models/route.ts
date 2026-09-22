@@ -28,6 +28,22 @@ export async function GET(req: NextRequest) {
         { status: 401, headers: CORS_HEADERS }
       );
     }
+
+    const keyScopes = Array.isArray(authData.scopes) ? authData.scopes : [];
+    const hasAiScope = keyScopes.includes('ai') || keyScopes.includes('admin') || keyScopes.includes('*');
+    if (!hasAiScope) {
+      return NextResponse.json(
+        {
+          error: {
+            message: "Access denied: This API key does not have the 'AI Gateway Access' (ai) scope. Please enable 'AI Gateway Access' for this key in Project Settings > API Keys.",
+            type: 'permission_error',
+            param: null,
+            code: 'tier_access_denied'
+          }
+        },
+        { status: 403, headers: CORS_HEADERS }
+      );
+    }
   }
 
   // Generate dynamic models list from registry

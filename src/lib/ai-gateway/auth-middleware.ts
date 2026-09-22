@@ -60,56 +60,80 @@ export type AuthenticateAiResult =
 export async function authenticateAiRequest(req: NextRequest): Promise<AuthenticateAiResult> {
   const authHeader = req.headers.get('authorization') || '';
 
-  if (!authHeader) {
-    return {
-      auth: null,
-      errorResponse: aiError('Missing Authorization header. Provide a valid Bearer API key.', 'authentication_error', 401),
-    };
-  }
-
-  const rawToken = authHeader.replace(/^Bearer\s+/i, '').trim();
-  if (!rawToken) {
-    return {
-      auth: null,
-      errorResponse: aiError('Empty bearer token. Provide a valid Bearer API key.', 'authentication_error', 401),
-    };
-  }
-
   // 1. API Key Auth (fl_...)
-  if (rawToken.startsWith('fl_')) {
-    const keyData = await validateApiKey(rawToken);
-    if (!keyData) {
+  if (authHeader) {
+    const rawToken = authHeader.replace(/^Bearer\s+/i, '').trim();
+    if (!rawToken) {
       return {
         auth: null,
-        errorResponse: aiError('Invalid API key provided.', 'authentication_error', 401),
+        errorResponse: aiError('Empty bearer token. Provide a valid Bearer API key.', 'authentication_error', 401),
       };
     }
 
-    const tier = await getUserPlan(keyData.userId);
-    return {
-      auth: {
-        userId: keyData.userId,
-        projectId: keyData.projectId,
-        tier,
-        scopes: keyData.scopes || ['read', 'write', 'ai'],
-        isApiKey: true,
-      },
-      errorResponse: null,
-    };
+    if (rawToken.startsWith('fl_')) {
+      const keyData = await validateApiKey(rawToken);
+      if (!keyData) {
+        return {
+          auth: null,
+          errorResponse: aiError('Invalid API key provided.', 'authentication_error', 401),
+        };
+      }
+
+      const keyScopes = Array.isArray(keyData.scopes) ? keyData.scopes : [];
+      // Strict Scope Enforcement: Key must have 'ai' or 'admin' scope (or wildcard '*')
+      const hasAiScope = keyScopes.includes('ai') || keyScopes.includes('admin') || keyScopes.includes('*');
+      if (!hasAiScope) {
+        return {
+          auth: null,
+          errorResponse: aiError(
+            "Access denied: This API key does not have the 'AI Gateway Access' (ai) scope. Please create or update an API key with the 'AI Gateway Access' permission in Project Settings > API Keys.",
+            'permission_error',
+            403
+          ),
+        };
+      }
+
+      const tier = await getUserPlan(keyData.userId);
+      return {
+        auth: {
+          userId: keyData.userId,
+          projectId: keyData.projectId,
+          tier,
+          scopes: keyScopes,
+          isApiKey: true,
+        },
+        errorResponse: null,
+      };
+    }
   }
 
-  // 2. Cookie / Session Token Fallback
+  // 2. Cookie / Session Token / Query Param API Key Fallback
   try {
     const sessionAuth = await getAuthContextFromRequest(req);
     if (sessionAuth?.userId) {
+      // If request was authenticated via an API key in getAuthContextFromRequest
+      if (sessionAuth.scopes && Array.isArray(sessionAuth.scopes)) {
+        const hasAiScope = sessionAuth.scopes.includes('ai') || sessionAuth.scopes.includes('admin') || sessionAuth.scopes.includes('*');
+        if (!hasAiScope) {
+          return {
+            auth: null,
+            errorResponse: aiError(
+              "Access denied: This API key does not have the 'AI Gateway Access' (ai) scope. Please create or update an API key with the 'AI Gateway Access' permission in Project Settings > API Keys.",
+              'permission_error',
+              403
+            ),
+          };
+        }
+      }
+
       const tier = await getUserPlan(sessionAuth.userId);
       return {
         auth: {
           userId: sessionAuth.userId,
           projectId: sessionAuth.allowedProjectId,
           tier,
-          scopes: ['*'],
-          isApiKey: false,
+          scopes: sessionAuth.scopes || ['*'],
+          isApiKey: Boolean(sessionAuth.scopes),
         },
         errorResponse: null,
       };
@@ -118,7 +142,11 @@ export async function authenticateAiRequest(req: NextRequest): Promise<Authentic
 
   return {
     auth: null,
-    errorResponse: aiError('Invalid or expired credentials.', 'authentication_error', 401),
+    errorResponse: aiError(
+      authHeader ? 'Invalid or expired credentials.' : 'Missing Authorization header. Provide a valid Bearer API key.',
+      'authentication_error',
+      401
+    ),
   };
 }
 

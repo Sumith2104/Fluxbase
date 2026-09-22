@@ -7,6 +7,7 @@ import { SignJWT, jwtVerify } from 'jose';
 import http from 'http';
 import fs from 'fs';
 import path from 'path';
+import { createHash } from 'crypto';
 import logger from '@/lib/logger';
 import { redis } from '@/lib/redis';
 import { checkOffTopicPolicy } from '@/lib/ai-policy-guard';
@@ -51,6 +52,9 @@ pool.on('error', (err: any) => {
 interface ExtWebSocket extends WebSocket {
     isAlive?: boolean;
     userId?: string;
+    scopes?: string[];
+    allowedProjectId?: string;
+    isSessionUser?: boolean;
 }
 
 // Broadcast helper
@@ -193,7 +197,7 @@ wss.on('close', () => {
 });
 
 // Auth helper — supports session cookies (browser) AND API keys (external clients)
-async function authenticateRequest(req: http.IncomingMessage): Promise<{ userId: string; allowedProjectId?: string } | null> {
+async function authenticateRequest(req: http.IncomingMessage): Promise<{ userId: string; allowedProjectId?: string; scopes?: string[]; isSessionUser?: boolean } | null> {
     // 1. Try session cookie first (browser clients)
     const cookieHeader = req.headers.cookie;
     if (cookieHeader) {
@@ -207,7 +211,7 @@ async function authenticateRequest(req: http.IncomingMessage): Promise<{ userId:
         if (session) {
             try {
                 const { payload: p1 } = await jwtVerify(session, getWsSecret()); const decoded = p1 as any;
-                return { userId: decoded.uid };
+                return { userId: decoded.uid, scopes: ['*'], isSessionUser: true };
             } catch {
                 // Invalid cookie — fall through to API key check
             }
@@ -235,7 +239,7 @@ async function authenticateRequest(req: http.IncomingMessage): Promise<{ userId:
         try {
             const { payload: p2 } = await jwtVerify(apiKey, getWsSecret()); const decoded = p2 as any;
             if (decoded && decoded.uid) {
-                return { userId: decoded.uid };
+                return { userId: decoded.uid, scopes: decoded.scopes || ['*'], isSessionUser: true };
             }
         } catch {
             // Not a valid JWT or expired — fall through to API key lookup
@@ -243,16 +247,21 @@ async function authenticateRequest(req: http.IncomingMessage): Promise<{ userId:
 
         // 2b. Try looking up as a persistent API key
         try {
+            const hash = createHash('sha256').update(apiKey).digest('hex');
             const res = await pool.query(
-                `SELECT ak.user_id, ak.project_id 
+                `SELECT ak.user_id, ak.project_id, ak.scopes 
                  FROM fluxbase_global.api_keys ak 
-                 WHERE ak.key_value = $1 AND ak.is_active = true`,
-                [apiKey]
+                 WHERE ak.id = $1`,
+                [hash]
             );
             if (res.rows.length > 0) {
+                const row = res.rows[0];
+                const scopes = Array.isArray(row.scopes) ? row.scopes : [];
                 return {
-                    userId: res.rows[0].user_id,
-                    allowedProjectId: res.rows[0].project_id || undefined,
+                    userId: row.user_id,
+                    allowedProjectId: row.project_id || undefined,
+                    scopes: scopes,
+                    isSessionUser: false,
                 };
             }
         } catch (e) {
@@ -293,7 +302,7 @@ wss.on('connection', async (ws: WebSocket, req: http.IncomingMessage) => {
     });
 
     try {
-        let auth: { userId: string; allowedProjectId?: string } | null = null;
+        let auth: { userId: string; allowedProjectId?: string; scopes?: string[]; isSessionUser?: boolean } | null = null;
         try {
             auth = await authenticateRequest(req);
         } catch (authErr) {
@@ -303,6 +312,9 @@ wss.on('connection', async (ws: WebSocket, req: http.IncomingMessage) => {
         const userId = auth?.userId || `anon_${Math.random().toString(36).slice(2, 10)}`;
         const allowedProjectId = auth?.allowedProjectId;
         extWs.userId = userId;
+        extWs.scopes = auth?.scopes;
+        extWs.allowedProjectId = allowedProjectId;
+        extWs.isSessionUser = auth?.isSessionUser || false;
 
         // Rate Limiting (Phase 3 Gatekeeping)
         let planType = 'free';
@@ -454,6 +466,25 @@ wss.on('connection', async (ws: WebSocket, req: http.IncomingMessage) => {
                 const { messages: clientMessages, currentPath, activeProject } = data;
                 if (!clientMessages || !Array.isArray(clientMessages)) {
                     ws.send(JSON.stringify({ type: 'chat_error', message: 'Missing messages array' }));
+                    return;
+                }
+
+                // Strict Scope Enforcement: Require authentication & 'ai' or 'admin' scope for API keys
+                if (!auth || !auth.userId || extWs.userId?.startsWith('anon_')) {
+                    ws.send(JSON.stringify({
+                        type: 'chat_error',
+                        message: 'Unauthorized: Authentication required to use Flux AI. Please sign in or provide a valid API key with AI Gateway Access.'
+                    }));
+                    return;
+                }
+
+                const userScopes = extWs.scopes || [];
+                const hasAiScope = extWs.isSessionUser || userScopes.includes('ai') || userScopes.includes('admin') || userScopes.includes('*');
+                if (!hasAiScope) {
+                    ws.send(JSON.stringify({
+                        type: 'chat_error',
+                        message: "Access denied: This API key does not have the 'AI Gateway Access' (ai) scope. Please create or update an API key with the 'AI Gateway Access' permission in Project Settings > API Keys."
+                    }));
                     return;
                 }
 
