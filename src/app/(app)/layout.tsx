@@ -192,7 +192,7 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
                     setUser(data.user || null);
 
                     if (data.plan) {
-                        const rawType = data.plan.type?.toLowerCase();
+                        const rawType = ((data.plan as any).plan || data.plan.type || 'free').toLowerCase();
                         if (rawType === 'max') setPlanType('Max');
                         else if (rawType === 'pro') setPlanType('Pro');
                         else if (rawType === 'employee') setPlanType('Employee');
@@ -200,7 +200,13 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
                         else if (rawType === 'pay_as_you_go') setPlanType('Pay-As-You-Go');
                         else setPlanType('Free');
                         setIsSuspended(data.plan.status === 'suspended');
-                        queryClient.setQueryData(['user-plan'], data.plan);
+                        queryClient.setQueryData(['user-plan'], {
+                            plan: rawType,
+                            type: rawType,
+                            role: (data.plan as any).role || data.user?.user_role || rawType,
+                            billing_cycle_end: (data.plan as any).billing_cycle_end || data.user?.billing_cycle_end || null,
+                            status: data.plan.status || 'active'
+                        });
                     }
 
                     if (data.projects) {

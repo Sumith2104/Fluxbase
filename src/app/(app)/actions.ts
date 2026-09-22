@@ -42,8 +42,19 @@ export async function getAppLayoutBootstrapData() {
             }
         }
 
+        const userPlan = user?.plan_type || 'free';
+        const userRole = user?.user_role || userPlan || 'student';
+        const billingCycleEnd = user?.billing_cycle_end || null;
+        const userStatus = user?.status || 'active';
+
         const plan = user 
-            ? { type: user.plan_type || 'free', status: (user as any).status || 'active' }
+            ? { 
+                plan: userPlan,
+                type: userPlan, 
+                role: userRole,
+                billing_cycle_end: billingCycleEnd,
+                status: userStatus 
+              }
             : null;
 
         return {

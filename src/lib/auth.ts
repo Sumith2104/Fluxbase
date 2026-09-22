@@ -38,6 +38,8 @@ export interface User {
     password?: string;
     user_role?: 'student' | 'employee' | 'org_owner' | string;
     plan_type?: string;
+    billing_cycle_end?: string | null;
+    status?: string;
     created_at: string;
 }
 

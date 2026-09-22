@@ -112,14 +112,18 @@ export default function GeneralSettingsPage() {
     });
 
     const [userPlan, setUserPlan] = useState<{ plan: string; billing_cycle_end: string | null; status?: string }>({ 
-        plan: cachedPlan?.plan || 'free', 
+        plan: cachedPlan?.plan || (cachedPlan as any)?.type || 'free', 
         billing_cycle_end: cachedPlan?.billing_cycle_end || null, 
         status: cachedPlan?.status || 'active' 
     });
 
     useEffect(() => {
         if (cachedPlan) {
-            setUserPlan(cachedPlan);
+            setUserPlan({
+                plan: cachedPlan.plan || (cachedPlan as any).type || 'free',
+                billing_cycle_end: cachedPlan.billing_cycle_end || null,
+                status: cachedPlan.status || 'active'
+            });
         }
     }, [cachedPlan]);
 

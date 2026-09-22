@@ -33,6 +33,7 @@ export async function findUserById(userId: string): Promise<User | null> {
             user_role: row.user_role || 'student',
             plan_type: row.plan_type || 'free',
             status: row.status || 'active',
+            billing_cycle_end: row.billing_cycle_end ? new Date(row.billing_cycle_end).toISOString() : null,
             created_at: row.created_at.toISOString(),
         } as User;
 

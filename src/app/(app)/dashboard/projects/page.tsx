@@ -69,7 +69,8 @@ export default function SelectProjectPage() {
     refetchOnWindowFocus: false,
   });
 
-  const currentPlan = (planData?.plan || 'free').toLowerCase();
+  const currentPlan = (planData?.plan || (planData as any)?.type || 'free').toLowerCase();
+  const currentRole = ((planData as any)?.role || (planData as any)?.userRole || resolveRoleFromPlan(currentPlan)).toLowerCase();
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const router = useRouter();
@@ -126,13 +127,14 @@ export default function SelectProjectPage() {
   const [studentPlan, setStudentPlan] = useState<'free' | 'pro' | 'max'>(resolveStudentPlanFromPlan(currentPlan));
   const [importBillingPreference, setImportBillingPreference] = useState<BillingOption>('monthly');
 
-  // Auto-sync import role & plan when active user subscription loads
+  // Auto-sync import role & plan when active user subscription loads or changes
   useEffect(() => {
-    if (currentPlan) {
-      setImportRole(resolveRoleFromPlan(currentPlan));
-      setStudentPlan(resolveStudentPlanFromPlan(currentPlan));
+    const active = (planData?.plan || (planData as any)?.type || currentPlan || '').toLowerCase();
+    if (active) {
+      setImportRole(resolveRoleFromPlan(active));
+      setStudentPlan(resolveStudentPlanFromPlan(active));
     }
-  }, [currentPlan]);
+  }, [planData, currentPlan]);
 
   // Execution & Logs state
   const [isImporting, setIsImporting] = useState(false);
@@ -142,10 +144,10 @@ export default function SelectProjectPage() {
   const [importedProject, setImportedProject] = useState<Project | null>(null);
 
   // Subscription Quota Detection
-  const isUpgradedAccount = currentPlan === 'employee' || currentPlan === 'org_owner' || currentPlan === 'org' || currentPlan === 'max' || currentPlan === 'pro' || currentPlan === 'pay_as_you_go';
+  const isUpgradedAccount = currentPlan === 'employee' || currentPlan === 'org_owner' || currentPlan === 'org' || currentPlan === 'max' || currentPlan === 'pro' || currentPlan === 'pay_as_you_go' || currentRole === 'org_owner' || currentRole === 'employee';
 
   const maxAllowedProjects = 
-    (currentPlan === 'max' || currentPlan === 'org_owner' || currentPlan === 'org' || currentPlan === 'employee' || currentPlan === 'emp' || currentPlan === 'pay_as_you_go' || currentPlan === 'payg') ? 999999 :
+    (currentPlan === 'max' || currentPlan === 'org_owner' || currentPlan === 'org' || currentPlan === 'employee' || currentPlan === 'emp' || currentPlan === 'pay_as_you_go' || currentPlan === 'payg' || currentRole === 'org_owner' || currentRole === 'employee') ? 999999 :
     (currentPlan === 'pro') ? 3 : 1;
 
   const hasAvailableQuota = isUpgradedAccount && projects.length < maxAllowedProjects;
@@ -200,8 +202,9 @@ export default function SelectProjectPage() {
     if (isConnected) {
       setIsGithubModalOpen(true);
       setGithubConnected(true);
-      setImportRole(resolveRoleFromPlan(currentPlan));
-      setStudentPlan(resolveStudentPlanFromPlan(currentPlan));
+      const active = (planData?.plan || (planData as any)?.type || currentPlan || 'free').toLowerCase();
+      setImportRole(resolveRoleFromPlan(active));
+      setStudentPlan(resolveStudentPlanFromPlan(active));
       const username = searchParams.get('github_username');
       if (username) setGithubUsername(username);
       setGithubStep('repos');
@@ -213,12 +216,13 @@ export default function SelectProjectPage() {
       // Clean up search param from URL
       window.history.replaceState({}, '', window.location.pathname);
     }
-  }, [searchParams, currentPlan]);
+  }, [searchParams, currentPlan, planData]);
 
   const handleOpenGithubModal = async () => {
     setIsGithubModalOpen(true);
-    setImportRole(resolveRoleFromPlan(currentPlan));
-    setStudentPlan(resolveStudentPlanFromPlan(currentPlan));
+    const active = (planData?.plan || (planData as any)?.type || currentPlan || 'free').toLowerCase();
+    setImportRole(resolveRoleFromPlan(active));
+    setStudentPlan(resolveStudentPlanFromPlan(active));
     const connected = await checkConnection();
     if (connected) {
       setGithubStep('repos');
@@ -2145,21 +2149,21 @@ export default function SelectProjectPage() {
                     { 
                       id: 'student', 
                       title: 'Student', 
-                      price: (currentPlan === 'max' || currentPlan === 'pro' || currentPlan === 'free') && (importRole || 'student') === 'student' ? `Active (${studentPlan.toUpperCase()})` : 'Free / Pro / Max', 
+                      price: (currentPlan === 'max' || currentPlan === 'pro' || currentPlan === 'free') && (importRole || 'student') === 'student' && currentPlan !== 'org_owner' && currentPlan !== 'employee' && currentRole !== 'org_owner' && currentRole !== 'employee' ? `Active (${studentPlan.toUpperCase()})` : 'Free / Pro / Max', 
                       desc: 'Academic & Sandbox', 
                       icon: GraduationCap 
                     },
                     { 
                       id: 'employee', 
                       title: 'Employee', 
-                      price: (currentPlan === 'employee' || currentPlan === 'emp') ? 'Active Plan' : '₹500 / mo', 
+                      price: (currentPlan === 'employee' || currentPlan === 'emp' || currentRole === 'employee') ? 'Active Plan' : '₹500 / mo', 
                       desc: 'High Performance', 
                       icon: Briefcase 
                     },
                     { 
                       id: 'org_owner', 
                       title: 'Org Owner', 
-                      price: (currentPlan === 'org_owner' || currentPlan === 'org') ? 'Active Plan' : '₹5,000 / mo', 
+                      price: (currentPlan === 'org_owner' || currentPlan === 'org' || currentRole === 'org_owner') ? 'Active Plan' : '₹5,000 / mo', 
                       desc: 'Enterprise Scaling', 
                       icon: Building2 
                     },
