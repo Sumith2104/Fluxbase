@@ -53,12 +53,7 @@ fluxbasedb.me, www.fluxbasedb.me {
 
     # Next.js Application, REST SQL Engine, Flux AI Gateway & MCP Gateway
     handle {
-        encode zstd gzip {
-            match {
-                header Content-Type text/*
-                not header Content-Type text/event-stream*
-            }
-        }
+        encode zstd gzip
 
         reverse_proxy app:3000 {
             header_up Host {host}
