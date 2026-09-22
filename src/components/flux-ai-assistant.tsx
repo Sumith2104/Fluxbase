@@ -650,6 +650,7 @@ export function FluxAiAssistant({ userId, isOpen, onOpenChange }: { userId: stri
       else if (saved === 'glm-4-plus' || saved === 'glm-5.2') setSelectedModel('flux-ultra');
       else if (saved === 'groq' || saved === 'groq-llama') setSelectedModel('flux-turbo');
       else if (saved === 'gemini' || saved === 'gemini-2.0-flash' || saved === 'gemini-1.5-flash') setSelectedModel('flux-omni');
+      else if (saved === 'flux-pro-max' || saved === 'claude-3-7-sonnet') setSelectedModel('flux-pro-max');
       else setSelectedModel(saved);
     }
   }, []);
@@ -1758,6 +1759,7 @@ export function FluxAiAssistant({ userId, isOpen, onOpenChange }: { userId: stri
                   <option value="flux-turbo">Flux Turbo</option>
                   <option value="flux-omni">Flux Omni (Vision)</option>
                   <option value="flux-max">Flux Max (Vision)</option>
+                  <option value="flux-pro-max">Flux Pro Max (Claude 3.7)</option>
                 </select>
                 <button onClick={() => setVoiceEnabled(v => !v)} className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors cursor-pointer" title={voiceEnabled ? 'Mute' : 'Unmute'}>{voiceEnabled ? <Volume2 size={15} /> : <VolumeX size={15} />}</button>
                 <button onClick={toggleFullScreen} className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors cursor-pointer" title={isFullScreen ? "Restore sidebar size" : "Expand to full screen"}>{isFullScreen ? <Minimize2 size={15} /> : <Maximize2 size={15} />}</button>

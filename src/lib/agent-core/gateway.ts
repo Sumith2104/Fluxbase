@@ -1,4 +1,5 @@
 import logger from '@/lib/logger';
+import { executeBedrockConverse, executeBedrockConverseStream } from '@/lib/ai-gateway/bedrock-adapter';
 
 export type ContentPart =
   | { type: 'text'; text: string }
@@ -41,7 +42,14 @@ export interface ModelGatewayResult {
 }
 
 // Model alias mapper
-export const MODEL_CATALOG: Record<string, { provider: 'glm' | 'groq' | 'gemini' | 'openai'; upstreamModel: string; label: string; description: string }> = {
+export const MODEL_CATALOG: Record<string, { provider: 'glm' | 'groq' | 'gemini' | 'openai' | 'bedrock'; upstreamModel: string; label: string; description: string }> = {
+  // Flux Pro Max Tier (Flagship Frontier Reasoning on AWS Bedrock)
+  'flux-pro-max': { provider: 'bedrock', upstreamModel: 'us.anthropic.claude-3-7-sonnet-20250219-v1:0', label: 'Flux Pro Max', description: 'Frontier hybrid reasoning powered by Anthropic Claude 3.7 Sonnet on AWS Bedrock' },
+  'pro-max': { provider: 'bedrock', upstreamModel: 'us.anthropic.claude-3-7-sonnet-20250219-v1:0', label: 'Flux Pro Max', description: 'Frontier hybrid reasoning powered by Anthropic Claude 3.7 Sonnet on AWS Bedrock' },
+  'claude-3-7-sonnet': { provider: 'bedrock', upstreamModel: 'us.anthropic.claude-3-7-sonnet-20250219-v1:0', label: 'Flux Pro Max', description: 'Frontier hybrid reasoning powered by Anthropic Claude 3.7 Sonnet on AWS Bedrock' },
+  'claude-3.7-sonnet': { provider: 'bedrock', upstreamModel: 'us.anthropic.claude-3-7-sonnet-20250219-v1:0', label: 'Flux Pro Max', description: 'Frontier hybrid reasoning powered by Anthropic Claude 3.7 Sonnet on AWS Bedrock' },
+  'claude-3-7': { provider: 'bedrock', upstreamModel: 'us.anthropic.claude-3-7-sonnet-20250219-v1:0', label: 'Flux Pro Max', description: 'Frontier hybrid reasoning powered by Anthropic Claude 3.7 Sonnet on AWS Bedrock' },
+
   // Flux Fast Tier (Default - Ultra Fast & Cost-Free)
   'flux-fast': { provider: 'glm', upstreamModel: 'glm-4-flash', label: 'Flux Fast', description: 'Ultra-fast general reasoning & SQL' },
   'flux': { provider: 'glm', upstreamModel: 'glm-4-flash', label: 'Flux Fast', description: 'Ultra-fast general reasoning & SQL' },
@@ -248,6 +256,29 @@ export class ModelGateway {
     model: string,
     options: ModelGatewayOptions
   ): Promise<ModelGatewayResult> {
+    if (provider === 'bedrock') {
+      const result = await executeBedrockConverse({
+        modelId: model,
+        messages: options.messages,
+        temperature: options.temperature,
+        top_p: options.top_p,
+        max_tokens: options.max_tokens,
+        outboundModelName: 'flux-pro-max',
+        enableThinking: true,
+        thinkingBudget: 2048,
+      });
+      const choice = result.choices?.[0];
+      const rawContent = choice?.message?.content || '';
+      return {
+        text: rawContent,
+        output: null,
+        tool_calls: [],
+        usage: result.usage,
+        provider: 'bedrock',
+        model,
+      };
+    }
+
     const config = this.getProviderEndpointAndKey(provider);
     if (!config.apiKey) {
       throw new Error(`API key for provider '${provider}' is not configured`);
@@ -325,6 +356,20 @@ export class ModelGateway {
     model: string,
     options: ModelGatewayOptions
   ): Promise<ReadableStream<Uint8Array>> {
+    if (provider === 'bedrock') {
+      const { stream } = await executeBedrockConverseStream({
+        modelId: model,
+        messages: options.messages,
+        temperature: options.temperature,
+        top_p: options.top_p,
+        max_tokens: options.max_tokens,
+        outboundModelName: 'flux-pro-max',
+        enableThinking: true,
+        thinkingBudget: 2048,
+      });
+      return stream as any;
+    }
+
     const config = this.getProviderEndpointAndKey(provider);
     if (!config.apiKey) {
       throw new Error(`API key for provider '${provider}' is not configured`);
@@ -389,6 +434,11 @@ export class ModelGateway {
         return {
           url: 'https://api.openai.com/v1/chat/completions',
           apiKey: process.env.OPENAI_API_KEY || ''
+        };
+      case 'bedrock':
+        return {
+          url: `https://bedrock-runtime.${process.env.AWS_BEDROCK_REGION || process.env.AWS_REGION || 'us-east-1'}.amazonaws.com`,
+          apiKey: process.env.AWS_SECRET_ACCESS_KEY || process.env.AWS_ACCESS_KEY_ID || (process.env.AWS_REGION ? 'aws-iam' : '')
         };
       default:
         throw new Error(`Unknown provider: ${provider}`);

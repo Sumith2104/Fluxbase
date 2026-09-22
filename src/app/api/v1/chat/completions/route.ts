@@ -3,7 +3,8 @@ import { resolveFluxModel, getProviderConfig, buildFallbackChain, type FluxModel
 import { authenticateAiRequest, checkTierAccess, handleOptions, aiError, CORS_HEADERS } from '@/lib/ai-gateway/auth-middleware';
 import { checkAiRateLimit, estimateTokens } from '@/lib/ai-gateway/rate-limiter';
 import { recordAiUsage } from '@/lib/ai-gateway/usage-ledger';
-import { whitelabelStream } from '@/lib/ai-gateway/response-helpers';
+import { whitelabelStream, aiSuccess } from '@/lib/ai-gateway/response-helpers';
+import { executeBedrockConverse, executeBedrockConverseStream } from '@/lib/ai-gateway/bedrock-adapter';
 import { redis } from '@/lib/redis';
 import logger from '@/lib/logger';
 
@@ -80,6 +81,72 @@ export async function POST(req: NextRequest) {
     if (!providerConfig.isAvailable) continue;
 
     try {
+      // Direct AWS Bedrock Converse API Dispatch
+      if (spec.provider === 'bedrock') {
+        const bedrockOpts = {
+          modelId: spec.upstreamModel,
+          messages: formattedMessages,
+          temperature,
+          top_p,
+          max_tokens,
+          outboundModelName,
+          enableThinking: true,
+          thinkingBudget: 2048,
+        };
+
+        if (stream) {
+          const { stream: bedrockStream, getUsage } = await executeBedrockConverseStream(bedrockOpts);
+          const latencyMs = Date.now() - startTime;
+          const usage = getUsage();
+
+          recordAiUsage({
+            userId: auth.userId,
+            projectId: auth.projectId,
+            modelId: spec.id,
+            modality: 'text',
+            provider: 'bedrock',
+            inputTokens: usage.inputTokens || estTokens,
+            outputTokens: usage.outputTokens || 150,
+            latencyMs,
+            status: 'success',
+          });
+
+          recordProjectRollup(auth.projectId, 1, (usage.inputTokens || estTokens) + 150);
+
+          return new Response(bedrockStream, {
+            headers: {
+              ...CORS_HEADERS,
+              ...rl.headers,
+              'Content-Type': 'text/event-stream; charset=utf-8',
+              'Cache-Control': 'no-cache, no-transform',
+              'Connection': 'keep-alive',
+              'X-Accel-Buffering': 'no',
+            },
+          });
+        }
+
+        const data = await executeBedrockConverse(bedrockOpts);
+        const latencyMs = Date.now() - startTime;
+        const promptTokens = data?.usage?.prompt_tokens || estTokens;
+        const completionTokens = data?.usage?.completion_tokens || 50;
+
+        recordAiUsage({
+          userId: auth.userId,
+          projectId: auth.projectId,
+          modelId: spec.id,
+          modality: 'text',
+          provider: 'bedrock',
+          inputTokens: promptTokens,
+          outputTokens: completionTokens,
+          latencyMs,
+          status: 'success',
+        });
+
+        recordProjectRollup(auth.projectId, 1, promptTokens + completionTokens);
+
+        return aiSuccess(data, rl.headers);
+      }
+
       const upstreamPayload: Record<string, any> = {
         model: spec.upstreamModel,
         messages: formattedMessages,

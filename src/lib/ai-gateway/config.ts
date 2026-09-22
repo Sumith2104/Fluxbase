@@ -11,7 +11,7 @@
  */
 
 export type Modality = 'text' | 'image' | 'audio-stt' | 'audio-tts' | 'video' | 'embedding';
-export type Provider = 'glm' | 'groq' | 'gemini' | 'openai';
+export type Provider = 'glm' | 'groq' | 'gemini' | 'openai' | 'bedrock';
 export type PlanTier = 'free' | 'pro' | 'max' | 'employee' | 'org_owner' | 'pay_as_you_go';
 
 export interface FluxModelSpec {
@@ -66,6 +66,10 @@ export const PROVIDER_ENDPOINTS = {
     speech: 'https://api.openai.com/v1/audio/speech',
     transcriptions: 'https://api.openai.com/v1/audio/transcriptions',
     embeddings: 'https://api.openai.com/v1/embeddings',
+  },
+  bedrock: {
+    baseUrl: 'https://bedrock-runtime.us-east-1.amazonaws.com',
+    chat: 'bedrock://converse',
   }
 } as const;
 
@@ -203,6 +207,19 @@ export const FLUX_MODEL_REGISTRY: Record<string, FluxModelSpec> = {
     maxOutputTokens: 16384,
     minTier: 'free',
     capabilities: ['text-generation', 'vision', 'chat', 'tool-calling', 'json-mode'],
+  },
+  'flux-pro-max': {
+    id: 'flux-pro-max',
+    modality: 'text',
+    provider: 'bedrock',
+    upstreamModel: 'us.anthropic.claude-3-7-sonnet-20250219-v1:0',
+    upstreamEndpoint: 'bedrock://converse',
+    label: 'Flux Pro Max',
+    description: 'Frontier hybrid reasoning architecture powered by Anthropic Claude 3.7 Sonnet on AWS Bedrock',
+    contextWindow: 200000,
+    maxOutputTokens: 64000,
+    minTier: 'max',
+    capabilities: ['text-generation', 'chat', 'reasoning', 'extended-thinking', 'tool-calling', 'json-mode', 'vision'],
   },
 
   // --- IMAGE GENERATION ---
@@ -383,7 +400,14 @@ export const MODEL_ALIASES: Record<string, string> = {
   'gpt-4-turbo': 'flux-ultra',
   'gpt-4': 'flux-ultra',
   'gpt-3.5-turbo': 'flux-fast',
-  'claude-3-5-sonnet': 'flux-ultra',
+  // Claude & Flagship Aliases
+  'flux-pro-max': 'flux-pro-max',
+  'pro-max': 'flux-pro-max',
+  'claude-3-7-sonnet': 'flux-pro-max',
+  'claude-3.7-sonnet': 'flux-pro-max',
+  'claude-3-7': 'flux-pro-max',
+  'claude-3.7': 'flux-pro-max',
+  'claude-3-5-sonnet': 'flux-pro-max',
   'claude-3-haiku': 'flux-fast',
 
   // OpenAI Image Aliases
@@ -431,6 +455,8 @@ export const WHITELABEL_MAP: Record<string, string> = {
   'gemini-1.5-flash': 'flux-omni',
   'gpt-4o-mini': 'flux-max',
   'gpt-4o': 'flux-max',
+  'us.anthropic.claude-3-7-sonnet-20250219-v1:0': 'flux-pro-max',
+  'anthropic.claude-3-5-sonnet-20241022-v2:0': 'flux-pro-max',
   'cogview-4': 'flux-image',
   'cogview-3-flash': 'flux-image-fast',
   'imagen-3.0-generate-002': 'flux-image-hd',
@@ -502,6 +528,10 @@ export function getProviderConfig(provider: Provider): ProviderConfig {
       apiKey = process.env.OPENAI_API_KEY || '';
       baseUrl = PROVIDER_ENDPOINTS.openai.baseUrl;
       break;
+    case 'bedrock':
+      apiKey = process.env.AWS_SECRET_ACCESS_KEY || process.env.AWS_ACCESS_KEY_ID || (process.env.AWS_REGION ? 'aws-iam' : '');
+      baseUrl = `https://bedrock-runtime.${process.env.AWS_BEDROCK_REGION || process.env.AWS_REGION || 'us-east-1'}.amazonaws.com`;
+      break;
   }
 
   return {
@@ -524,7 +554,7 @@ export function buildFallbackChain(primarySpec: FluxModelSpec, hasMultimodal = f
       const config = getProviderConfig(primarySpec.provider);
       if (config.isAvailable) chain.push(primarySpec);
     }
-    const visionPriority = ['flux-vision', 'flux-omni', 'flux-max'];
+    const visionPriority = ['flux-pro-max', 'flux-vision', 'flux-omni', 'flux-max'];
     for (const vId of visionPriority) {
       const spec = FLUX_MODEL_REGISTRY[vId];
       if (spec && !chain.some(s => s.id === spec.id)) {
@@ -541,7 +571,9 @@ export function buildFallbackChain(primarySpec: FluxModelSpec, hasMultimodal = f
   }
 
   if (primarySpec.modality === 'text') {
-    const fallbacks = hasMultimodal ? ['flux-vision', 'flux-omni', 'flux-max'] : ['flux-turbo', 'flux-omni', 'flux-fast', 'flux-max'];
+    const fallbacks = hasMultimodal
+      ? ['flux-pro-max', 'flux-vision', 'flux-omni', 'flux-max']
+      : ['flux-pro-max', 'flux-ultra', 'flux-turbo', 'flux-omni', 'flux-fast', 'flux-max'];
     for (const fbId of fallbacks) {
       const fbSpec = FLUX_MODEL_REGISTRY[fbId];
       if (fbSpec && fbSpec.id !== primarySpec.id && !chain.some(s => s.id === fbSpec.id)) {
