@@ -385,7 +385,7 @@ export const FLUX_MODEL_REGISTRY: Record<string, FluxModelSpec> = {
     upstreamEndpoint: PROVIDER_ENDPOINTS.glm.videos,
     label: 'Flux Video',
     description: 'Text-to-video generation with dynamic motion and lighting',
-    minTier: 'pro', // Free tier users blocked with upgrade notice
+    minTier: 'free',
     capabilities: ['text-to-video', 'image-to-video', 'async-polling'],
     supportedFormats: ['mp4'],
   },
@@ -418,14 +418,14 @@ export const FLUX_MODEL_REGISTRY: Record<string, FluxModelSpec> = {
   'flux-embed': {
     id: 'flux-embed',
     modality: 'embedding',
-    provider: 'gemini',
-    upstreamModel: 'text-embedding-004',
-    upstreamEndpoint: PROVIDER_ENDPOINTS.gemini.embeddings,
+    provider: 'bedrock',
+    upstreamModel: 'amazon.titan-embed-text-v2:0',
+    upstreamEndpoint: 'bedrock://invoke-model',
     label: 'Flux Embed',
-    description: 'High-performance 768-dimensional text embeddings for RAG & search',
-    contextWindow: 2048,
+    description: 'High-performance 1024-dimensional text embeddings powered by Amazon Titan Embeddings V2 on AWS Bedrock',
+    contextWindow: 8192,
     minTier: 'free',
-    capabilities: ['embeddings', 'similarity-search'],
+    capabilities: ['embeddings', 'similarity-search', 'rag-retrieval', '1024-dim'],
   },
 };
 
@@ -445,11 +445,11 @@ export const MODEL_ALIASES: Record<string, string> = {
   'flux-embed': 'flux-embed',
 
   // OpenAI Chat Aliases
-  'gpt-4o': 'flux-ultra',
-  'gpt-4o-mini': 'flux-max',
-  'gpt-4-turbo': 'flux-ultra',
-  'gpt-4': 'flux-ultra',
-  'gpt-3.5-turbo': 'flux-fast',
+  'gpt-4o': 'flux-nova-pro',
+  'gpt-4o-mini': 'flux-nova-lite',
+  'gpt-4-turbo': 'flux-nova-pro',
+  'gpt-4': 'flux-nova-pro',
+  'gpt-3.5-turbo': 'flux-nova-lite',
   // Nova & Amazon Bedrock Aliases
   'flux-nova-pro': 'flux-nova-pro',
   'nova-pro': 'flux-nova-pro',

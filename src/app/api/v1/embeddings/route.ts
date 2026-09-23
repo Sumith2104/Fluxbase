@@ -4,6 +4,7 @@ import { authenticateAiRequest, checkTierAccess, handleOptions, aiError } from '
 import { checkAiRateLimit } from '@/lib/ai-gateway/rate-limiter';
 import { recordAiUsage } from '@/lib/ai-gateway/usage-ledger';
 import { aiSuccess } from '@/lib/ai-gateway/response-helpers';
+import { executeBedrockEmbedding } from '@/lib/ai-gateway/bedrock-adapter';
 import logger from '@/lib/logger';
 
 export const dynamic = 'force-dynamic';
@@ -40,7 +41,7 @@ export async function POST(req: NextRequest) {
   }
 
   // Count estimated tokens
-  const texts = Array.isArray(input) ? input : [input];
+  const texts: string[] = Array.isArray(input) ? input : [input];
   const totalLength = texts.reduce((acc: number, t: any) => acc + (typeof t === 'string' ? t.length : 0), 0);
   const estimatedTokens = Math.max(1, Math.ceil(totalLength / 4));
 
@@ -52,12 +53,32 @@ export async function POST(req: NextRequest) {
 
   const startTime = Date.now();
 
-  // Try providers in order: Gemini -> OpenAI -> GLM
-  const providersToTry: Array<{ provider: 'gemini' | 'openai' | 'glm'; model: string }> = [
+  // Prioritize active providers: Bedrock Titan V2 -> GLM -> Gemini -> OpenAI
+  const providersToTry: Array<{ provider: 'bedrock' | 'glm' | 'gemini' | 'openai'; model: string }> = [];
+
+  if (primarySpec.provider === 'bedrock') {
+    providersToTry.push({ provider: 'bedrock', model: primarySpec.upstreamModel || 'amazon.titan-embed-text-v2:0' });
+  } else if (primarySpec.provider === 'glm') {
+    providersToTry.push({ provider: 'glm', model: primarySpec.upstreamModel || 'embedding-3' });
+  } else if (primarySpec.provider === 'gemini') {
+    providersToTry.push({ provider: 'gemini', model: primarySpec.upstreamModel || 'text-embedding-004' });
+  } else if (primarySpec.provider === 'openai') {
+    providersToTry.push({ provider: 'openai', model: primarySpec.upstreamModel || 'text-embedding-3-small' });
+  }
+
+  // Fallback chain prioritizing configured environments
+  const defaultFallbacks: Array<{ provider: 'bedrock' | 'glm' | 'gemini' | 'openai'; model: string }> = [
+    { provider: 'bedrock', model: 'amazon.titan-embed-text-v2:0' },
+    { provider: 'glm', model: 'embedding-3' },
     { provider: 'gemini', model: 'text-embedding-004' },
     { provider: 'openai', model: 'text-embedding-3-small' },
-    { provider: 'glm', model: 'embedding-3' },
   ];
+
+  for (const fb of defaultFallbacks) {
+    if (!providersToTry.some(p => p.provider === fb.provider)) {
+      providersToTry.push(fb);
+    }
+  }
 
   let lastError: any = null;
 
@@ -66,10 +87,48 @@ export async function POST(req: NextRequest) {
     if (!config.isAvailable) continue;
 
     try {
+      if (provider === 'bedrock') {
+        const results: Array<{ object: 'embedding'; embedding: number[]; index: number }> = [];
+        let totalInputTokens = 0;
+
+        for (let i = 0; i < texts.length; i++) {
+          const textItem = typeof texts[i] === 'string' ? texts[i] : JSON.stringify(texts[i]);
+          const bedRes = await executeBedrockEmbedding(textItem, model);
+          results.push({
+            object: 'embedding',
+            embedding: bedRes.embedding,
+            index: i,
+          });
+          totalInputTokens += bedRes.inputTokens;
+        }
+
+        const latencyMs = Date.now() - startTime;
+
+        recordAiUsage({
+          userId: auth.userId,
+          projectId: auth.projectId,
+          modelId: primarySpec.id,
+          modality: 'embedding',
+          provider: 'bedrock',
+          inputTokens: totalInputTokens || estimatedTokens,
+          latencyMs,
+          status: 'success',
+        });
+
+        return aiSuccess({
+          object: 'list',
+          data: results,
+          model: primarySpec.id,
+          usage: {
+            prompt_tokens: totalInputTokens || estimatedTokens,
+            total_tokens: totalInputTokens || estimatedTokens,
+          },
+        }, rl.headers);
+      }
+
       let res: Response;
 
       if (provider === 'gemini') {
-        // Gemini OpenAI-compatible embeddings endpoint
         res = await fetch('https://generativelanguage.googleapis.com/v1beta/openai/embeddings', {
           method: 'POST',
           headers: {

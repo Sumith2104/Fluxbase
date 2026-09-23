@@ -378,7 +378,27 @@ const MODEL_CATALOG: ModelCardData[] = [
         badgeText: 'Instant Gen',
         workTags: ['Image synthesis', 'Avatars', 'Rapid prototyping']
     },
-    // 6. CogVideoX Flash (Fast AI Motion Video)
+    // 6. CogView 4 (High Definition Image Generation)
+    {
+        id: 'flux-image',
+        realName: 'Zhipu AI CogView 4',
+        provider: 'Zhipu AI',
+        modality: 'image',
+        label: 'CogView 4',
+        description: 'High-quality photorealistic text-to-image synthesis with prompt refinement and direct cloud asset delivery.',
+        contextWindow: 'N/A (Image)',
+        maxOutput: '1024x1024',
+        speedRating: 'Balanced',
+        minTier: 'free',
+        capabilities: ['photorealistic', 's3-auto-storage'],
+        aliases: ['cogview-4'],
+        samplePrompt: 'Futuristic cybernetic database server room with glowing orange neon conduits, cinematic 8k photorealistic.',
+        bannerColor: '#ebd475',
+        illustrationType: 'palette-canvas',
+        badgeText: 'HD Image',
+        workTags: ['General illustration', 'Logos', 'S3 cloud storage']
+    },
+    // 7. CogVideoX Flash (Fast AI Motion Video)
     {
         id: 'flux-video',
         realName: 'Zhipu AI CogVideoX Flash',
@@ -398,7 +418,7 @@ const MODEL_CATALOG: ModelCardData[] = [
         badgeText: 'AI Video',
         workTags: ['Video generation', 'Dynamic motion', 'Camera pans']
     },
-    // 7. Amazon Titan Embeddings V2 (AWS Bedrock RAG)
+    // 8. Amazon Titan Embeddings V2 (AWS Bedrock RAG)
     {
         id: 'flux-embed',
         realName: 'Amazon Titan Embeddings V2',
@@ -418,7 +438,7 @@ const MODEL_CATALOG: ModelCardData[] = [
         badgeText: 'Vector RAG',
         workTags: ['Semantic search', 'RAG retrieval', 'Vector index']
     },
-    // 8. GLM-4V Multimodal (Vision & OCR)
+    // 9. GLM-4V Multimodal (Vision & OCR)
     {
         id: 'flux-vision',
         realName: 'Zhipu AI GLM-4V Multimodal',
@@ -437,67 +457,7 @@ const MODEL_CATALOG: ModelCardData[] = [
         badgeText: 'Vision OCR',
         workTags: ['Visual inspection', 'Diagram analysis', 'OCR']
     },
-    // 9. Meta LLaMA 3.3 70B on Groq LPUs
-    {
-        id: 'flux-turbo',
-        realName: 'Meta LLaMA 3.3 70B Versatile',
-        provider: 'Groq / Meta',
-        modality: 'text',
-        label: 'LLaMA 3.3 70B',
-        description: 'Hyper-speed 300+ tokens/second inference powered by Groq LPUs. Ideal for real-time agents and rapid interactive UX.',
-        contextWindow: '128,000 tokens',
-        maxOutput: '8,192 tokens',
-        speedRating: '300+ tok/s (Hyper)',
-        minTier: 'free',
-        capabilities: ['hyper-fast', 'code', 'chat', 'tool-calling', 'json-mode'],
-        aliases: ['llama-3.3-70b', 'groq-llama-70b'],
-        samplePrompt: 'Write an optimized regex parser in Rust with benchmarks.',
-        bannerColor: '#e68ca4', // Berry Rose
-        illustrationType: 'soaring-bird',
-        badgeText: '300+ tok/s',
-        workTags: ['Real-time agents', 'Rust coding', 'Extreme speed']
-    },
-    // 10. Google Gemini 2.0 Flash (1M Context)
-    {
-        id: 'flux-omni',
-        realName: 'Google Gemini 2.0 Flash',
-        provider: 'Google Gemini',
-        modality: 'text',
-        label: 'Gemini 2.0 Flash',
-        description: 'Massive 1M token context window, multimodal image understanding, and high-velocity reasoning.',
-        contextWindow: '1,048,576 tokens',
-        maxOutput: '8,192 tokens',
-        speedRating: 'Ultra-Fast Multimodal',
-        minTier: 'free',
-        capabilities: ['1m-context', 'vision', 'document-analysis', 'tool-calling'],
-        aliases: ['gemini-2.0-flash', 'gemini-flash'],
-        samplePrompt: 'Analyze this full application schema and generate an ER diagram in Mermaid format.',
-        bannerColor: '#7bbef0', // Sky Blue
-        illustrationType: 'brain-head',
-        badgeText: '1M Context',
-        workTags: ['Long document', 'Entire codebase', 'Multimodal']
-    },
-    // 11. OpenAI GPT-4o Mini
-    {
-        id: 'flux-max',
-        realName: 'OpenAI GPT-4o Mini',
-        provider: 'OpenAI',
-        modality: 'text',
-        label: 'GPT-4o Mini',
-        description: 'Lightweight flagship intelligence with strong coding and instruction adherence at high velocity.',
-        contextWindow: '128,000 tokens',
-        maxOutput: '16,384 tokens',
-        speedRating: 'Fast & Robust',
-        minTier: 'free',
-        capabilities: ['instruction-following', 'vision', 'chat', 'json-mode'],
-        aliases: ['gpt-4o-mini'],
-        samplePrompt: 'Summarize the differences between optimistic and pessimistic locking in SQL.',
-        bannerColor: '#7ed4ad', // Emerald Mint
-        illustrationType: 'cluster-burst',
-        badgeText: 'Precise',
-        workTags: ['Instruction following', 'Strict JSON', 'Chat']
-    },
-    // 12. GLM-4 Flash (Turbo UX)
+    // 10. GLM-4 Flash (Turbo UX)
     {
         id: 'flux-flash',
         realName: 'Zhipu AI GLM-4 Flash (Turbo UX)',
@@ -512,12 +472,12 @@ const MODEL_CATALOG: ModelCardData[] = [
         capabilities: ['real-time-ux', 'autocomplete', 'streaming', 'lightweight'],
         aliases: ['fast-chat'],
         samplePrompt: 'Autocomplete this JavaScript debounce utility function.',
-        bannerColor: '#ebe4d3',
+        bannerColor: '#e6dec8',
         illustrationType: 'cursor-node',
         badgeText: 'Sub-100ms',
         workTags: ['Autocomplete', 'Real-time UX', 'Streaming']
     },
-    // 13. GLM-4 Plus (Frontier Agent)
+    // 11. GLM-4 Plus (Frontier Agent)
     {
         id: 'flux-5.2',
         realName: 'Zhipu AI GLM-4 Plus (Frontier Agent)',
@@ -537,7 +497,7 @@ const MODEL_CATALOG: ModelCardData[] = [
         badgeText: 'Agentic',
         workTags: ['Recursive reasoning', 'Multi-tool', 'Workflows']
     },
-    // 14. GLM-4 Air (Strict JSON & Analysis)
+    // 12. GLM-4 Air (Strict JSON & Analysis)
     {
         id: 'flux-pro',
         realName: 'Zhipu AI GLM-4 Air',
@@ -556,7 +516,7 @@ const MODEL_CATALOG: ModelCardData[] = [
         badgeText: 'Strict JSON',
         workTags: ['Schema modeling', 'Structured JSON', 'BI Queries']
     },
-    // 15. GLM-4 Plus (Deep Reasoning)
+    // 13. GLM-4 Plus (Deep Reasoning)
     {
         id: 'flux-ultra',
         realName: 'Zhipu AI GLM-4 Plus (Deep Reasoning)',
@@ -575,127 +535,7 @@ const MODEL_CATALOG: ModelCardData[] = [
         badgeText: 'Deep Thought',
         workTags: ['Architecture blueprints', 'Security audits', 'Migrations']
     },
-    // 16. OpenAI Drop-in Alias
-    {
-        id: 'gpt-4o',
-        realName: 'OpenAI GPT-4o (Drop-in Alias)',
-        provider: 'OpenAI',
-        modality: 'text',
-        label: 'GPT-4o Alias',
-        description: 'OpenAI compatibility alias. Transparently routed to flagship tier with zero code modifications.',
-        contextWindow: '128,000 tokens',
-        maxOutput: '8,192 tokens',
-        speedRating: 'Flagship Alias',
-        minTier: 'free',
-        capabilities: ['openai-drop-in', 'chat', 'coding'],
-        isDropinAlias: true,
-        samplePrompt: 'Write a Next.js App Router API route with session verification.',
-        bannerColor: '#98d9ba',
-        illustrationType: 'brain-head',
-        badgeText: 'Drop-In',
-        workTags: ['Drop-in OpenAI', 'Zero config', 'Compatibility']
-    },
-    // 17. Stable Image Ultra (Pro Tier)
-    {
-        id: 'flux-image-ultra',
-        realName: 'Stability AI Stable Image Ultra 1.0',
-        provider: 'AWS Bedrock',
-        modality: 'image',
-        label: 'Stable Image Ultra',
-        description: 'SOTA photorealism, exquisite typography rendering, complex composition, and automatic S3 cloud storage.',
-        contextWindow: 'N/A (Image)',
-        maxOutput: 'Up to 4K UHD',
-        speedRating: 'Ultra High Fidelity',
-        minTier: 'pro',
-        capabilities: ['photorealism-sota', 'typography', 'cinematic-lighting', 's3-auto-storage'],
-        aliases: ['stable-image-ultra', 'stable-diffusion-ultra'],
-        samplePrompt: 'A futuristic cybernetic database server room with neon orange coolant tubes, cinematic 8k photorealistic.',
-        bannerColor: '#c4a5f4',
-        illustrationType: 'palette-canvas',
-        badgeText: 'Pro SOTA',
-        workTags: ['Photorealism SOTA', 'Typography', '4K UHD']
-    },
-    // 18. Google Imagen 3.0
-    {
-        id: 'flux-image-hd',
-        realName: 'Google Imagen 3.0',
-        provider: 'Google Gemini',
-        modality: 'image',
-        label: 'Imagen 3.0 HD',
-        description: 'High-definition 4K image generation with superior detail, natural skin tones, and crisp English text rendering.',
-        contextWindow: 'N/A (Image)',
-        maxOutput: 'Up to 4K',
-        speedRating: 'Fast High-Def',
-        minTier: 'free',
-        capabilities: ['4k-hd', 'typography', 'creative-scenes', 's3-auto-storage'],
-        aliases: ['imagen-3'],
-        samplePrompt: 'Vintage travel poster for Neo Tokyo with bold typography and retro color palette.',
-        bannerColor: '#f4ad92',
-        illustrationType: 'palette-canvas',
-        badgeText: 'HD Creative',
-        workTags: ['Graphic design', 'Marketing assets', 'Fine detail']
-    },
-    // 19. OpenAI DALL·E 3 (Pro Tier)
-    {
-        id: 'flux-image-pro',
-        realName: 'OpenAI DALL·E 3',
-        provider: 'OpenAI',
-        modality: 'image',
-        label: 'DALL·E 3 Pro',
-        description: 'Premium prompt adherence with imaginative visual styling and composition accuracy.',
-        contextWindow: 'N/A (Image)',
-        maxOutput: '1024x1024 / 1792x1024',
-        speedRating: 'High Quality',
-        minTier: 'pro',
-        capabilities: ['prompt-adherence', 'creative', 's3-auto-storage'],
-        aliases: ['dall-e-3'],
-        samplePrompt: 'A minimal isometric 3D render of a cloud database architecture on a dark sleek background.',
-        bannerColor: '#8bc5ea',
-        illustrationType: 'palette-canvas',
-        badgeText: 'Pro',
-        workTags: ['Prompt adherence', 'Concept art', '3D Renders']
-    },
-    // 20. CogView 4
-    {
-        id: 'flux-image',
-        realName: 'Zhipu AI CogView 4',
-        provider: 'Zhipu AI',
-        modality: 'image',
-        label: 'CogView 4',
-        description: 'High-quality photorealistic text-to-image synthesis with prompt refinement and direct S3 cloud asset delivery.',
-        contextWindow: 'N/A (Image)',
-        maxOutput: '1024x1024',
-        speedRating: 'Balanced',
-        minTier: 'free',
-        capabilities: ['photorealistic', 's3-auto-storage'],
-        aliases: ['cogview-4'],
-        samplePrompt: 'Modern minimalist logo for a high-performance database startup, vector style.',
-        bannerColor: '#ebd475',
-        illustrationType: 'palette-canvas',
-        badgeText: 'Free',
-        workTags: ['General illustration', 'Logos', 'S3 cloud storage']
-    },
-    // 21. Luma Ray v2 (Pro Tier)
-    {
-        id: 'flux-video-ray',
-        realName: 'Luma AI Ray v2',
-        provider: 'AWS Bedrock',
-        modality: 'video',
-        label: 'Luma Ray v2',
-        description: 'Cinema-grade dynamic video generation with temporal consistency, physics rendering, and camera motion on AWS Bedrock.',
-        contextWindow: 'N/A (Video)',
-        maxOutput: '720p / 1080p MP4',
-        speedRating: 'Cinematic Engine',
-        minTier: 'pro',
-        capabilities: ['cinema-physics', 'camera-motion', 'async-polling', 's3-dest'],
-        aliases: ['luma-ray-v2', 'ray-v2'],
-        samplePrompt: 'Cinematic drone shot flying through a bioluminescent redwood forest at twilight, mist rolling in.',
-        bannerColor: '#f5a97f',
-        illustrationType: 'film-motion',
-        badgeText: 'Pro Cinema',
-        workTags: ['Cinema physics', 'Drone shots', 'Camera motion']
-    },
-    // 22. CogVideoX HD (Max Tier)
+    // 14. CogVideoX HD (Studio Video)
     {
         id: 'flux-video-pro',
         realName: 'Zhipu AI CogVideoX HD',
@@ -706,112 +546,54 @@ const MODEL_CATALOG: ModelCardData[] = [
         contextWindow: 'N/A (Video)',
         maxOutput: '1080p HD MP4',
         speedRating: 'Studio Render',
-        minTier: 'max',
+        minTier: 'free',
         capabilities: ['1080p-hd', 'motion-stability', 'async-polling'],
         aliases: ['cogvideox-hd'],
         samplePrompt: 'Slow motion macro shot of water droplets splashing onto a shiny obsidian stone.',
         bannerColor: '#83cbe3',
         illustrationType: 'film-motion',
-        badgeText: 'Max Tier',
+        badgeText: '1080p Studio',
         workTags: ['1080p Studio', 'Macro motion', 'High resolution']
     },
-    // 23. Whisper Large v3 Turbo on Groq LPUs
+    // 15. OpenAI GPT-4o Drop-in Alias (Served by Amazon Nova Pro)
     {
-        id: 'flux-listen',
-        realName: 'OpenAI Whisper Large v3 Turbo',
-        provider: 'Groq / Meta',
-        modality: 'audio-stt',
-        label: 'Whisper v3 Turbo',
-        description: 'Ultra-fast multilingual audio transcription with segment timestamps, powered by Groq LPUs at 10x real-time speed.',
-        contextWindow: '25 MB Audio File',
-        maxOutput: 'Full Transcript + Timestamps',
-        speedRating: '10x Real-time (Groq)',
+        id: 'gpt-4o',
+        realName: 'OpenAI GPT-4o Drop-in (Amazon Nova Pro)',
+        provider: 'AWS Bedrock',
+        modality: 'text',
+        label: 'GPT-4o Drop-in',
+        description: 'OpenAI compatibility alias. Transparently served by Amazon Nova Pro on AWS Bedrock with zero code modifications.',
+        contextWindow: '300,000 tokens',
+        maxOutput: '8,192 tokens',
+        speedRating: 'Flagship Drop-in',
         minTier: 'free',
-        capabilities: ['multilingual-stt', 'word-timestamps', 'groq-accelerated'],
-        aliases: ['whisper-1', 'whisper-large-v3-turbo'],
-        samplePrompt: 'Transcribe meeting audio recording with speaker timestamps.',
-        bannerColor: '#a49ee6',
-        illustrationType: 'audio-wave',
-        badgeText: '10x Speed',
-        workTags: ['Meeting transcripts', 'Subtitles', 'Word timestamps']
+        capabilities: ['openai-drop-in', 'chat', 'coding', 'vision'],
+        isDropinAlias: true,
+        samplePrompt: 'Write a Next.js App Router API route with session verification.',
+        bannerColor: '#98d9ba',
+        illustrationType: 'brain-head',
+        badgeText: 'Drop-In',
+        workTags: ['Drop-in OpenAI', 'Zero config', 'Compatibility']
     },
-    // 24. Whisper Large v3
+    // 16. OpenAI GPT-4o Mini Drop-in Alias (Served by Amazon Nova Lite)
     {
-        id: 'flux-listen-pro',
-        realName: 'OpenAI Whisper Large v3',
-        provider: 'Groq / Meta',
-        modality: 'audio-stt',
-        label: 'Whisper Large v3',
-        description: 'Maximum precision transcription for noisy environments, technical terminology, accents, and multiple dialects.',
-        contextWindow: '25 MB Audio File',
-        maxOutput: 'Full Precision Transcript',
-        speedRating: 'High Accuracy',
+        id: 'gpt-4o-mini',
+        realName: 'OpenAI GPT-4o Mini Drop-in (Amazon Nova Lite)',
+        provider: 'AWS Bedrock',
+        modality: 'text',
+        label: 'GPT-4o Mini Drop-in',
+        description: 'OpenAI compatibility alias. Transparently served by Amazon Nova Lite on AWS Bedrock at sub-200ms velocity.',
+        contextWindow: '300,000 tokens',
+        maxOutput: '8,192 tokens',
+        speedRating: 'Sub-200ms Drop-in',
         minTier: 'free',
-        capabilities: ['high-accuracy', 'noise-robust', 'multilingual'],
-        samplePrompt: 'Transcribe medical conference audio with technical jargon.',
-        bannerColor: '#7acbe6',
-        illustrationType: 'audio-wave',
-        badgeText: 'High Accuracy',
-        workTags: ['Noisy audio', 'Technical jargon', 'Multilingual']
-    },
-    // 25. Distil-Whisper Large v3
-    {
-        id: 'flux-listen-en',
-        realName: 'Distil-Whisper Large v3 English',
-        provider: 'Groq / Meta',
-        modality: 'audio-stt',
-        label: 'Distil-Whisper English',
-        description: 'Lightweight, hyper-fast English-only speech recognition with near-zero latency for live voice assistants.',
-        contextWindow: '25 MB Audio File',
-        maxOutput: 'English Transcript',
-        speedRating: 'Hyper-Fast English',
-        minTier: 'free',
-        capabilities: ['english-optimized', 'sub-second', 'voice-agents'],
-        samplePrompt: 'Instant transcription for live voice search command.',
-        bannerColor: '#94d6b6',
-        illustrationType: 'audio-wave',
-        badgeText: 'Sub-Second',
-        workTags: ['Voice assistants', 'Live speech', 'English-only']
-    },
-    // 26. OpenAI TTS-1
-    {
-        id: 'flux-speak',
-        realName: 'OpenAI TTS-1',
-        provider: 'OpenAI',
-        modality: 'audio-tts',
-        label: 'TTS-1 Speech',
-        description: 'Natural, expressive text-to-speech voice synthesis across 6 voice personas (alloy, echo, fable, onyx, nova, shimmer).',
-        contextWindow: '4,096 characters',
-        maxOutput: 'MP3 / Opus Audio Stream',
-        speedRating: 'Real-time Audio Stream',
-        minTier: 'free',
-        capabilities: ['voice-synthesis', '6-voices', 'streaming-audio'],
-        aliases: ['tts-1'],
-        samplePrompt: 'Synthesize audio narration: "Welcome to Fluxbase. Your serverless database is ready."',
-        bannerColor: '#e6b18c',
-        illustrationType: 'audio-wave',
-        badgeText: '6 Personas',
-        workTags: ['Speech synthesis', 'Podcasts', 'Narration']
-    },
-    // 27. OpenAI TTS-1 HD (Pro Tier)
-    {
-        id: 'flux-speak-hd',
-        realName: 'OpenAI TTS-1 HD',
-        provider: 'OpenAI',
-        modality: 'audio-tts',
-        label: 'TTS-1 HD Studio',
-        description: 'Studio-grade high-definition audio synthesis for polished podcast intros, product walkthroughs, and audiobooks.',
-        contextWindow: '4,096 characters',
-        maxOutput: 'Lossless HD Audio',
-        speedRating: 'Studio Quality',
-        minTier: 'pro',
-        capabilities: ['studio-master', 'hd-audio', '6-voices'],
-        aliases: ['tts-1-hd'],
-        samplePrompt: 'Synthesize studio HD audio for an enterprise customer onboarding guide.',
-        bannerColor: '#f096aa',
-        illustrationType: 'audio-wave',
-        badgeText: 'Pro HD',
-        workTags: ['Studio mastering', 'Audiobooks', 'Lossless audio']
+        capabilities: ['openai-drop-in', 'chat', 'fast', 'json-mode'],
+        isDropinAlias: true,
+        samplePrompt: 'Summarize the differences between optimistic and pessimistic locking in SQL.',
+        bannerColor: '#7ed4ad',
+        illustrationType: 'cursor-node',
+        badgeText: 'Drop-In',
+        workTags: ['Drop-in OpenAI', 'Sub-200ms', 'JSON Mode']
     }
 ];
 
@@ -1134,6 +916,48 @@ while True:
 generateVideo();`;
         }
 
+        if (model.modality === 'embedding') {
+            if (lang === 'curl') {
+                return `curl -X POST https://fluxbasedb.me/api/v1/embeddings \\
+  -H "Authorization: Bearer ${key}" \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "model": "${model.id}",
+    "input": "${model.samplePrompt || 'Generate embedding vector for semantic search'}"
+  }'`;
+            }
+            if (lang === 'python') {
+                return `from openai import OpenAI
+
+client = OpenAI(
+    base_url="https://fluxbasedb.me/api/v1",
+    api_key="${key}"
+)
+
+response = client.embeddings.create(
+    model="${model.id}",
+    input="${model.samplePrompt || 'Generate embedding vector for semantic search'}"
+)
+
+print("Titan Embedding Vector (1024-dim):", response.data[0].embedding[:5], "... len:", len(response.data[0].embedding))`;
+            }
+            return `import OpenAI from 'openai';
+
+const client = new OpenAI({
+  baseURL: 'https://fluxbasedb.me/api/v1',
+  apiKey: process.env.FLUXBASE_API_KEY || '${key}',
+});
+
+async function main() {
+  const res = await client.embeddings.create({
+    model: '${model.id}',
+    input: '${model.samplePrompt || 'Generate embedding vector for semantic search'}',
+  });
+  console.log('Embedding dimensions:', res.data[0].embedding.length);
+}
+main();`;
+        }
+
         // Standard Text / Chat
         if (lang === 'curl') {
             return `curl -X POST https://fluxbasedb.me/api/v1/chat/completions \\
@@ -1196,35 +1020,89 @@ main();`;
         setPlaygroundResponse(null);
 
         try {
-            const endpoint = selectedPlaygroundModel.modality === 'image' 
-                ? '/api/v1/images/generations' 
-                : '/api/v1/chat/completions';
-            
-            const body = selectedPlaygroundModel.modality === 'image'
-                ? { model: selectedPlaygroundModel.id, prompt: playgroundPrompt }
-                : {
-                    model: selectedPlaygroundModel.id,
-                    messages: [{ role: 'user', content: playgroundPrompt }]
-                };
-
-            const res = await fetch(endpoint, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    ...(selectedProject ? { 'X-Project-Id': selectedProject.project_id } : {})
-                },
-                body: JSON.stringify(body)
-            });
-
-            const data = await res.json();
-            if (data.choices?.[0]?.message?.content) {
-                setPlaygroundResponse(data.choices[0].message.content);
-            } else if (data.data?.[0]?.url) {
-                setPlaygroundResponse(`IMAGE_GENERATED: ${data.data[0].url}`);
-            } else if (data.error) {
-                setPlaygroundResponse(`Error: ${data.error.message || JSON.stringify(data.error)}`);
+            if (selectedPlaygroundModel.modality === 'image') {
+                const res = await fetch('/api/v1/images/generations', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        ...(selectedProject ? { 'X-Project-Id': selectedProject.project_id } : {})
+                    },
+                    body: JSON.stringify({
+                        model: selectedPlaygroundModel.id,
+                        prompt: playgroundPrompt
+                    })
+                });
+                const data = await res.json();
+                if (data.data?.[0]?.url) {
+                    setPlaygroundResponse(`IMAGE_GENERATED: ${data.data[0].url}`);
+                } else if (data.error) {
+                    setPlaygroundResponse(`Error: ${data.error.message || JSON.stringify(data.error)}`);
+                } else {
+                    setPlaygroundResponse(JSON.stringify(data, null, 2));
+                }
+            } else if (selectedPlaygroundModel.modality === 'embedding') {
+                const res = await fetch('/api/v1/embeddings', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        ...(selectedProject ? { 'X-Project-Id': selectedProject.project_id } : {})
+                    },
+                    body: JSON.stringify({
+                        model: selectedPlaygroundModel.id,
+                        input: playgroundPrompt
+                    })
+                });
+                const data = await res.json();
+                if (data.data?.[0]?.embedding) {
+                    const emb = data.data[0].embedding;
+                    const preview = emb.slice(0, 8).map((n: number) => n.toFixed(5)).join(', ');
+                    setPlaygroundResponse(`✓ Vector Embedding Generated Successfully!\n• Dimensions: ${emb.length} floats\n• Model: ${data.model || selectedPlaygroundModel.id}\n• Prompt Tokens: ${data.usage?.prompt_tokens ?? data.usage?.total_tokens ?? 'N/A'}\n\nVector Preview:\n[${preview}, ... +${emb.length - 8} more floats]`);
+                } else if (data.error) {
+                    setPlaygroundResponse(`Error: ${data.error.message || JSON.stringify(data.error)}`);
+                } else {
+                    setPlaygroundResponse(JSON.stringify(data, null, 2));
+                }
+            } else if (selectedPlaygroundModel.modality === 'video') {
+                const res = await fetch('/api/v1/videos/generations', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        ...(selectedProject ? { 'X-Project-Id': selectedProject.project_id } : {})
+                    },
+                    body: JSON.stringify({
+                        model: selectedPlaygroundModel.id,
+                        prompt: playgroundPrompt
+                    })
+                });
+                const data = await res.json();
+                if (data.id && data.status === 'processing') {
+                    setPlaygroundResponse(`✓ Video Generation Task Dispatched!\n• Task ID: ${data.id}\n• Status: ${data.status}\n• Model: ${data.model}\n• Poll URL: ${data.poll_url}\n\nVideo rendering is processing asynchronously. The model generates 720p/1080p MP4 motion video in the background.`);
+                } else if (data.error) {
+                    setPlaygroundResponse(`Error: ${data.error.message || JSON.stringify(data.error)}`);
+                } else {
+                    setPlaygroundResponse(JSON.stringify(data, null, 2));
+                }
             } else {
-                setPlaygroundResponse(JSON.stringify(data, null, 2));
+                // Text / Chat
+                const res = await fetch('/api/v1/chat/completions', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        ...(selectedProject ? { 'X-Project-Id': selectedProject.project_id } : {})
+                    },
+                    body: JSON.stringify({
+                        model: selectedPlaygroundModel.id,
+                        messages: [{ role: 'user', content: playgroundPrompt }]
+                    })
+                });
+                const data = await res.json();
+                if (data.choices?.[0]?.message?.content) {
+                    setPlaygroundResponse(data.choices[0].message.content);
+                } else if (data.error) {
+                    setPlaygroundResponse(`Error: ${data.error.message || JSON.stringify(data.error)}`);
+                } else {
+                    setPlaygroundResponse(JSON.stringify(data, null, 2));
+                }
             }
         } catch (err: any) {
             setPlaygroundResponse(`Execution error: ${err.message}`);

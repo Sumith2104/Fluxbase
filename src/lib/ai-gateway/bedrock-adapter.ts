@@ -2,6 +2,7 @@ import {
   BedrockRuntimeClient,
   ConverseCommand,
   ConverseStreamCommand,
+  InvokeModelCommand,
   type Message as BedrockMessage,
   type SystemContentBlock,
   type ContentBlock,
@@ -354,5 +355,40 @@ export async function executeBedrockConverseStream(opts: BedrockChatOptions): Pr
   return {
     stream: readableStream,
     getUsage: () => ({ inputTokens, outputTokens }),
+  };
+}
+
+/**
+ * Executes text embedding vector generation using AWS Bedrock Titan Embeddings V2
+ */
+export async function executeBedrockEmbedding(
+  text: string,
+  modelId: string = 'amazon.titan-embed-text-v2:0'
+): Promise<{
+  embedding: number[];
+  inputTokens: number;
+}> {
+  const client = getBedrockClient();
+  const targetModelId = resolveBedrockModelId(modelId);
+
+  const payload = {
+    inputText: text,
+    dimensions: 1024,
+    normalize: true,
+  };
+
+  const command = new InvokeModelCommand({
+    modelId: targetModelId,
+    contentType: 'application/json',
+    accept: 'application/json',
+    body: JSON.stringify(payload),
+  });
+
+  const response = await client.send(command);
+  const decoded = JSON.parse(new TextDecoder().decode(response.body));
+
+  return {
+    embedding: decoded.embedding || [],
+    inputTokens: decoded.inputTextTokenCount || Math.max(1, Math.ceil(text.length / 4)),
   };
 }
