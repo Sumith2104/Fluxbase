@@ -1077,8 +1077,50 @@ main();`;
                     })
                 });
                 const data = await res.json();
-                if (data.id && data.status === 'processing') {
-                    setPlaygroundResponse(`✓ Video Generation Task Dispatched!\n• Task ID: ${data.id}\n• Status: ${data.status}\n• Model: ${data.model}\n• Poll URL: ${data.poll_url}\n\nVideo rendering is processing asynchronously. The model generates 720p/1080p MP4 motion video in the background.`);
+                if (data.id && (data.status === 'processing' || data.poll_url)) {
+                    const taskId = data.id;
+                    const pollUrl = data.poll_url || `/api/v1/videos/generations/${taskId}`;
+                    setPlaygroundResponse(`✓ Video Task Dispatched (${taskId})\n⏳ Rendering motion video with ${selectedPlaygroundModel.realName}...\nPlease wait while video frames are synthesized.`);
+
+                    // Live Polling Loop
+                    let attempts = 0;
+                    const maxAttempts = 60; // Up to ~4 mins
+                    let videoUrl: string | null = null;
+                    let pollError: string | null = null;
+
+                    while (attempts < maxAttempts) {
+                        await new Promise(r => setTimeout(r, 4000));
+                        attempts++;
+
+                        try {
+                            const pollRes = await fetch(pollUrl, {
+                                headers: {
+                                    ...(selectedProject ? { 'X-Project-Id': selectedProject.project_id } : {})
+                                }
+                            });
+                            const pollData = await pollRes.json();
+
+                            if (pollData.status === 'completed' && pollData.data?.[0]?.url) {
+                                videoUrl = pollData.data[0].url;
+                                break;
+                            } else if (pollData.status === 'failed') {
+                                pollError = pollData.error || 'Video generation failed upstream.';
+                                break;
+                            } else {
+                                setPlaygroundResponse(`⏳ Rendering motion video with ${selectedPlaygroundModel.realName}...\n• Elapsed: ${attempts * 4}s\n• Task ID: ${taskId}\n• Status: ${pollData.status || 'processing'}\n\nFrames are synthesizing in the GPU cluster. Your video will appear here automatically.`);
+                            }
+                        } catch (err: any) {
+                            console.warn('[Playground] Video poll tick failed:', err);
+                        }
+                    }
+
+                    if (videoUrl) {
+                        setPlaygroundResponse(`VIDEO_GENERATED: ${videoUrl}`);
+                    } else if (pollError) {
+                        setPlaygroundResponse(`Video Generation Error: ${pollError}`);
+                    } else {
+                        setPlaygroundResponse(`Video is still rendering in the background (Task ID: ${taskId}). You can check back shortly or poll ${pollUrl}.`);
+                    }
                 } else if (data.error) {
                     setPlaygroundResponse(`Error: ${data.error.message || JSON.stringify(data.error)}`);
                 } else {
@@ -1916,12 +1958,54 @@ main();`;
                                     ) : playgroundResponse ? (
                                         playgroundResponse.startsWith('IMAGE_GENERATED: ') ? (
                                             <div className="space-y-2">
-                                                <div className="text-emerald-400 font-bold">Image Generated Successfully!</div>
+                                                <div className="text-emerald-400 font-bold flex items-center gap-1.5">
+                                                    <CheckCircle2 className="h-4 w-4" />
+                                                    <span>Image Generated Successfully!</span>
+                                                </div>
                                                 <img 
                                                     src={playgroundResponse.replace('IMAGE_GENERATED: ', '')} 
                                                     alt="Generated Output" 
-                                                    className="rounded-lg max-h-64 object-cover border border-zinc-700" 
+                                                    className="rounded-lg max-h-64 object-cover border border-zinc-700 shadow-md" 
                                                 />
+                                                <div className="pt-1">
+                                                    <a 
+                                                        href={playgroundResponse.replace('IMAGE_GENERATED: ', '')} 
+                                                        target="_blank" 
+                                                        rel="noopener noreferrer" 
+                                                        className="text-[11px] text-orange-400 hover:underline flex items-center gap-1 font-sans"
+                                                    >
+                                                        <span>Open full-resolution image</span>
+                                                        <ExternalLink className="h-3 w-3" />
+                                                    </a>
+                                                </div>
+                                            </div>
+                                        ) : playgroundResponse.startsWith('VIDEO_GENERATED: ') ? (
+                                            <div className="space-y-3">
+                                                <div className="text-emerald-400 font-bold flex items-center gap-1.5">
+                                                    <CheckCircle2 className="h-4 w-4" />
+                                                    <span>Video Rendered Successfully!</span>
+                                                </div>
+                                                <div className="rounded-lg overflow-hidden border border-zinc-700 bg-black/80 max-w-lg shadow-xl">
+                                                    <video 
+                                                        src={playgroundResponse.replace('VIDEO_GENERATED: ', '')} 
+                                                        controls 
+                                                        autoPlay 
+                                                        loop 
+                                                        playsInline 
+                                                        className="w-full max-h-72 object-contain"
+                                                    />
+                                                </div>
+                                                <div className="flex items-center gap-3 pt-1">
+                                                    <a 
+                                                        href={playgroundResponse.replace('VIDEO_GENERATED: ', '')} 
+                                                        target="_blank" 
+                                                        rel="noopener noreferrer" 
+                                                        className="text-[11px] text-orange-400 hover:underline flex items-center gap-1 font-sans font-medium"
+                                                    >
+                                                        <span>Download / Open MP4 Video</span>
+                                                        <ExternalLink className="h-3 w-3" />
+                                                    </a>
+                                                </div>
                                             </div>
                                         ) : (
                                             playgroundResponse
