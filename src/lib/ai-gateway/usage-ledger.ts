@@ -72,16 +72,47 @@ export async function ensureAiTablesExist(): Promise<void> {
 /**
  * Calculates estimated cost for analytics
  */
-export function estimateCost(modality: Modality, inputTokens: number = 0, outputTokens: number = 0): number {
+export function estimateCost(
+  modality: Modality, 
+  inputTokens: number = 0, 
+  outputTokens: number = 0,
+  modelId?: string
+): number {
+  if (modality === 'embedding' || (modality as string) === 'embeddings') {
+    // Amazon Titan Embeddings V2: $0.02 per 1M tokens ($0.00002 / 1k tokens)
+    return Number(((inputTokens / 1_000_000) * 0.02).toFixed(6));
+  }
   if (modality === 'image') return 0.02; // $0.02 per generated image
   if (modality === 'video') return 0.10; // $0.10 per video clip
   if (modality === 'audio-stt') return 0.006; // $0.006 per minute
   if (modality === 'audio-tts') return 0.015; // $0.015 per 1000 chars
 
-  // Text: $0.15 / 1M prompt tokens, $0.60 / 1M completion tokens
-  const promptCost = (inputTokens / 1_000_000) * 0.15;
-  const completionCost = (outputTokens / 1_000_000) * 0.60;
-  return Number((promptCost + completionCost).toFixed(6));
+  // Text models pricing
+  const m = (modelId || '').toLowerCase();
+  let promptPer1M = 0.15;
+  let completionPer1M = 0.60;
+
+  if (m.includes('nova-pro') || m.includes('ultra') || m.includes('gpt-4o')) {
+    promptPer1M = 0.80;
+    completionPer1M = 3.20;
+  } else if (m.includes('nova-micro')) {
+    promptPer1M = 0.035;
+    completionPer1M = 0.14;
+  } else if (m.includes('nova-lite')) {
+    promptPer1M = 0.06;
+    completionPer1M = 0.24;
+  } else if (m.includes('titan-embed') || m.includes('embed')) {
+    return Number(((inputTokens / 1_000_000) * 0.02).toFixed(6));
+  }
+
+  const promptCost = (inputTokens / 1_000_000) * promptPer1M;
+  const completionCost = (outputTokens / 1_000_000) * completionPer1M;
+  const total = promptCost + completionCost;
+
+  if (total === 0 && (inputTokens > 0 || outputTokens > 0)) {
+    return 0.000001;
+  }
+  return Number(total.toFixed(6));
 }
 
 /**
@@ -93,7 +124,7 @@ export async function recordAiUsage(record: AiUsageRecord): Promise<void> {
     try {
       await ensureAiTablesExist();
       const pool = getPgPool();
-      const cost = record.costEstimate ?? estimateCost(record.modality, record.inputTokens, record.outputTokens);
+      const cost = record.costEstimate ?? estimateCost(record.modality, record.inputTokens, record.outputTokens, record.modelId);
 
       await pool.query(
         `INSERT INTO fluxbase_global.ai_usage_log 
