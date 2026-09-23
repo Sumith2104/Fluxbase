@@ -80,7 +80,6 @@ const navItems = [
     { href: "/query", label: "SQL Editor", icon: <SquareTerminal /> },
     { href: "/ai-models", label: "AI Models", icon: <Sparkles /> },
     { href: "/analytics", label: "Analytics", icon: <BarChart3 /> },
-    { href: "/scraper", label: "Scraper", icon: <Globe /> },
     { href: "/storage", label: "Storage", icon: <Folder /> },
     { href: "/settings", label: "Settings", icon: <SettingsIcon /> },
 ];
@@ -311,7 +310,7 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
     const isLoading = userLoading || projectContextLoading;
 
     const toolItems = navItems.slice(0, -1).map(item => {
-        const isProjectSpecific = ["/editor", "/storage", "/query", "/database", "/analytics", "/scraper"].includes(item.href);
+        const isProjectSpecific = ["/editor", "/storage", "/query", "/database", "/analytics"].includes(item.href);
         const isDisabled = isProjectSpecific && !selectedProject?.project_id;
         let finalHref = item.href;
 
