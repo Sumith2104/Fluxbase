@@ -13,7 +13,7 @@ import {
     LayoutDashboard, Table, Database, SquareTerminal, BarChart3,
     Code, Globe, Folder, Settings, Search, ArrowRight,
     Users, Key, Webhook, Shield, GitBranch,
-    Bell, Archive, CreditCard, Sparkles
+    Bell, Archive, CreditCard, Infinity as InfinityIcon
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useKeyboardShortcuts } from '@/hooks/use-keyboard-shortcuts';
@@ -38,7 +38,7 @@ const getStaticItems = (projectId?: string): CommandItem[] => {
         { id: 'database', label: 'Database', description: 'Manage schema & structure', icon: <Database className="h-4 w-4" />, href: projectHref('/database'), category: 'Navigation', keywords: ['schema', 'columns'] },
         { id: 'query', label: 'SQL Editor', description: 'Run SQL queries', icon: <SquareTerminal className="h-4 w-4" />, href: projectHref('/query'), category: 'Navigation', keywords: ['sql', 'query', 'select'] },
         { id: 'analytics', label: 'Analytics', description: 'View usage analytics', icon: <BarChart3 className="h-4 w-4" />, href: projectHref('/analytics'), category: 'Navigation', keywords: ['charts', 'metrics', 'stats'] },
-        { id: 'ai-models', label: 'AI Models', description: 'AI Gateway & frontier models hub', icon: <Sparkles className="h-4 w-4" />, href: '/ai-models', category: 'Navigation', keywords: ['ai', 'models', 'claude', 'bedrock', 'chat', 'llm'] },
+        { id: 'ai-models', label: 'AI Models', description: 'AI Gateway & frontier models hub', icon: <InfinityIcon className="h-4 w-4" />, href: '/ai-models', category: 'Navigation', keywords: ['ai', 'models', 'claude', 'bedrock', 'chat', 'llm', 'infinity'] },
         { id: 'api', label: 'API', description: 'REST API explorer', icon: <Code className="h-4 w-4" />, href: projectHref('/api'), category: 'Navigation', keywords: ['rest', 'endpoint'] },
         { id: 'storage', label: 'Storage', description: 'File & object storage', icon: <Folder className="h-4 w-4" />, href: projectHref('/storage'), category: 'Navigation', keywords: ['files', 's3', 'upload'] },
         // Settings

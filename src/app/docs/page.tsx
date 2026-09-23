@@ -6,7 +6,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { 
     Download, Book, Code2, Webhook, Database, ShieldCheck, Shield,
     Zap, Copy, Check, ArrowRight, HardDrive, AlertCircle,
-    Info, Lock, Users, Eye, KeyRound, Globe, Cpu, ChevronRight, Bot, Sparkles, Printer
+    Info, Lock, Users, Eye, KeyRound, Globe, Cpu, ChevronRight, Bot, Sparkles, Printer,
+    Infinity as InfinityIcon
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -350,7 +351,7 @@ Content-Type: application/json`} />
                             <div className="my-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 rounded-xl border border-orange-500/30 bg-orange-500/10 text-orange-200">
                                 <div className="space-y-1">
                                     <div className="font-bold text-sm text-white flex items-center gap-1.5">
-                                        <Sparkles className="h-4 w-4 text-orange-400" />
+                                        <InfinityIcon className="h-4 w-4 text-orange-400" />
                                         Interactive AI Models Hub & Key Creation
                                     </div>
                                     <p className="text-xs text-orange-200/80">
@@ -363,7 +364,7 @@ Content-Type: application/json`} />
                             </div>
 
                             <h3 className="text-base font-bold text-white mt-8 flex items-center gap-2">
-                                <Sparkles className="h-4 w-4 text-orange-400" />
+                                <InfinityIcon className="h-4 w-4 text-orange-400" />
                                 Available Flux AI Models & Real Upstream Architectures
                             </h3>
                             <p className="text-sm">
@@ -675,7 +676,7 @@ for item in response.data:
                                         </tr>
                                         <tr className="bg-emerald-500/5 hover:bg-emerald-500/10">
                                             <td className="px-4 py-3 font-bold text-emerald-400 text-xs flex items-center gap-1.5">
-                                                <Sparkles className="h-3.5 w-3.5" /> Employee / Org Owner / PAYG
+                                                <InfinityIcon className="h-3.5 w-3.5" /> Employee / Org Owner / PAYG
                                             </td>
                                             <td className="px-4 py-3 text-xs text-emerald-300 font-mono font-bold">Unlimited</td>
                                             <td className="px-4 py-3 text-xs text-emerald-300 font-mono font-bold">Unlimited</td>

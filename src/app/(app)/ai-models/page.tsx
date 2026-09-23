@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useContext, useMemo } from 'react';
 import { ProjectContext } from '@/contexts/project-context';
 import { 
-    Sparkles, Key, Copy, Check, Search, Shield, Zap, 
+    Infinity as InfinityIcon, Key, Copy, Check, Search, Shield, Zap, 
     Bot, Cpu, Image as ImageIcon, Video, Mic, Volume2, 
     Database, ExternalLink, RefreshCw, Plus, Trash2, 
     Code2, Play, Terminal, ArrowUpRight, CheckCircle2,
@@ -880,11 +880,14 @@ main();`;
                 <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 relative z-10">
                     <div className="space-y-2">
                         <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-semibold bg-orange-500/10 text-orange-400 border border-orange-500/20">
-                            <Sparkles className="h-3.5 w-3.5" />
+                            <InfinityIcon className="h-3.5 w-3.5" />
                             Universal Multimodal Gateway • OpenAI-Compatible
                         </div>
-                        <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight text-foreground">
-                            AI Models & Gateway Registry
+                        <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight text-foreground flex items-center gap-3">
+                            <span className="flex items-center justify-center h-10 w-10 sm:h-11 sm:w-11 rounded-xl bg-orange-500/15 border border-orange-500/30 text-orange-500 shadow-md shadow-orange-500/10 shrink-0">
+                                <InfinityIcon className="h-6 w-6" />
+                            </span>
+                            <span>AI Models & Gateway Registry</span>
                         </h1>
                         <p className="text-muted-foreground max-w-2xl text-sm sm:text-base leading-relaxed">
                             Access top-tier frontier intelligence across 6 modalities with unified OpenAI SDK compatibility. 

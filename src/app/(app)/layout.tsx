@@ -63,6 +63,7 @@ import {
     BarChart3,
     AlertTriangle,
     Sparkles,
+    Infinity as InfinityIcon,
     SquareTerminal,
     LogOut,
     CreditCard,
@@ -78,7 +79,7 @@ const navItems = [
     { href: "/editor", label: "Table Editor", icon: <Table /> },
     { href: "/database", label: "Database", icon: <Database /> },
     { href: "/query", label: "SQL Editor", icon: <SquareTerminal /> },
-    { href: "/ai-models", label: "AI Models", icon: <Sparkles /> },
+    { href: "/ai-models", label: "AI Models", icon: <InfinityIcon /> },
     { href: "/analytics", label: "Analytics", icon: <BarChart3 /> },
     { href: "/storage", label: "Storage", icon: <Folder /> },
     { href: "/settings", label: "Settings", icon: <SettingsIcon /> },
@@ -397,9 +398,9 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
             description: 'Go to Settings'
         },
         {
-            combination: 'g w',
-            handler: () => selectedProject?.project_id ? router.push(`/scraper?projectId=${selectedProject.project_id}`) : router.push('/dashboard/projects'),
-            description: 'Go to Scraper'
+            combination: 'g m',
+            handler: () => router.push('/ai-models'),
+            description: 'Go to AI Models'
         },
     ], !!userId);
 
