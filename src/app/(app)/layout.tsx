@@ -78,6 +78,7 @@ const navItems = [
     { href: "/editor", label: "Table Editor", icon: <Table /> },
     { href: "/database", label: "Database", icon: <Database /> },
     { href: "/query", label: "SQL Editor", icon: <SquareTerminal /> },
+    { href: "/ai-models", label: "AI Models", icon: <Sparkles /> },
     { href: "/analytics", label: "Analytics", icon: <BarChart3 /> },
     { href: "/scraper", label: "Scraper", icon: <Globe /> },
     { href: "/storage", label: "Storage", icon: <Folder /> },

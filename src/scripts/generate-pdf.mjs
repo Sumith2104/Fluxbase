@@ -394,23 +394,44 @@ addText(
 addAlert('Gateway Base URL & Compatibility',
     'Endpoint: POST https://www.fluxbasedb.me/api/v1/chat/completions\n' +
     'Set your client base_url to "https://www.fluxbasedb.me/api/v1" and supply your Fluxbase API Key.\n' +
-    'Supports both standard JSON responses and real-time Server-Sent Events (stream=true).',
+    'Dedicated Interactive Hub: https://www.fluxbasedb.me/ai-models\n' +
+    'Supports streaming (stream=true), image generation, video tasks, and speech STT/TTS.',
     'success'
 );
 
-addH2('Model Catalog');
+addH2('Frontier Model Catalog & Real Upstream Architectures');
 addTable(
-    ['Model ID', 'Tier & Speed', 'Capabilities & Best Use Case'],
+    ['Gateway ID', 'Real Upstream Model', 'Provider / Tier', 'Specs & Best Use Case'],
     [
-        ['flux', 'Flagship (Default)', 'General reasoning, high-precision SQL synthesis, code intelligence'],
-        ['flux-flash', 'Realtime Ultra-Fast', 'Sub-100ms token throughput. Ideal for autocompletion and chat UX'],
-        ['flux-pro', 'Balanced Pro', 'Complex multi-table queries, strict JSON schema mode, auditing'],
-        ['flux-ultra', 'Deep Reasoning', 'Maximum cognitive depth for system architecture and large chains'],
-        ['flux-5.2', 'Frontier Agentic', 'Specialized in multi-step autonomous agent execution and tool use'],
-        ['gpt-4o', 'OpenAI Alias', 'Drop-in alias automatically mapped to flux-ultra'],
-        ['gpt-3.5-turbo', 'OpenAI Alias', 'Drop-in alias automatically mapped to flux-flash'],
+        ['flux-sonnet', 'Claude Sonnet 4.5', 'Bedrock (Pro)', 'Frontier reasoning, complex coding, 200k context, 64k max output'],
+        ['flux-pro-max', 'Claude 3.7 / 4.6 Sonnet', 'Bedrock (Max)', 'Extended thinking benchmarks and deep SQL query optimization'],
+        ['flux-turbo', 'LLaMA 3.3 70B Versatile', 'Groq (Free)', 'Hyper-speed 300+ tok/s inference on Groq LPUs. 128k context'],
+        ['flux-omni', 'Gemini 2.0 Flash', 'Google (Free)', 'Massive 1M token context window, multimodal vision understanding'],
+        ['flux-max', 'GPT-4o Mini', 'OpenAI (Free)', 'Lightweight flagship coding and prompt adherence. 128k context'],
+        ['flux', 'GLM-4 Flash (Default)', 'Zhipu (Free)', 'High-accuracy general reasoning, precision SQL synthesis. 128k context'],
+        ['flux-flash', 'GLM-4 Flash (Turbo UX)', 'Zhipu (Free)', 'Sub-100ms token throughput. Ideal for autocompletion and chat UX'],
+        ['flux-5.2', 'GLM-4 Plus (Agentic)', 'Zhipu (Free)', 'Specialized reasoning for autonomous multi-step agent tool execution'],
+        ['flux-image-ultra', 'Stable Image Ultra 1.0', 'Bedrock (Pro)', 'SOTA photorealism, typography rendering, S3 auto cloud storage'],
+        ['flux-image-hd', 'Imagen 3.0', 'Google (Free)', 'High-definition 4K image generation with superior detail rendering'],
+        ['flux-video-ray', 'Luma Ray v2', 'Bedrock (Pro)', 'Cinema-grade video generation with realistic physics and motion'],
+        ['flux-listen', 'Whisper Large v3 Turbo', 'Groq (Free)', '10x real-time multilingual transcription with word-level timestamps'],
+        ['flux-speak', 'TTS-1 (6 Voices)', 'OpenAI (Free)', 'Natural expressive speech synthesis (alloy, echo, fable, onyx, etc.)'],
+        ['flux-embed', 'Text Embedding 004', 'Google (Free)', '768-dimensional dense vector embeddings for semantic search & RAG'],
+        ['gpt-4o', 'GPT-4o Alias', 'OpenAI (Free)', 'Drop-in compatibility alias automatically mapped to flux-ultra'],
     ],
-    [90, 110, 305]
+    [85, 105, 80, 235]
+);
+
+addH2('Tier Token Allocations & Rate Limits Matrix');
+addTable(
+    ['Plan Tier', 'Text TPM', 'Requests / Min', 'Daily Quota', 'Image & Video Limits'],
+    [
+        ['Free', '10,000 TPM', '10 RPM', '500 req / day', '5 Images/day • Video locked'],
+        ['Pro', '100,000 TPM', '60 RPM', '10,000 req / day', '50 Images/day • 5 Videos/day'],
+        ['Max', '500,000 TPM', '300 RPM', '50,000 req / day', '200 Images/day • 20 Videos/day'],
+        ['Pay-As-You-Go', 'Unlimited TPM', 'Unlimited RPM', 'Unlimited (Metered)', 'Uncapped elasticity at standard rates'],
+    ],
+    [75, 85, 80, 110, 155]
 );
 
 addH2('Python Integration (OpenAI SDK)');
@@ -422,25 +443,24 @@ addCodeBlock([
     '    api_key="flx_live_your_fluxbase_key"',
     ')',
     '',
-    '# Standard Completion',
+    '# 1. Frontier Reasoning with Claude Sonnet 4.5',
     'response = client.chat.completions.create(',
-    '    model="flux",',
+    '    model="flux-sonnet",',
     '    messages=[',
-    '        {"role": "system", "content": "You are a senior PostgreSQL database architect."},',
-    '        {"role": "user", "content": "Design an optimized partition table for user telemetry."}',
+    '        {"role": "system", "content": "You are a senior database architect."},',
+    '        {"role": "user", "content": "Design an optimal distributed sharding schema."}',
     '    ],',
     '    temperature=0.2',
     ')',
     'print(response.choices[0].message.content)',
     '',
-    '# Real-Time Streaming (SSE)',
-    'stream = client.chat.completions.create(',
-    '    model="flux-flash",',
-    '    messages=[{"role": "user", "content": "Explain window functions vs CTEs in SQL."}],',
-    '    stream=True',
+    '# 2. SOTA Photorealistic Image Generation',
+    'img = client.images.generate(',
+    '    model="flux-image-ultra",',
+    '    prompt="Futuristic data center server room, neon orange coolant, cinematic 8k",',
+    '    size="1024x1024"',
     ')',
-    'for chunk in stream:',
-    '    print(chunk.choices[0].delta.content or "", end="", flush=True)',
+    'print("Image URL:", img.data[0].url)',
 ], 'python');
 
 addH2('Node.js / TypeScript Integration');

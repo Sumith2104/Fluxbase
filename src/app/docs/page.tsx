@@ -346,9 +346,25 @@ Content-Type: application/json`} />
                                 <strong>Unlimited Everything Policy:</strong> Accounts on <strong className="text-emerald-300">Employee</strong>, <strong className="text-emerald-300">Org Owner</strong>, and <strong className="text-emerald-300">Pay-As-You-Go (PAYG)</strong> plans enjoy <strong>unlimited access across all modalities</strong>. Rate limits (RPM/TPM), daily quotas, and tier-lock restrictions are completely waived.
                             </Callout>
 
+                            {/* Hub Banner */}
+                            <div className="my-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 rounded-xl border border-orange-500/30 bg-orange-500/10 text-orange-200">
+                                <div className="space-y-1">
+                                    <div className="font-bold text-sm text-white flex items-center gap-1.5">
+                                        <Sparkles className="h-4 w-4 text-orange-400" />
+                                        Interactive AI Models Hub & Key Creation
+                                    </div>
+                                    <p className="text-xs text-orange-200/80">
+                                        Browse all 33 models with real upstream architectures, inspect your tier&apos;s token quotas, test live in browser playground, and create scoped API keys.
+                                    </p>
+                                </div>
+                                <Button size="sm" asChild className="bg-orange-500 hover:bg-orange-600 text-white font-semibold shrink-0">
+                                    <Link href="/ai-models">Open AI Models Hub →</Link>
+                                </Button>
+                            </div>
+
                             <h3 className="text-base font-bold text-white mt-8 flex items-center gap-2">
                                 <Sparkles className="h-4 w-4 text-orange-400" />
-                                Available Flux AI Models
+                                Available Flux AI Models & Real Upstream Architectures
                             </h3>
                             <p className="text-sm">
                                 All requests to <code className="text-xs font-mono text-foreground/80 bg-muted px-1.5 py-0.5 rounded">/api/v1/chat/completions</code> use these model identifiers. If omitted, the default model is <code className="text-xs font-mono text-orange-400 bg-orange-500/10 px-1.5 py-0.5 rounded">flux</code>.
@@ -360,43 +376,118 @@ Content-Type: application/json`} />
                                     <thead>
                                         <tr className="bg-secondary border-b border-border text-xs uppercase tracking-wide text-muted-foreground/75">
                                             <th className="px-4 py-3">Modality</th>
-                                            <th className="px-4 py-3">Model ID</th>
-                                            <th className="px-4 py-3">Tier / Aliases</th>
-                                            <th className="px-4 py-3">Capabilities & Best For</th>
+                                            <th className="px-4 py-3">Flux Gateway ID</th>
+                                            <th className="px-4 py-3">Real Upstream Model</th>
+                                            <th className="px-4 py-3">Provider</th>
+                                            <th className="px-4 py-3">Min Tier</th>
+                                            <th className="px-4 py-3">Capabilities & Specs</th>
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-border/60">
                                         {[
-                                            { mod: 'Text / Chat', id: 'flux', tier: 'Flagship (Default)', desc: 'High-accuracy general reasoning, SQL synthesis, and conversational code intelligence. 128k context.' },
-                                            { mod: 'Text / Chat', id: 'flux-flash', tier: 'Low Latency', desc: 'Ultra-fast token throughput. Ideal for autocompletion, real-time UX, and lightweight tasks.' },
-                                            { mod: 'Text / Chat', id: 'flux-pro', tier: 'Balanced Pro', desc: 'Enhanced instruction following, multi-table analysis, and strict JSON formatting.' },
-                                            { mod: 'Text / Chat', id: 'flux-ultra', tier: 'Enterprise Intelligence', desc: 'Maximum cognitive depth for complex system architecture, long reasoning chains, and auditing.' },
-                                            { mod: 'Text / Chat', id: 'flux-5.2', tier: 'Frontier', desc: 'Next-generation reasoning architecture specialized in multi-step agentic execution.' },
-                                            { mod: 'Text / Chat', id: 'flux-sonnet', tier: 'Frontier (Claude 4.5)', desc: 'Frontier coding, architectural reasoning, and agentic workflows powered by Claude Sonnet 4.5 on AWS Bedrock.' },
-                                            { mod: 'Text / Chat', id: 'flux-turbo', tier: 'Hyper-Speed (300+ tok/s)', desc: 'Hyper-speed 300+ tokens/second inference powered by Groq LLaMA 3.3. 128k context.' },
-                                            { mod: 'Text / Chat', id: 'flux-omni', tier: 'Multimodal Vision', desc: 'Multimodal vision, document comprehension, and fast reasoning. 1M context.' },
-                                            { mod: 'Text / Chat', id: 'gpt-4o', tier: 'Alias → flux-ultra', desc: 'OpenAI drop-in compatibility alias automatically mapped to flux-ultra.' },
-                                            { mod: 'Text / Chat', id: 'gpt-3.5-turbo', tier: 'Alias → flux-flash', desc: 'OpenAI drop-in compatibility alias automatically mapped to flux-flash.' },
-                                            { mod: 'Image Generation', id: 'flux-image', tier: 'Photorealistic (dall-e-3)', desc: 'High-quality photorealistic text-to-image synthesis with automatic S3 hosting.' },
-                                            { mod: 'Image Generation', id: 'flux-image-fast', tier: 'Fast (dall-e-2)', desc: 'Ultra-fast low-latency image generation for web assets and thumbnails.' },
-                                            { mod: 'Image Generation', id: 'flux-image-hd', tier: 'High Definition', desc: 'High-definition 4K image generation with superior typography rendering.' },
-                                            { mod: 'Image Generation', id: 'flux-image-ultra', tier: 'Photorealism Ultra', desc: 'State-of-the-art photorealistic image generation with typography powered by Stability AI Stable Image Ultra on AWS Bedrock.' },
-                                            { mod: 'Speech-to-Text', id: 'flux-listen', tier: 'STT (whisper-1)', desc: 'Ultra-fast multilingual audio transcription with segment timestamps.' },
-                                            { mod: 'Speech-to-Text', id: 'flux-listen-pro', tier: 'STT Studio Quality', desc: 'Maximum precision transcription for noisy, accented, or technical audio.' },
-                                            { mod: 'Text-to-Speech', id: 'flux-speak', tier: 'TTS (tts-1)', desc: 'Natural, expressive voice synthesis across 6 voices (alloy, echo, fable, onyx, nova, shimmer).' },
-                                            { mod: 'Text-to-Speech', id: 'flux-speak-hd', tier: 'TTS Studio HD', desc: 'Studio-grade high-definition audio synthesis for production voiceovers.' },
-                                            { mod: 'Video Generation', id: 'flux-video', tier: 'Text / Image to Video', desc: 'Dynamic motion video synthesis (HTTP 202 async task polling).' },
-                                            { mod: 'Video Generation', id: 'flux-video-pro', tier: 'Cinematic 1080p', desc: 'Cinematic 1080p high-fidelity video generation.' },
-                                            { mod: 'Video Generation', id: 'flux-video-ray', tier: 'Cinema Grade (Luma)', desc: 'Cinema-grade dynamic video generation with realistic physics and camera motion powered by Luma AI Ray v2 on AWS Bedrock.' },
-                                            { mod: 'Embeddings', id: 'flux-embed', tier: 'Vector (768-dim)', desc: '768-dimensional vector embeddings for semantic search and RAG pipelines.' },
+                                            { mod: 'Text / Chat', id: 'flux-sonnet', real: 'Claude Sonnet 4.5', prov: 'AWS Bedrock', tier: 'Pro', desc: 'SOTA frontier reasoning, architectural design, coding. 200k context, 64k max output.' },
+                                            { mod: 'Text / Chat', id: 'flux-pro-max', real: 'Claude 3.7 / 4.6 Sonnet', prov: 'AWS Bedrock', tier: 'Max', desc: 'Frontier hybrid reasoning with extended thinking and rigorous SQL optimization. 200k context.' },
+                                            { mod: 'Text / Chat', id: 'flux-turbo', real: 'LLaMA 3.3 70B Versatile', prov: 'Groq / Meta', tier: 'Free', desc: 'Hyper-speed 300+ tokens/second inference. Ideal for real-time agents. 128k context.' },
+                                            { mod: 'Text / Chat', id: 'flux-omni', real: 'Gemini 2.0 Flash', prov: 'Google Gemini', tier: 'Free', desc: 'Massive 1M token context window, multimodal vision understanding, high velocity.' },
+                                            { mod: 'Text / Chat', id: 'flux-max', real: 'GPT-4o Mini', prov: 'OpenAI', tier: 'Free', desc: 'Flagship coding, instruction following, and vision benchmarks. 128k context.' },
+                                            { mod: 'Text / Chat', id: 'flux', real: 'GLM-4 Flash', prov: 'Zhipu AI', tier: 'Free', desc: 'Flagship default. High-accuracy general reasoning, precision SQL synthesis. 128k context.' },
+                                            { mod: 'Text / Chat', id: 'flux-flash', real: 'GLM-4 Flash (Turbo UX)', prov: 'Zhipu AI', tier: 'Free', desc: 'Sub-100ms token throughput. Ideal for autocompletion, real-time UX, streaming.' },
+                                            { mod: 'Text / Chat', id: 'flux-5.2', real: 'GLM-4 Plus (Agentic)', prov: 'Zhipu AI', tier: 'Free', desc: 'Frontier reasoning architecture engineered for multi-step agentic execution.' },
+                                            { mod: 'Text / Chat', id: 'flux-pro', real: 'GLM-4 Air', prov: 'Zhipu AI', tier: 'Free', desc: 'Enhanced instruction following, multi-table analysis, strict JSON Schema formatting.' },
+                                            { mod: 'Text / Chat', id: 'flux-ultra', real: 'GLM-4 Plus (Deep Reasoning)', prov: 'Zhipu AI', tier: 'Free', desc: 'Maximum cognitive depth for database architectural blueprints and complex migrations.' },
+                                            { mod: 'Text / Chat', id: 'flux-vision', real: 'GLM-4V Multimodal', prov: 'Zhipu AI', tier: 'Free', desc: 'Visual schema comprehension, diagram recognition, screenshot-to-code.' },
+                                            { mod: 'Text / Chat', id: 'gpt-4o', real: 'GPT-4o Alias', prov: 'OpenAI', tier: 'Free', desc: 'OpenAI compatibility alias automatically mapped to flux-ultra.' },
+                                            { mod: 'Text / Chat', id: 'gpt-3.5-turbo', real: 'GPT-3.5 Turbo Alias', prov: 'OpenAI', tier: 'Free', desc: 'OpenAI compatibility alias automatically mapped to flux-flash.' },
+                                            { mod: 'Image Generation', id: 'flux-image-ultra', real: 'Stable Image Ultra 1.0', prov: 'AWS Bedrock', tier: 'Pro', desc: 'SOTA photorealism, typography rendering, and cinematic lighting with automatic S3 storage.' },
+                                            { mod: 'Image Generation', id: 'flux-image-hd', real: 'Imagen 3.0', prov: 'Google Gemini', tier: 'Free', desc: 'High-definition 4K image generation with superior detail and typography.' },
+                                            { mod: 'Image Generation', id: 'flux-image-pro', real: 'DALL·E 3', prov: 'OpenAI', tier: 'Pro', desc: 'Premium creative composition with prompt adherence and S3 storage.' },
+                                            { mod: 'Image Generation', id: 'flux-image', real: 'CogView 4', prov: 'Zhipu AI', tier: 'Free', desc: 'High-quality photorealistic text-to-image synthesis with automatic S3 cloud hosting.' },
+                                            { mod: 'Image Generation', id: 'flux-image-fast', real: 'CogView 3 Flash', prov: 'Zhipu AI', tier: 'Free', desc: 'Ultra-fast low-latency image generation for avatars and thumbnails.' },
+                                            { mod: 'Video Generation', id: 'flux-video-ray', real: 'Luma Ray v2', prov: 'AWS Bedrock', tier: 'Pro', desc: 'Cinema-grade video generation with realistic physics and camera motion on AWS Bedrock.' },
+                                            { mod: 'Video Generation', id: 'flux-video', real: 'CogVideoX Flash', prov: 'Zhipu AI', tier: 'Pro', desc: 'Text-to-video synthesis with dynamic motion and lighting (HTTP 202 async polling).' },
+                                            { mod: 'Video Generation', id: 'flux-video-pro', real: 'CogVideoX HD', prov: 'Zhipu AI', tier: 'Max', desc: 'Cinematic 1080p high-fidelity video generation.' },
+                                            { mod: 'Speech-to-Text', id: 'flux-listen', real: 'Whisper Large v3 Turbo', prov: 'Groq / Meta', tier: 'Free', desc: '10x real-time multilingual transcription with timestamps on Groq LPUs.' },
+                                            { mod: 'Speech-to-Text', id: 'flux-listen-pro', real: 'Whisper Large v3', prov: 'Groq / Meta', tier: 'Free', desc: 'Maximum precision transcription for noisy, technical audio.' },
+                                            { mod: 'Speech-to-Text', id: 'flux-listen-en', real: 'Distil-Whisper Large v3 En', prov: 'Groq / Meta', tier: 'Free', desc: 'Lightweight, hyper-fast English-only speech recognition.' },
+                                            { mod: 'Text-to-Speech', id: 'flux-speak', real: 'TTS-1', prov: 'OpenAI', tier: 'Free', desc: 'Natural voice synthesis across 6 voices (alloy, echo, fable, onyx, nova, shimmer).' },
+                                            { mod: 'Text-to-Speech', id: 'flux-speak-hd', real: 'TTS-1 HD', prov: 'OpenAI', tier: 'Pro', desc: 'Studio-grade high-definition audio synthesis for production voiceovers.' },
+                                            { mod: 'Embeddings', id: 'flux-embed', real: 'Text Embedding 004', prov: 'Google Gemini', tier: 'Free', desc: '768-dimensional dense vector embeddings for semantic search and RAG.' },
                                         ].map(m => (
                                             <tr key={m.id} className="hover:bg-secondary/70">
                                                 <td className="px-4 py-3 font-mono text-cyan-400 text-xs font-semibold whitespace-nowrap">{m.mod}</td>
                                                 <td className="px-4 py-3 font-mono text-orange-400 text-xs font-bold whitespace-nowrap">{m.id}</td>
-                                                <td className="px-4 py-3 text-xs text-muted-foreground font-mono">{m.tier}</td>
+                                                <td className="px-4 py-3 text-xs font-semibold text-foreground whitespace-nowrap">{m.real}</td>
+                                                <td className="px-4 py-3 text-xs text-muted-foreground whitespace-nowrap">{m.prov}</td>
+                                                <td className="px-4 py-3 whitespace-nowrap">
+                                                    <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                                                        m.tier === 'Max' ? 'bg-amber-500/10 text-amber-400 border border-amber-500/30' :
+                                                        m.tier === 'Pro' ? 'bg-blue-500/10 text-blue-400 border border-blue-500/30' :
+                                                        'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30'
+                                                    }`}>
+                                                        {m.tier}
+                                                    </span>
+                                                </td>
                                                 <td className="px-4 py-3 text-foreground/85 text-xs">{m.desc}</td>
                                             </tr>
                                         ))}
+                                    </tbody>
+                                </table>
+                            </div>
+
+                            {/* Tier Token Quotas Table */}
+                            <h3 className="text-base font-bold text-white mt-8 flex items-center gap-2">
+                                <Shield className="h-4 w-4 text-emerald-400" />
+                                Tier Token Allocations & Rate Limits Matrix
+                            </h3>
+                            <p className="text-sm">
+                                Token throughput (TPM), request velocity (RPM), and daily generation ceilings enforced per account tier:
+                            </p>
+
+                            <div className="rounded-lg border border-border overflow-hidden text-sm mt-3">
+                                <table className="w-full text-left bg-card">
+                                    <thead>
+                                        <tr className="bg-secondary border-b border-border text-xs uppercase tracking-wide text-muted-foreground/75">
+                                            <th className="px-4 py-3">Plan Tier</th>
+                                            <th className="px-4 py-3">Text & Reasoning TPM</th>
+                                            <th className="px-4 py-3">Requests / Min</th>
+                                            <th className="px-4 py-3">Daily Request Limit</th>
+                                            <th className="px-4 py-3">Image Generation</th>
+                                            <th className="px-4 py-3">Video Synthesis</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-border/60 text-xs">
+                                        <tr className="hover:bg-secondary/70">
+                                            <td className="px-4 py-3 font-bold text-zinc-400">Free Tier</td>
+                                            <td className="px-4 py-3 font-mono">10,000 TPM</td>
+                                            <td className="px-4 py-3 font-mono">10 RPM</td>
+                                            <td className="px-4 py-3">500 req / day</td>
+                                            <td className="px-4 py-3">5 gens / day (20k TPM)</td>
+                                            <td className="px-4 py-3 text-muted-foreground">Locked (Pro/Max)</td>
+                                        </tr>
+                                        <tr className="hover:bg-secondary/70">
+                                            <td className="px-4 py-3 font-bold text-blue-400">Pro Tier</td>
+                                            <td className="px-4 py-3 font-mono text-blue-300">100,000 TPM</td>
+                                            <td className="px-4 py-3 font-mono">60 RPM</td>
+                                            <td className="px-4 py-3">10,000 req / day</td>
+                                            <td className="px-4 py-3 text-blue-300">50 gens / day (100k TPM)</td>
+                                            <td className="px-4 py-3 text-blue-300">5 gens / day (50k TPM)</td>
+                                        </tr>
+                                        <tr className="hover:bg-secondary/70">
+                                            <td className="px-4 py-3 font-bold text-amber-400">Max Tier</td>
+                                            <td className="px-4 py-3 font-mono text-amber-300">500,000 TPM</td>
+                                            <td className="px-4 py-3 font-mono">300 RPM</td>
+                                            <td className="px-4 py-3">50,000 req / day</td>
+                                            <td className="px-4 py-3 text-amber-300">200 gens / day (300k TPM)</td>
+                                            <td className="px-4 py-3 text-amber-300">20 gens / day (100k TPM)</td>
+                                        </tr>
+                                        <tr className="hover:bg-secondary/70 bg-emerald-500/5">
+                                            <td className="px-4 py-3 font-bold text-emerald-400">Pay-As-You-Go / Enterprise</td>
+                                            <td className="px-4 py-3 font-mono text-emerald-300 font-bold">Unlimited (Uncapped)</td>
+                                            <td className="px-4 py-3 font-mono text-emerald-300 font-bold">Unlimited</td>
+                                            <td className="px-4 py-3 text-emerald-300 font-bold">Unlimited (Metered)</td>
+                                            <td className="px-4 py-3 text-emerald-300 font-bold">Unlimited</td>
+                                            <td className="px-4 py-3 text-emerald-300 font-bold">Unlimited</td>
+                                        </tr>
                                     </tbody>
                                 </table>
                             </div>
