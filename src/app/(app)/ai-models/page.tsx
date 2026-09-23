@@ -1784,12 +1784,12 @@ main();`;
             <Dialog open={snippetModalOpen} onOpenChange={setSnippetModalOpen}>
                 <DialogContent className="max-w-2xl">
                     <DialogHeader>
-                        <DialogTitle className="flex items-center justify-between">
+                        <DialogTitle className="flex flex-wrap items-center justify-between gap-2.5">
                             <div className="flex items-center gap-2">
                                 <Code2 className="h-5 w-5 text-primary" />
                                 <span>Integration Code: {selectedSnippetModel?.label}</span>
                             </div>
-                            <span className="text-xs font-mono text-muted-foreground font-normal">
+                            <span className="text-xs font-mono text-muted-foreground font-normal bg-secondary/60 px-2 py-0.5 rounded border border-border/60">
                                 Real: {selectedSnippetModel?.realName}
                             </span>
                         </DialogTitle>
@@ -1854,7 +1854,7 @@ main();`;
             <Dialog open={playgroundModalOpen} onOpenChange={setPlaygroundModalOpen}>
                 <DialogContent className="max-w-3xl">
                     <DialogHeader>
-                        <DialogTitle className="flex items-center justify-between">
+                        <DialogTitle className="flex flex-wrap items-center justify-between gap-2.5">
                             <div className="flex items-center gap-2">
                                 <Play className="h-5 w-5 text-orange-400" />
                                 <span>Test Model: {selectedPlaygroundModel?.label}</span>
