@@ -378,20 +378,20 @@ const MODEL_CATALOG: ModelCardData[] = [
         badgeText: 'Instant Gen',
         workTags: ['Image synthesis', 'Avatars', 'Rapid prototyping']
     },
-    // 6. CogView 4 (High Definition Image Generation)
+    // 6. CogView 3 Flash HD (High Definition Image Generation)
     {
         id: 'flux-image',
-        realName: 'Zhipu AI CogView 4',
+        realName: 'Zhipu AI CogView 3 Flash HD',
         provider: 'Zhipu AI',
         modality: 'image',
-        label: 'CogView 4',
-        description: 'High-quality photorealistic text-to-image synthesis with prompt refinement and direct cloud asset delivery.',
+        label: 'CogView 3 Flash HD',
+        description: 'High-quality photorealistic text-to-image synthesis with fast rendering and direct cloud asset delivery.',
         contextWindow: 'N/A (Image)',
         maxOutput: '1024x1024',
-        speedRating: 'Balanced',
+        speedRating: 'Fast 1024x1024',
         minTier: 'free',
-        capabilities: ['photorealistic', 's3-auto-storage'],
-        aliases: ['cogview-4'],
+        capabilities: ['photorealistic', 's3-auto-storage', 'fast'],
+        aliases: ['cogview-4', 'cogview-3-flash'],
         samplePrompt: 'Futuristic cybernetic database server room with glowing orange neon conduits, cinematic 8k photorealistic.',
         bannerColor: '#ebd475',
         illustrationType: 'palette-canvas',

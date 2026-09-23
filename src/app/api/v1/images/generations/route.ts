@@ -174,14 +174,20 @@ async function dispatchImageGeneration(
 ): Promise<ImageResultItem[]> {
   // 1. Zhipu (CogView) Dispatch
   if (spec.provider === 'glm') {
-    const res = await fetch('https://open.bigmodel.cn/api/paas/v4/images/generations', {
+    let modelToUse = spec.upstreamModel || 'cogview-3-flash';
+    // Fallback paid cogview-4 / cogview-3 to free, high-speed cogview-3-flash to avoid balance exhaustion
+    if (modelToUse === 'cogview-4' || modelToUse === 'cogview-3') {
+      modelToUse = 'cogview-3-flash';
+    }
+
+    let res = await fetch('https://open.bigmodel.cn/api/paas/v4/images/generations', {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${apiKey}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: spec.upstreamModel,
+        model: modelToUse,
         prompt,
         size: size.includes('x') ? size : '1024x1024',
       }),
@@ -189,7 +195,29 @@ async function dispatchImageGeneration(
 
     if (!res.ok) {
       const errText = await res.text();
-      throw new Error(`Zhipu image API error (${res.status}): ${errText}`);
+      // If upstream account balance is exhausted (error 1113), automatically retry with free cogview-3-flash
+      if ((errText.includes('1113') || errText.includes('余额不足')) && modelToUse !== 'cogview-3-flash') {
+        logger.warn('[ImageGen] Upstream GLM balance depleted for ' + modelToUse + ' - Falling back to cogview-3-flash');
+        res = await fetch('https://open.bigmodel.cn/api/paas/v4/images/generations', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${apiKey}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            model: 'cogview-3-flash',
+            prompt,
+            size: size.includes('x') ? size : '1024x1024',
+          }),
+        });
+      } else {
+        throw new Error(`Zhipu image API error (${res.status}): ${errText}`);
+      }
+
+      if (!res.ok) {
+        const retryErr = await res.text();
+        throw new Error(`Zhipu image API error (${res.status}): ${retryErr}`);
+      }
     }
 
     const data = await res.json();
