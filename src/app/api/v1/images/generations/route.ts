@@ -263,5 +263,40 @@ async function dispatchImageGeneration(
     return items;
   }
 
+  // 4. AWS Bedrock (Stability AI Stable Image Ultra) Dispatch
+  if (spec.provider === 'bedrock') {
+    const { BedrockRuntimeClient, InvokeModelCommand } = await import('@aws-sdk/client-bedrock-runtime');
+    const region = process.env.AWS_BEDROCK_IMAGE_REGION || 'us-west-2';
+    const client = new BedrockRuntimeClient({ region });
+
+    const payload = {
+      prompt,
+      mode: 'text-to-image',
+      aspect_ratio: size === '1024x1024' ? '1:1' : (size.includes('16:9') || size.includes('1792') ? '16:9' : '1:1'),
+      output_format: 'jpeg',
+    };
+
+    const cmd = new InvokeModelCommand({
+      modelId: spec.upstreamModel,
+      contentType: 'application/json',
+      accept: 'application/json',
+      body: JSON.stringify(payload),
+    });
+
+    const res = await client.send(cmd);
+    const bodyText = new TextDecoder().decode(res.body);
+    const data = JSON.parse(bodyText);
+    const items: ImageResultItem[] = [];
+    if (data?.images && Array.isArray(data.images)) {
+      for (const imgB64 of data.images) {
+        items.push({
+          buffer: Buffer.from(imgB64, 'base64'),
+          revised_prompt: prompt,
+        });
+      }
+    }
+    return items;
+  }
+
   return [];
 }

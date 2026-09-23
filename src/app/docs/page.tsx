@@ -372,6 +372,7 @@ Content-Type: application/json`} />
                                             { mod: 'Text / Chat', id: 'flux-pro', tier: 'Balanced Pro', desc: 'Enhanced instruction following, multi-table analysis, and strict JSON formatting.' },
                                             { mod: 'Text / Chat', id: 'flux-ultra', tier: 'Enterprise Intelligence', desc: 'Maximum cognitive depth for complex system architecture, long reasoning chains, and auditing.' },
                                             { mod: 'Text / Chat', id: 'flux-5.2', tier: 'Frontier', desc: 'Next-generation reasoning architecture specialized in multi-step agentic execution.' },
+                                            { mod: 'Text / Chat', id: 'flux-sonnet', tier: 'Frontier (Claude 4.5)', desc: 'Frontier coding, architectural reasoning, and agentic workflows powered by Claude Sonnet 4.5 on AWS Bedrock.' },
                                             { mod: 'Text / Chat', id: 'flux-turbo', tier: 'Hyper-Speed (300+ tok/s)', desc: 'Hyper-speed 300+ tokens/second inference powered by Groq LLaMA 3.3. 128k context.' },
                                             { mod: 'Text / Chat', id: 'flux-omni', tier: 'Multimodal Vision', desc: 'Multimodal vision, document comprehension, and fast reasoning. 1M context.' },
                                             { mod: 'Text / Chat', id: 'gpt-4o', tier: 'Alias → flux-ultra', desc: 'OpenAI drop-in compatibility alias automatically mapped to flux-ultra.' },
@@ -379,12 +380,14 @@ Content-Type: application/json`} />
                                             { mod: 'Image Generation', id: 'flux-image', tier: 'Photorealistic (dall-e-3)', desc: 'High-quality photorealistic text-to-image synthesis with automatic S3 hosting.' },
                                             { mod: 'Image Generation', id: 'flux-image-fast', tier: 'Fast (dall-e-2)', desc: 'Ultra-fast low-latency image generation for web assets and thumbnails.' },
                                             { mod: 'Image Generation', id: 'flux-image-hd', tier: 'High Definition', desc: 'High-definition 4K image generation with superior typography rendering.' },
+                                            { mod: 'Image Generation', id: 'flux-image-ultra', tier: 'Photorealism Ultra', desc: 'State-of-the-art photorealistic image generation with typography powered by Stability AI Stable Image Ultra on AWS Bedrock.' },
                                             { mod: 'Speech-to-Text', id: 'flux-listen', tier: 'STT (whisper-1)', desc: 'Ultra-fast multilingual audio transcription with segment timestamps.' },
                                             { mod: 'Speech-to-Text', id: 'flux-listen-pro', tier: 'STT Studio Quality', desc: 'Maximum precision transcription for noisy, accented, or technical audio.' },
                                             { mod: 'Text-to-Speech', id: 'flux-speak', tier: 'TTS (tts-1)', desc: 'Natural, expressive voice synthesis across 6 voices (alloy, echo, fable, onyx, nova, shimmer).' },
                                             { mod: 'Text-to-Speech', id: 'flux-speak-hd', tier: 'TTS Studio HD', desc: 'Studio-grade high-definition audio synthesis for production voiceovers.' },
                                             { mod: 'Video Generation', id: 'flux-video', tier: 'Text / Image to Video', desc: 'Dynamic motion video synthesis (HTTP 202 async task polling).' },
                                             { mod: 'Video Generation', id: 'flux-video-pro', tier: 'Cinematic 1080p', desc: 'Cinematic 1080p high-fidelity video generation.' },
+                                            { mod: 'Video Generation', id: 'flux-video-ray', tier: 'Cinema Grade (Luma)', desc: 'Cinema-grade dynamic video generation with realistic physics and camera motion powered by Luma AI Ray v2 on AWS Bedrock.' },
                                             { mod: 'Embeddings', id: 'flux-embed', tier: 'Vector (768-dim)', desc: '768-dimensional vector embeddings for semantic search and RAG pipelines.' },
                                         ].map(m => (
                                             <tr key={m.id} className="hover:bg-secondary/70">

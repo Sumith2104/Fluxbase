@@ -221,6 +221,19 @@ export const FLUX_MODEL_REGISTRY: Record<string, FluxModelSpec> = {
     minTier: 'max',
     capabilities: ['text-generation', 'chat', 'reasoning', 'extended-thinking', 'tool-calling', 'json-mode', 'vision'],
   },
+  'flux-sonnet': {
+    id: 'flux-sonnet',
+    modality: 'text',
+    provider: 'bedrock',
+    upstreamModel: 'us.anthropic.claude-sonnet-4-5-20250929-v1:0',
+    upstreamEndpoint: 'bedrock://converse',
+    label: 'Flux Sonnet 4.5',
+    description: 'Frontier reasoning, architectural database design, and coding powered by Anthropic Claude Sonnet 4.5 on AWS Bedrock',
+    contextWindow: 200000,
+    maxOutputTokens: 64000,
+    minTier: 'pro',
+    capabilities: ['text-generation', 'chat', 'reasoning', 'extended-thinking', 'tool-calling', 'json-mode', 'vision'],
+  },
 
   // --- IMAGE GENERATION ---
   'flux-image': {
@@ -269,6 +282,18 @@ export const FLUX_MODEL_REGISTRY: Record<string, FluxModelSpec> = {
     description: 'Premium creative composition with prompt adherence',
     minTier: 'pro',
     capabilities: ['text-to-image', 'hd'],
+    supportedFormats: ['url', 'b64_json'],
+  },
+  'flux-image-ultra': {
+    id: 'flux-image-ultra',
+    modality: 'image',
+    provider: 'bedrock',
+    upstreamModel: 'stability.stable-image-ultra-v1:1',
+    upstreamEndpoint: 'bedrock://invoke-model',
+    label: 'Flux Image Ultra',
+    description: 'State-of-the-art photorealistic image generation powered by Stability AI Stable Image Ultra on AWS Bedrock',
+    minTier: 'pro',
+    capabilities: ['text-to-image', 'photorealistic', 'typography', 'high-resolution'],
     supportedFormats: ['url', 'b64_json'],
   },
 
@@ -363,6 +388,18 @@ export const FLUX_MODEL_REGISTRY: Record<string, FluxModelSpec> = {
     capabilities: ['text-to-video', 'image-to-video', 'hd', 'async-polling'],
     supportedFormats: ['mp4'],
   },
+  'flux-video-ray': {
+    id: 'flux-video-ray',
+    modality: 'video',
+    provider: 'bedrock',
+    upstreamModel: 'luma.ray-v2:0',
+    upstreamEndpoint: 'bedrock://start-async-invoke',
+    label: 'Flux Video Ray',
+    description: 'Cinema-grade dynamic video generation with realistic physics and camera motion powered by Luma AI Ray v2 on AWS Bedrock',
+    minTier: 'pro',
+    capabilities: ['text-to-video', 'cinematic', 'async-polling'],
+    supportedFormats: ['mp4'],
+  },
 
   // --- TEXT EMBEDDINGS ---
   'flux-embed': {
@@ -403,6 +440,11 @@ export const MODEL_ALIASES: Record<string, string> = {
   // Claude & Flagship Aliases
   'flux-pro-max': 'flux-pro-max',
   'pro-max': 'flux-pro-max',
+  'flux-sonnet': 'flux-sonnet',
+  'flux-sonnet-4-5': 'flux-sonnet',
+  'claude-sonnet-4-5': 'flux-sonnet',
+  'claude-sonnet-4.5': 'flux-sonnet',
+  'claude-4-5': 'flux-sonnet',
   'claude-3-7-sonnet': 'flux-pro-max',
   'claude-3.7-sonnet': 'flux-pro-max',
   'claude-3-7': 'flux-pro-max',
@@ -411,6 +453,9 @@ export const MODEL_ALIASES: Record<string, string> = {
   'claude-3-haiku': 'flux-fast',
 
   // OpenAI Image Aliases
+  'flux-image-ultra': 'flux-image-ultra',
+  'stable-image-ultra': 'flux-image-ultra',
+  'stable-diffusion-ultra': 'flux-image-ultra',
   'dall-e-3': 'flux-image',
   'dall-e-2': 'flux-image-fast',
   'dall-e': 'flux-image',
@@ -439,6 +484,9 @@ export const MODEL_ALIASES: Record<string, string> = {
   'cogview-3-flash': 'flux-image-fast',
   'cogvideox-flash': 'flux-video',
   'cogvideox': 'flux-video-pro',
+  'flux-video-ray': 'flux-video-ray',
+  'luma-ray-v2': 'flux-video-ray',
+  'ray-v2': 'flux-video-ray',
 };
 
 /**
@@ -470,6 +518,8 @@ export const WHITELABEL_MAP: Record<string, string> = {
   'tts-1-hd': 'flux-speak-hd',
   'cogvideox-flash': 'flux-video',
   'cogvideox': 'flux-video-pro',
+  'luma.ray-v2:0': 'flux-video-ray',
+  'stability.stable-image-ultra-v1:1': 'flux-image-ultra',
   'text-embedding-004': 'flux-embed',
 };
 
@@ -574,8 +624,8 @@ export function buildFallbackChain(primarySpec: FluxModelSpec, hasMultimodal = f
 
   if (primarySpec.modality === 'text') {
     const fallbacks = hasMultimodal
-      ? ['flux-pro-max', 'flux-vision', 'flux-omni', 'flux-max']
-      : ['flux-pro-max', 'flux-ultra', 'flux-turbo', 'flux-omni', 'flux-fast', 'flux-max'];
+      ? ['flux-sonnet', 'flux-pro-max', 'flux-vision', 'flux-omni', 'flux-max']
+      : ['flux-sonnet', 'flux-pro-max', 'flux-ultra', 'flux-turbo', 'flux-omni', 'flux-fast', 'flux-max'];
     for (const fbId of fallbacks) {
       const fbSpec = FLUX_MODEL_REGISTRY[fbId];
       if (fbSpec && fbSpec.id !== primarySpec.id && !chain.some(s => s.id === fbSpec.id)) {
@@ -584,7 +634,16 @@ export function buildFallbackChain(primarySpec: FluxModelSpec, hasMultimodal = f
       }
     }
   } else if (primarySpec.modality === 'image') {
-    const fallbacks = ['flux-image-fast', 'flux-image-hd', 'flux-image-pro'];
+    const fallbacks = ['flux-image-ultra', 'flux-image-fast', 'flux-image-hd', 'flux-image-pro'];
+    for (const fbId of fallbacks) {
+      const fbSpec = FLUX_MODEL_REGISTRY[fbId];
+      if (fbSpec && fbSpec.id !== primarySpec.id && !chain.some(s => s.id === fbSpec.id)) {
+        const config = getProviderConfig(fbSpec.provider);
+        if (config.isAvailable) chain.push(fbSpec);
+      }
+    }
+  } else if (primarySpec.modality === 'video') {
+    const fallbacks = ['flux-video-ray', 'flux-video-pro', 'flux-video'];
     for (const fbId of fallbacks) {
       const fbSpec = FLUX_MODEL_REGISTRY[fbId];
       if (fbSpec && fbSpec.id !== primarySpec.id && !chain.some(s => s.id === fbSpec.id)) {

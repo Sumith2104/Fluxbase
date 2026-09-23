@@ -56,7 +56,65 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ task
     });
   }
 
-  // 3. Poll upstream provider (Zhipu CogVideoX)
+  // 3. Poll upstream provider
+  if (taskData.provider === 'bedrock') {
+    try {
+      const { BedrockRuntimeClient, GetAsyncInvokeCommand } = await import('@aws-sdk/client-bedrock-runtime');
+      const region = process.env.AWS_BEDROCK_VIDEO_REGION || 'us-west-2';
+      const client = new BedrockRuntimeClient({ region });
+      const cmd = new GetAsyncInvokeCommand({ invocationArn: taskData.upstreamTaskId });
+      const res = await client.send(cmd);
+
+      if (res.status === 'Completed') {
+        const s3Uri = res.outputDataConfig?.s3OutputDataConfig?.s3Uri || '';
+        const completedData = [{ url: s3Uri, revised_prompt: taskData.prompt }];
+        taskData.status = 'completed';
+        taskData.data = completedData;
+        await (redis as any).set(taskKey, taskData, { ex: 7200 });
+        return aiSuccess({
+          id: taskId,
+          object: 'video.generation',
+          status: 'completed',
+          model: taskData.modelId,
+          created: Math.floor(taskData.createdAt / 1000),
+          data: completedData,
+        });
+      }
+
+      if (res.status === 'Failed') {
+        taskData.status = 'failed';
+        taskData.error = res.failureMessage || 'Bedrock video generation failed upstream.';
+        await (redis as any).set(taskKey, taskData, { ex: 7200 });
+        return aiSuccess({
+          id: taskId,
+          object: 'video.generation',
+          status: 'failed',
+          model: taskData.modelId,
+          created: Math.floor(taskData.createdAt / 1000),
+          error: taskData.error,
+        });
+      }
+
+      return aiSuccess({
+        id: taskId,
+        object: 'video.generation',
+        status: 'processing',
+        model: taskData.modelId,
+        created: Math.floor(taskData.createdAt / 1000),
+      });
+    } catch (err: any) {
+      logger.error('[VideoPoll] Error polling Bedrock video task:', err);
+      return aiSuccess({
+        id: taskId,
+        object: 'video.generation',
+        status: 'processing',
+        model: taskData.modelId,
+        created: Math.floor(taskData.createdAt / 1000),
+      });
+    }
+  }
+
+  // 4. Poll Zhipu CogVideoX
   const providerConfig = getProviderConfig(taskData.provider);
   if (!providerConfig.isAvailable) {
     return aiError('Provider credentials missing to query task.', 'api_error', 500);

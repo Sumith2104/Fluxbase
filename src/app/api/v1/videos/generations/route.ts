@@ -59,32 +59,59 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    // Dispatch async generation to Zhipu CogVideoX
-    const upstreamRes = await fetch(primarySpec.upstreamEndpoint, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${providerConfig.apiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: primarySpec.upstreamModel,
-        prompt,
-        image_url: body?.image_url || undefined,
-        quality: body?.quality || 'quality',
-        with_audio: body?.with_audio ?? false,
-        size: body?.size || '1280x720',
-        duration: body?.duration || 5,
-        fps: body?.fps || 30,
-      }),
-    });
+    let upstreamTaskId = '';
 
-    if (!upstreamRes.ok) {
-      const errText = await upstreamRes.text();
-      throw new Error(`Upstream video task creation error (${upstreamRes.status}): ${errText}`);
+    if (primarySpec.provider === 'bedrock') {
+      const { BedrockRuntimeClient, StartAsyncInvokeCommand } = await import('@aws-sdk/client-bedrock-runtime');
+      const region = process.env.AWS_BEDROCK_VIDEO_REGION || 'us-west-2';
+      const client = new BedrockRuntimeClient({ region });
+      const bucketName = process.env.AWS_STORAGE_BUCKET || process.env.S3_BUCKET_NAME || 'fluxbase-storage-default';
+      const s3Prefix = `videos/${auth.userId}/${Date.now()}`;
+
+      const cmd = new StartAsyncInvokeCommand({
+        modelId: primarySpec.upstreamModel,
+        modelInput: {
+          prompt,
+          aspect_ratio: body?.aspect_ratio || '16:9',
+          duration: body?.duration || 5,
+        },
+        outputDataConfig: {
+          s3OutputDataConfig: {
+            s3Uri: `s3://${bucketName}/${s3Prefix}/`
+          }
+        }
+      });
+      const upstreamRes = await client.send(cmd);
+      upstreamTaskId = upstreamRes.invocationArn || '';
+    } else {
+      // Dispatch async generation to Zhipu CogVideoX
+      const upstreamRes = await fetch(primarySpec.upstreamEndpoint, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${providerConfig.apiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: primarySpec.upstreamModel,
+          prompt,
+          image_url: body?.image_url || undefined,
+          quality: body?.quality || 'quality',
+          with_audio: body?.with_audio ?? false,
+          size: body?.size || '1280x720',
+          duration: body?.duration || 5,
+          fps: body?.fps || 30,
+        }),
+      });
+
+      if (!upstreamRes.ok) {
+        const errText = await upstreamRes.text();
+        throw new Error(`Upstream video task creation error (${upstreamRes.status}): ${errText}`);
+      }
+
+      const upstreamData = await upstreamRes.json();
+      upstreamTaskId = upstreamData.id || upstreamData.task_id;
     }
 
-    const upstreamData = await upstreamRes.json();
-    const upstreamTaskId = upstreamData.id || upstreamData.task_id;
     if (!upstreamTaskId) {
       throw new Error('Upstream did not return a valid task ID.');
     }

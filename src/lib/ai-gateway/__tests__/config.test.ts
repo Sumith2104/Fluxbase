@@ -50,6 +50,26 @@ describe('Flux AI Gateway - Model Registry & Resolution', () => {
     expect(resolveFluxModel('text-embedding-3-small', 'embedding').id).toBe('flux-embed');
   });
 
+  it('should resolve frontier AWS Bedrock models (flux-sonnet, flux-image-ultra, flux-video-ray)', () => {
+    // 1. Frontier Reasoning
+    const sonnet = resolveFluxModel('flux-sonnet', 'text');
+    expect(sonnet.id).toBe('flux-sonnet');
+    expect(sonnet.provider).toBe('bedrock');
+    expect(resolveFluxModel('claude-sonnet-4-5', 'text').id).toBe('flux-sonnet');
+
+    // 2. State-of-the-Art Image
+    const imgUltra = resolveFluxModel('flux-image-ultra', 'image');
+    expect(imgUltra.id).toBe('flux-image-ultra');
+    expect(imgUltra.provider).toBe('bedrock');
+    expect(resolveFluxModel('stable-image-ultra', 'image').id).toBe('flux-image-ultra');
+
+    // 3. Cinema-Grade Video
+    const vidRay = resolveFluxModel('flux-video-ray', 'video');
+    expect(vidRay.id).toBe('flux-video-ray');
+    expect(vidRay.provider).toBe('bedrock');
+    expect(resolveFluxModel('luma-ray-v2', 'video').id).toBe('flux-video-ray');
+  });
+
   it('should build a fallback chain containing the primary model first', () => {
     const primary = FLUX_MODEL_REGISTRY['flux-fast'];
     const chain = buildFallbackChain(primary);

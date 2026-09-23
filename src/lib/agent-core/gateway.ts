@@ -43,6 +43,12 @@ export interface ModelGatewayResult {
 
 // Model alias mapper
 export const MODEL_CATALOG: Record<string, { provider: 'glm' | 'groq' | 'gemini' | 'openai' | 'bedrock'; upstreamModel: string; label: string; description: string }> = {
+  // Flux Sonnet Tier (Claude Sonnet 4.5 Frontier on AWS Bedrock)
+  'flux-sonnet': { provider: 'bedrock', upstreamModel: 'us.anthropic.claude-sonnet-4-5-20250929-v1:0', label: 'Flux Sonnet 4.5', description: 'Frontier reasoning, architectural database design, and coding powered by Anthropic Claude Sonnet 4.5 on AWS Bedrock' },
+  'flux-sonnet-4-5': { provider: 'bedrock', upstreamModel: 'us.anthropic.claude-sonnet-4-5-20250929-v1:0', label: 'Flux Sonnet 4.5', description: 'Frontier reasoning, architectural database design, and coding powered by Anthropic Claude Sonnet 4.5 on AWS Bedrock' },
+  'claude-sonnet-4-5': { provider: 'bedrock', upstreamModel: 'us.anthropic.claude-sonnet-4-5-20250929-v1:0', label: 'Flux Sonnet 4.5', description: 'Frontier reasoning, architectural database design, and coding powered by Anthropic Claude Sonnet 4.5 on AWS Bedrock' },
+  'claude-sonnet-4.5': { provider: 'bedrock', upstreamModel: 'us.anthropic.claude-sonnet-4-5-20250929-v1:0', label: 'Flux Sonnet 4.5', description: 'Frontier reasoning, architectural database design, and coding powered by Anthropic Claude Sonnet 4.5 on AWS Bedrock' },
+
   // Flux Pro Max Tier (Flagship Frontier Reasoning on AWS Bedrock)
   'flux-pro-max': { provider: 'bedrock', upstreamModel: 'us.anthropic.claude-3-7-sonnet-20250219-v1:0', label: 'Flux Pro Max', description: 'Frontier hybrid reasoning powered by Anthropic Claude 3.7 Sonnet on AWS Bedrock' },
   'pro-max': { provider: 'bedrock', upstreamModel: 'us.anthropic.claude-3-7-sonnet-20250219-v1:0', label: 'Flux Pro Max', description: 'Frontier hybrid reasoning powered by Anthropic Claude 3.7 Sonnet on AWS Bedrock' },
