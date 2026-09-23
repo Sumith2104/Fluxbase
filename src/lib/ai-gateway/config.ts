@@ -208,31 +208,18 @@ export const FLUX_MODEL_REGISTRY: Record<string, FluxModelSpec> = {
     minTier: 'free',
     capabilities: ['text-generation', 'vision', 'chat', 'tool-calling', 'json-mode'],
   },
-  'flux-pro-max': {
-    id: 'flux-pro-max',
+  'flux-nova-micro': {
+    id: 'flux-nova-micro',
     modality: 'text',
     provider: 'bedrock',
-    upstreamModel: process.env.AWS_BEDROCK_CLAUDE_MODEL || 'us.anthropic.claude-sonnet-4-6',
+    upstreamModel: 'amazon.nova-micro-v1:0',
     upstreamEndpoint: 'bedrock://converse',
-    label: 'Flux Pro Max',
-    description: 'Frontier hybrid reasoning architecture powered by Anthropic Claude Sonnet on AWS Bedrock',
-    contextWindow: 200000,
-    maxOutputTokens: 64000,
-    minTier: 'max',
-    capabilities: ['text-generation', 'chat', 'reasoning', 'extended-thinking', 'tool-calling', 'json-mode', 'vision'],
-  },
-  'flux-sonnet': {
-    id: 'flux-sonnet',
-    modality: 'text',
-    provider: 'bedrock',
-    upstreamModel: 'us.anthropic.claude-sonnet-4-5-20250929-v1:0',
-    upstreamEndpoint: 'bedrock://converse',
-    label: 'Flux Sonnet 4.5',
-    description: 'Frontier reasoning, architectural database design, and coding powered by Anthropic Claude Sonnet 4.5 on AWS Bedrock',
-    contextWindow: 200000,
-    maxOutputTokens: 64000,
-    minTier: 'pro',
-    capabilities: ['text-generation', 'chat', 'reasoning', 'extended-thinking', 'tool-calling', 'json-mode', 'vision'],
+    label: 'Flux Nova Micro',
+    description: 'Lightweight, ultra-low latency text intelligence on AWS Bedrock',
+    contextWindow: 128000,
+    maxOutputTokens: 4096,
+    minTier: 'free',
+    capabilities: ['text-generation', 'chat', 'hyper-fast', 'tool-calling', 'json-mode'],
   },
   'flux-nova-pro': {
     id: 'flux-nova-pro',
@@ -463,20 +450,21 @@ export const MODEL_ALIASES: Record<string, string> = {
   'gpt-4-turbo': 'flux-ultra',
   'gpt-4': 'flux-ultra',
   'gpt-3.5-turbo': 'flux-fast',
-  // Claude & Flagship Aliases
-  'flux-pro-max': 'flux-pro-max',
-  'pro-max': 'flux-pro-max',
-  'flux-sonnet': 'flux-sonnet',
-  'flux-sonnet-4-5': 'flux-sonnet',
-  'claude-sonnet-4-5': 'flux-sonnet',
-  'claude-sonnet-4.5': 'flux-sonnet',
-  'claude-4-5': 'flux-sonnet',
-  'claude-3-7-sonnet': 'flux-pro-max',
-  'claude-3.7-sonnet': 'flux-pro-max',
-  'claude-3-7': 'flux-pro-max',
-  'claude-3.7': 'flux-pro-max',
-  'claude-3-5-sonnet': 'flux-pro-max',
-  'claude-3-haiku': 'flux-fast',
+  // Nova & Amazon Bedrock Aliases
+  'flux-nova-pro': 'flux-nova-pro',
+  'nova-pro': 'flux-nova-pro',
+  'amazon-nova-pro': 'flux-nova-pro',
+  'amazon.nova-pro-v1:0': 'flux-nova-pro',
+  'flux-nova-lite': 'flux-nova-lite',
+  'nova-lite': 'flux-nova-lite',
+  'amazon-nova-lite': 'flux-nova-lite',
+  'amazon.nova-lite-v1:0': 'flux-nova-lite',
+  'flux-nova-micro': 'flux-nova-micro',
+  'nova-micro': 'flux-nova-micro',
+  'amazon-nova-micro': 'flux-nova-micro',
+  'amazon.nova-micro-v1:0': 'flux-nova-micro',
+  'titan-embed': 'flux-embed',
+  'amazon.titan-embed-text-v2:0': 'flux-embed',
 
   // OpenAI Image Aliases
   'flux-image-ultra': 'flux-image-ultra',
@@ -524,15 +512,15 @@ export const WHITELABEL_MAP: Record<string, string> = {
   'glm-4-plus': 'flux-ultra',
   'glm-4v-flash': 'flux-vision',
   'glm-4v': 'flux-vision',
+  'amazon.nova-pro-v1:0': 'flux-nova-pro',
+  'amazon.nova-lite-v1:0': 'flux-nova-lite',
+  'amazon.nova-micro-v1:0': 'flux-nova-micro',
+  'amazon.titan-embed-text-v2:0': 'flux-embed',
   'llama-3.3-70b-versatile': 'flux-turbo',
   'gemini-2.0-flash': 'flux-omni',
   'gemini-1.5-flash': 'flux-omni',
   'gpt-4o-mini': 'flux-max',
   'gpt-4o': 'flux-max',
-  'us.anthropic.claude-sonnet-4-6': 'flux-pro-max',
-  'us.anthropic.claude-sonnet-4-5-20250929-v1:0': 'flux-pro-max',
-  'us.anthropic.claude-3-7-sonnet-20250219-v1:0': 'flux-pro-max',
-  'anthropic.claude-3-5-sonnet-20241022-v2:0': 'flux-pro-max',
   'cogview-4': 'flux-image',
   'cogview-3-flash': 'flux-image-fast',
   'imagen-3.0-generate-002': 'flux-image-hd',
@@ -638,7 +626,7 @@ export function buildFallbackChain(primarySpec: FluxModelSpec, hasMultimodal = f
       const config = getProviderConfig(primarySpec.provider);
       if (config.isAvailable) chain.push(primarySpec);
     }
-    const visionPriority = ['flux-pro-max', 'flux-vision', 'flux-omni', 'flux-max'];
+    const visionPriority = ['flux-nova-pro', 'flux-vision', 'flux-omni', 'flux-max'];
     for (const vId of visionPriority) {
       const spec = FLUX_MODEL_REGISTRY[vId];
       if (spec && !chain.some(s => s.id === spec.id)) {
@@ -656,8 +644,8 @@ export function buildFallbackChain(primarySpec: FluxModelSpec, hasMultimodal = f
 
   if (primarySpec.modality === 'text') {
     const fallbacks = hasMultimodal
-      ? ['flux-sonnet', 'flux-pro-max', 'flux-vision', 'flux-omni', 'flux-max']
-      : ['flux-sonnet', 'flux-pro-max', 'flux-ultra', 'flux-turbo', 'flux-omni', 'flux-fast', 'flux-max'];
+      ? ['flux-nova-pro', 'flux-vision', 'flux-omni', 'flux-max']
+      : ['flux-nova-pro', 'flux-nova-lite', 'flux', 'flux-turbo', 'flux-omni', 'flux-fast', 'flux-max'];
     for (const fbId of fallbacks) {
       const fbSpec = FLUX_MODEL_REGISTRY[fbId];
       if (fbSpec && fbSpec.id !== primarySpec.id && !chain.some(s => s.id === fbSpec.id)) {

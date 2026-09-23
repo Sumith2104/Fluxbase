@@ -43,18 +43,24 @@ export interface ModelGatewayResult {
 
 // Model alias mapper
 export const MODEL_CATALOG: Record<string, { provider: 'glm' | 'groq' | 'gemini' | 'openai' | 'bedrock'; upstreamModel: string; label: string; description: string }> = {
-  // Flux Sonnet Tier (Claude Sonnet 4.5 Frontier on AWS Bedrock)
-  'flux-sonnet': { provider: 'bedrock', upstreamModel: 'us.anthropic.claude-sonnet-4-5-20250929-v1:0', label: 'Flux Sonnet 4.5', description: 'Frontier reasoning, architectural database design, and coding powered by Anthropic Claude Sonnet 4.5 on AWS Bedrock' },
-  'flux-sonnet-4-5': { provider: 'bedrock', upstreamModel: 'us.anthropic.claude-sonnet-4-5-20250929-v1:0', label: 'Flux Sonnet 4.5', description: 'Frontier reasoning, architectural database design, and coding powered by Anthropic Claude Sonnet 4.5 on AWS Bedrock' },
-  'claude-sonnet-4-5': { provider: 'bedrock', upstreamModel: 'us.anthropic.claude-sonnet-4-5-20250929-v1:0', label: 'Flux Sonnet 4.5', description: 'Frontier reasoning, architectural database design, and coding powered by Anthropic Claude Sonnet 4.5 on AWS Bedrock' },
-  'claude-sonnet-4.5': { provider: 'bedrock', upstreamModel: 'us.anthropic.claude-sonnet-4-5-20250929-v1:0', label: 'Flux Sonnet 4.5', description: 'Frontier reasoning, architectural database design, and coding powered by Anthropic Claude Sonnet 4.5 on AWS Bedrock' },
+  // Flux Nova Pro (Amazon Bedrock Flagship Multimodal Intelligence)
+  'flux-nova-pro': { provider: 'bedrock', upstreamModel: 'amazon.nova-pro-v1:0', label: 'Flux Nova Pro', description: 'Flagship multimodal reasoning, vision, and coding powered by Amazon Nova Pro on AWS Bedrock' },
+  'nova-pro': { provider: 'bedrock', upstreamModel: 'amazon.nova-pro-v1:0', label: 'Flux Nova Pro', description: 'Flagship multimodal reasoning, vision, and coding powered by Amazon Nova Pro on AWS Bedrock' },
+  'amazon.nova-pro-v1:0': { provider: 'bedrock', upstreamModel: 'amazon.nova-pro-v1:0', label: 'Flux Nova Pro', description: 'Amazon Nova Pro' },
 
-  // Flux Pro Max Tier (Flagship Frontier Reasoning on AWS Bedrock)
-  'flux-pro-max': { provider: 'bedrock', upstreamModel: 'us.anthropic.claude-3-7-sonnet-20250219-v1:0', label: 'Flux Pro Max', description: 'Frontier hybrid reasoning powered by Anthropic Claude 3.7 Sonnet on AWS Bedrock' },
-  'pro-max': { provider: 'bedrock', upstreamModel: 'us.anthropic.claude-3-7-sonnet-20250219-v1:0', label: 'Flux Pro Max', description: 'Frontier hybrid reasoning powered by Anthropic Claude 3.7 Sonnet on AWS Bedrock' },
-  'claude-3-7-sonnet': { provider: 'bedrock', upstreamModel: 'us.anthropic.claude-3-7-sonnet-20250219-v1:0', label: 'Flux Pro Max', description: 'Frontier hybrid reasoning powered by Anthropic Claude 3.7 Sonnet on AWS Bedrock' },
-  'claude-3.7-sonnet': { provider: 'bedrock', upstreamModel: 'us.anthropic.claude-3-7-sonnet-20250219-v1:0', label: 'Flux Pro Max', description: 'Frontier hybrid reasoning powered by Anthropic Claude 3.7 Sonnet on AWS Bedrock' },
-  'claude-3-7': { provider: 'bedrock', upstreamModel: 'us.anthropic.claude-3-7-sonnet-20250219-v1:0', label: 'Flux Pro Max', description: 'Frontier hybrid reasoning powered by Anthropic Claude 3.7 Sonnet on AWS Bedrock' },
+  // Flux Nova Lite (Amazon Bedrock High-Velocity Multimodal)
+  'flux-nova-lite': { provider: 'bedrock', upstreamModel: 'amazon.nova-lite-v1:0', label: 'Flux Nova Lite', description: 'Ultra-fast multimodal reasoning and interactive processing on AWS Bedrock' },
+  'nova-lite': { provider: 'bedrock', upstreamModel: 'amazon.nova-lite-v1:0', label: 'Flux Nova Lite', description: 'Ultra-fast multimodal reasoning and interactive processing on AWS Bedrock' },
+  'amazon.nova-lite-v1:0': { provider: 'bedrock', upstreamModel: 'amazon.nova-lite-v1:0', label: 'Flux Nova Lite', description: 'Amazon Nova Lite' },
+
+  // Flux Nova Micro (Amazon Bedrock Ultra-Low Latency Text)
+  'flux-nova-micro': { provider: 'bedrock', upstreamModel: 'amazon.nova-micro-v1:0', label: 'Flux Nova Micro', description: 'Lowest latency text intelligence engineered for extreme throughput on AWS Bedrock' },
+  'nova-micro': { provider: 'bedrock', upstreamModel: 'amazon.nova-micro-v1:0', label: 'Flux Nova Micro', description: 'Lowest latency text intelligence engineered for extreme throughput on AWS Bedrock' },
+  'amazon.nova-micro-v1:0': { provider: 'bedrock', upstreamModel: 'amazon.nova-micro-v1:0', label: 'Flux Nova Micro', description: 'Amazon Nova Micro' },
+
+  // Legacy mappings smoothly redirected to Nova Pro
+  'flux-sonnet': { provider: 'bedrock', upstreamModel: 'amazon.nova-pro-v1:0', label: 'Flux Nova Pro', description: 'Mapped to Amazon Nova Pro on AWS Bedrock' },
+  'flux-pro-max': { provider: 'bedrock', upstreamModel: 'amazon.nova-pro-v1:0', label: 'Flux Nova Pro', description: 'Mapped to Amazon Nova Pro on AWS Bedrock' },
 
   // Flux Fast Tier (Default - Ultra Fast & Cost-Free)
   'flux-fast': { provider: 'glm', upstreamModel: 'glm-4-flash', label: 'Flux Fast', description: 'Ultra-fast general reasoning & SQL' },

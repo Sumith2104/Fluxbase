@@ -50,12 +50,12 @@ describe('Flux AI Gateway - Model Registry & Resolution', () => {
     expect(resolveFluxModel('text-embedding-3-small', 'embedding').id).toBe('flux-embed');
   });
 
-  it('should resolve frontier AWS Bedrock models (flux-sonnet, flux-image-ultra, flux-video-ray)', () => {
+  it('should resolve frontier AWS Bedrock models (flux-nova-pro, flux-image-ultra, flux-video-ray)', () => {
     // 1. Frontier Reasoning
-    const sonnet = resolveFluxModel('flux-sonnet', 'text');
-    expect(sonnet.id).toBe('flux-sonnet');
-    expect(sonnet.provider).toBe('bedrock');
-    expect(resolveFluxModel('claude-sonnet-4-5', 'text').id).toBe('flux-sonnet');
+    const novaPro = resolveFluxModel('flux-nova-pro', 'text');
+    expect(novaPro.id).toBe('flux-nova-pro');
+    expect(novaPro.provider).toBe('bedrock');
+    expect(resolveFluxModel('nova-pro', 'text').id).toBe('flux-nova-pro');
 
     // 2. State-of-the-Art Image
     const imgUltra = resolveFluxModel('flux-image-ultra', 'image');

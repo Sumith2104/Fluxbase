@@ -43,8 +43,6 @@ export interface BedrockChatOptions {
  * Resolves requested model ID to active Bedrock cross-region inference profile
  */
 export function resolveBedrockModelId(modelId: string): string {
-  const envModel = process.env.AWS_BEDROCK_CLAUDE_MODEL;
-  if (envModel) return envModel;
   if (modelId.includes('nova-pro') || modelId === 'amazon.nova-pro-v1:0') {
     return 'amazon.nova-pro-v1:0';
   }
@@ -54,11 +52,11 @@ export function resolveBedrockModelId(modelId: string): string {
   if (modelId.includes('nova-micro') || modelId === 'amazon.nova-micro-v1:0') {
     return 'amazon.nova-micro-v1:0';
   }
-  if (modelId.includes('sonnet-4-5') || modelId.includes('sonnet-4.5')) {
-    return 'us.anthropic.claude-sonnet-4-5-20250929-v1:0';
+  if (modelId.includes('titan-embed') || modelId.includes('titan')) {
+    return 'amazon.titan-embed-text-v2:0';
   }
-  if (!modelId || modelId.includes('3-7-sonnet') || modelId.includes('3.7')) {
-    return 'us.anthropic.claude-3-7-sonnet-20250219-v1:0';
+  if (!modelId || modelId === 'default' || modelId === 'bedrock') {
+    return 'amazon.nova-pro-v1:0';
   }
   return modelId;
 }

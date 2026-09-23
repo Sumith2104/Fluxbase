@@ -7,7 +7,7 @@ import {
     Bot, Cpu, Image as ImageIcon, Video, Mic, Volume2, 
     Database, ExternalLink, RefreshCw, Plus, Trash2, 
     Code2, Play, Terminal, ArrowUpRight, CheckCircle2,
-    Layers, AlertCircle, Info, Sliders, ChevronDown
+    Layers, AlertCircle, Info, Sliders, ChevronDown, X
 } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -37,6 +37,17 @@ import Link from 'next/link';
 
 export type ModalityType = 'text' | 'image' | 'video' | 'audio-stt' | 'audio-tts' | 'embedding';
 
+export type IllustrationType = 
+    | 'brain-head' 
+    | 'cursor-node' 
+    | 'cluster-burst' 
+    | 'soaring-bird' 
+    | 'palette-canvas' 
+    | 'film-motion' 
+    | 'vector-cube' 
+    | 'vision-eye' 
+    | 'audio-wave';
+
 export interface ModelCardData {
     id: string;
     realName: string;
@@ -52,47 +63,228 @@ export interface ModelCardData {
     aliases?: string[];
     isDropinAlias?: boolean;
     samplePrompt?: string;
+    // Two-tone card layout properties
+    bannerColor: string;
+    illustrationType: IllustrationType;
+    badgeText?: string;
+    workTags: string[];
 }
 
-// Complete Catalog with Real Upstream Names & Specs
+// ─── Inline Vector Illustrations ───────────────────────────────────────────
+
+function IllustrationBrainHead({ className = "w-24 h-24" }: { className?: string }) {
+    return (
+        <svg className={className} viewBox="0 0 100 100" fill="none" stroke="#141824" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+            {/* Profile head silhouette */}
+            <path d="M 32 86 C 32 78 30 70 28 62 C 24 48 30 25 52 20 C 72 16 82 30 80 48 C 79 56 75 62 76 68 C 77 74 81 78 81 86" strokeWidth="2.6" />
+            {/* Neural network nodes */}
+            <circle cx="50" cy="36" r="3.5" fill="#141824" />
+            <circle cx="64" cy="42" r="3.5" fill="#141824" />
+            <circle cx="44" cy="50" r="3" fill="#141824" />
+            <circle cx="58" cy="58" r="3" fill="#141824" />
+            <circle cx="48" cy="68" r="2.5" fill="#141824" />
+            {/* Interconnections */}
+            <line x1="50" y1="36" x2="64" y2="42" />
+            <line x1="50" y1="36" x2="44" y2="50" />
+            <line x1="64" y1="42" x2="58" y2="58" />
+            <line x1="44" y1="50" x2="58" y2="58" />
+            <line x1="44" y1="50" x2="48" y2="68" />
+            <line x1="58" y1="58" x2="48" y2="68" />
+            {/* Radiance */}
+            <path d="M 39 17 Q 45 11 53 13" strokeDasharray="2 3" />
+            <path d="M 61 15 Q 67 11 74 16" strokeDasharray="2 3" />
+        </svg>
+    );
+}
+
+function IllustrationCursorNode({ className = "w-24 h-24" }: { className?: string }) {
+    return (
+        <svg className={className} viewBox="0 0 100 100" fill="none" stroke="#141824" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+            {/* Network branch lines */}
+            <line x1="46" y1="46" x2="74" y2="28" />
+            <line x1="46" y1="46" x2="79" y2="50" />
+            <line x1="46" y1="46" x2="72" y2="74" />
+            {/* Target nodes */}
+            <circle cx="74" cy="28" r="4.5" fill="#141824" />
+            <circle cx="79" cy="50" r="4" fill="#141824" />
+            <circle cx="72" cy="74" r="4" fill="#141824" />
+            {/* Active center node */}
+            <circle cx="46" cy="46" r="7" strokeWidth="2" />
+            <circle cx="46" cy="46" r="3.5" fill="#141824" />
+            {/* Cursor arrow pointing at node */}
+            <path d="M 22 70 L 22 28 L 38 44 L 50 44 Z" fill="#141824" stroke="#141824" strokeWidth="2" />
+            <line x1="33" y1="40" x2="41" y2="54" stroke="#ffffff" strokeWidth="2.5" />
+        </svg>
+    );
+}
+
+function IllustrationClusterBurst({ className = "w-24 h-24" }: { className?: string }) {
+    return (
+        <svg className={className} viewBox="0 0 100 100" fill="none" stroke="#141824" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+            {/* Center nucleus */}
+            <circle cx="50" cy="50" r="5" fill="#141824" />
+            <circle cx="50" cy="50" r="11" strokeDasharray="3 3" />
+            {/* Radial spokes */}
+            <line x1="50" y1="50" x2="30" y2="30" />
+            <line x1="50" y1="50" x2="70" y2="32" />
+            <line x1="50" y1="50" x2="76" y2="60" />
+            <line x1="50" y1="50" x2="52" y2="76" />
+            <line x1="50" y1="50" x2="26" y2="64" />
+            <line x1="50" y1="50" x2="48" y2="24" />
+            {/* Orbital nodes */}
+            <circle cx="30" cy="30" r="3.5" fill="#141824" />
+            <circle cx="70" cy="32" r="4" fill="#141824" />
+            <circle cx="76" cy="60" r="3.5" fill="#141824" />
+            <circle cx="52" cy="76" r="4" fill="#141824" />
+            <circle cx="26" cy="64" r="3" fill="#141824" />
+            <circle cx="48" cy="24" r="3.5" fill="#141824" />
+            {/* Cross links */}
+            <line x1="30" y1="30" x2="48" y2="24" strokeDasharray="2 3" />
+            <line x1="70" y1="32" x2="76" y2="60" strokeDasharray="2 3" />
+            <line x1="76" y1="60" x2="52" y2="76" strokeDasharray="2 3" />
+            <line x1="26" y1="64" x2="30" y2="30" strokeDasharray="2 3" />
+        </svg>
+    );
+}
+
+function IllustrationSoaringBird({ className = "w-24 h-24" }: { className?: string }) {
+    return (
+        <svg className={className} viewBox="0 0 100 100" fill="none" stroke="#141824" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+            {/* Geometric soaring bird */}
+            <path d="M 22 55 L 45 42 L 78 24 L 60 52 L 80 62 L 50 60 L 38 74 L 38 60 Z" />
+            <line x1="45" y1="42" x2="50" y2="60" />
+            <line x1="45" y1="42" x2="60" y2="52" />
+            {/* Node vertices */}
+            <circle cx="22" cy="55" r="3" fill="#141824" />
+            <circle cx="78" cy="24" r="3.5" fill="#141824" />
+            <circle cx="80" cy="62" r="3" fill="#141824" />
+            <circle cx="38" cy="74" r="2.5" fill="#141824" />
+            {/* Speed trails */}
+            <line x1="16" y1="64" x2="26" y2="64" strokeDasharray="3 3" />
+            <line x1="12" y1="72" x2="28" y2="72" strokeDasharray="3 3" />
+        </svg>
+    );
+}
+
+function IllustrationPaletteCanvas({ className = "w-24 h-24" }: { className?: string }) {
+    return (
+        <svg className={className} viewBox="0 0 100 100" fill="none" stroke="#141824" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+            {/* Palette contour */}
+            <path d="M 50 20 C 30 20 20 34 20 54 C 20 74 36 82 52 82 C 60 82 66 78 68 72 C 70 66 76 64 82 66 C 86 67 90 64 90 58 C 90 36 74 20 50 20 Z" />
+            {/* Color swatches */}
+            <circle cx="36" cy="38" r="4" fill="#141824" />
+            <circle cx="52" cy="34" r="4" fill="#141824" />
+            <circle cx="68" cy="42" r="4" fill="#141824" />
+            <circle cx="36" cy="56" r="3.5" fill="#141824" />
+            {/* Thumb aperture */}
+            <circle cx="72" cy="56" r="5" />
+            {/* Sparkle */}
+            <path d="M 82 24 L 84 18 L 86 24 L 92 26 L 86 28 L 84 34 L 82 28 L 76 26 Z" fill="#141824" stroke="none" />
+        </svg>
+    );
+}
+
+function IllustrationFilmMotion({ className = "w-24 h-24" }: { className?: string }) {
+    return (
+        <svg className={className} viewBox="0 0 100 100" fill="none" stroke="#141824" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+            {/* Film slate frame */}
+            <rect x="22" y="30" width="56" height="44" rx="6" />
+            {/* Film sprockets */}
+            <circle cx="30" cy="38" r="2.5" fill="#141824" />
+            <circle cx="42" cy="38" r="2.5" fill="#141824" />
+            <circle cx="30" cy="66" r="2.5" fill="#141824" />
+            <circle cx="42" cy="66" r="2.5" fill="#141824" />
+            {/* Play triangle */}
+            <polygon points="50,44 64,52 50,60" fill="#141824" stroke="#141824" strokeWidth="2" strokeLinejoin="round" />
+            {/* Camera motion waves */}
+            <path d="M 84 38 Q 88 52 84 66" />
+            <path d="M 89 34 Q 94 52 89 70" strokeDasharray="3 3" />
+        </svg>
+    );
+}
+
+function IllustrationVectorCube({ className = "w-24 h-24" }: { className?: string }) {
+    return (
+        <svg className={className} viewBox="0 0 100 100" fill="none" stroke="#141824" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+            {/* Isometric 3D cube */}
+            <polygon points="50,22 80,38 50,54 20,38" />
+            <polygon points="20,38 50,54 50,84 20,68" />
+            <polygon points="80,38 50,54 50,84 80,68" />
+            {/* Coordinate vertices */}
+            <circle cx="50" cy="22" r="3.5" fill="#141824" />
+            <circle cx="80" cy="38" r="3.5" fill="#141824" />
+            <circle cx="20" cy="38" r="3.5" fill="#141824" />
+            <circle cx="50" cy="54" r="4.5" fill="#141824" />
+            <circle cx="50" cy="84" r="3.5" fill="#141824" />
+            {/* Internal lattice points */}
+            <circle cx="35" cy="46" r="2" fill="#141824" />
+            <circle cx="65" cy="46" r="2" fill="#141824" />
+            <circle cx="50" cy="38" r="2" fill="#141824" />
+        </svg>
+    );
+}
+
+function IllustrationVisionEye({ className = "w-24 h-24" }: { className?: string }) {
+    return (
+        <svg className={className} viewBox="0 0 100 100" fill="none" stroke="#141824" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+            {/* Focus reticle brackets */}
+            <path d="M 22 36 L 22 26 L 32 26" />
+            <path d="M 78 36 L 78 26 L 68 26" />
+            <path d="M 22 64 L 22 74 L 32 74" />
+            <path d="M 78 64 L 78 74 L 68 74" />
+            {/* Eye contour */}
+            <path d="M 24 50 C 34 36 66 36 76 50 C 66 64 34 64 24 50 Z" />
+            {/* Iris & pupil */}
+            <circle cx="50" cy="50" r="9" />
+            <circle cx="50" cy="50" r="4" fill="#141824" />
+            <circle cx="47" cy="47" r="1.5" fill="#ffffff" />
+        </svg>
+    );
+}
+
+function IllustrationAudioWave({ className = "w-24 h-24" }: { className?: string }) {
+    return (
+        <svg className={className} viewBox="0 0 100 100" fill="none" stroke="#141824" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+            {/* Audio waveform vertical bars */}
+            <line x1="22" y1="46" x2="22" y2="54" strokeWidth="3" />
+            <line x1="30" y1="38" x2="30" y2="62" strokeWidth="3" />
+            <line x1="38" y1="28" x2="38" y2="72" strokeWidth="3" />
+            <line x1="46" y1="22" x2="46" y2="78" strokeWidth="3.5" />
+            <line x1="54" y1="22" x2="54" y2="78" strokeWidth="3.5" />
+            <line x1="62" y1="32" x2="62" y2="68" strokeWidth="3" />
+            <line x1="70" y1="40" x2="70" y2="60" strokeWidth="3" />
+            <line x1="78" y1="46" x2="78" y2="54" strokeWidth="3" />
+            {/* Frequency guideline */}
+            <line x1="16" y1="50" x2="84" y2="50" strokeDasharray="2 4" strokeWidth="1" />
+        </svg>
+    );
+}
+
+function ModelIllustration({ type, className }: { type: IllustrationType; className?: string }) {
+    switch (type) {
+        case 'brain-head': return <IllustrationBrainHead className={className} />;
+        case 'cursor-node': return <IllustrationCursorNode className={className} />;
+        case 'cluster-burst': return <IllustrationClusterBurst className={className} />;
+        case 'soaring-bird': return <IllustrationSoaringBird className={className} />;
+        case 'palette-canvas': return <IllustrationPaletteCanvas className={className} />;
+        case 'film-motion': return <IllustrationFilmMotion className={className} />;
+        case 'vector-cube': return <IllustrationVectorCube className={className} />;
+        case 'vision-eye': return <IllustrationVisionEye className={className} />;
+        case 'audio-wave': return <IllustrationAudioWave className={className} />;
+        default: return <IllustrationBrainHead className={className} />;
+    }
+}
+
+// ─── COMPLETE CATALOG: FREE & TOP MODELS FIRST (NO CLAUDE) ─────────────────
+
 const MODEL_CATALOG: ModelCardData[] = [
-    // --- TEXT & REASONING ---
-    {
-        id: 'flux-sonnet',
-        realName: 'Anthropic Claude Sonnet 4.5',
-        provider: 'AWS Bedrock',
-        modality: 'text',
-        label: 'Flux Sonnet 4.5',
-        description: 'SOTA frontier reasoning, complex architecture synthesis, and autonomous agent workflows on AWS Bedrock.',
-        contextWindow: '200,000 tokens',
-        maxOutput: '64,000 tokens',
-        speedRating: 'High Speed Reasoning',
-        minTier: 'pro',
-        capabilities: ['deep-reasoning', 'coding', 'vision', 'tool-calling', 'json-mode', 'extended-thinking'],
-        aliases: ['flux-sonnet-4-5', 'claude-sonnet-4-5', 'claude-sonnet-4.5'],
-        samplePrompt: 'Design a distributed fault-tolerant database shard allocation algorithm in TypeScript.'
-    },
-    {
-        id: 'flux-pro-max',
-        realName: 'Anthropic Claude 3.7 / 4.6 Sonnet',
-        provider: 'AWS Bedrock',
-        modality: 'text',
-        label: 'Flux Pro Max',
-        description: 'Frontier hybrid reasoning architecture with extended thinking benchmarks and rigorous SQL optimization.',
-        contextWindow: '200,000 tokens',
-        maxOutput: '64,000 tokens',
-        speedRating: 'Deep Thinking',
-        minTier: 'max',
-        capabilities: ['extended-thinking', 'code-synthesis', 'system-design', 'multi-tool'],
-        aliases: ['claude-3-7-sonnet', 'claude-sonnet-latest'],
-        samplePrompt: 'Perform a full security and performance audit of a PostgreSQL foreign data wrapper implementation.'
-    },
+    // 1. Amazon Nova Pro (AWS Bedrock Flagship Multimodal)
     {
         id: 'flux-nova-pro',
         realName: 'Amazon Nova Pro',
         provider: 'AWS Bedrock',
         modality: 'text',
-        label: 'Flux Nova Pro',
+        label: 'Nova Pro',
         description: 'Amazon Bedrock flagship multimodal intelligence with high speed reasoning, native vision, and fast document analysis.',
         contextWindow: '300,000 tokens',
         maxOutput: '8,192 tokens',
@@ -100,14 +292,19 @@ const MODEL_CATALOG: ModelCardData[] = [
         minTier: 'free',
         capabilities: ['multimodal', 'vision', 'tool-calling', 'json-mode', 'coding'],
         aliases: ['nova-pro', 'amazon-nova-pro', 'amazon.nova-pro-v1:0'],
-        samplePrompt: 'Analyze this distributed system architecture and suggest failure recovery mechanisms.'
+        samplePrompt: 'Analyze this distributed system architecture and suggest failure recovery mechanisms.',
+        bannerColor: '#7aa7e8', // Soft Sky Blue
+        illustrationType: 'brain-head',
+        badgeText: 'Flagship',
+        workTags: ['Most capable', 'Research', 'Multi-day tasks', 'Coding']
     },
+    // 2. Amazon Nova Lite (AWS Bedrock High Velocity)
     {
         id: 'flux-nova-lite',
         realName: 'Amazon Nova Lite',
         provider: 'AWS Bedrock',
         modality: 'text',
-        label: 'Flux Nova Lite',
+        label: 'Nova Lite',
         description: 'Ultra-fast multimodal reasoning, high-throughput interactive processing, and real-time generation on AWS Bedrock.',
         contextWindow: '300,000 tokens',
         maxOutput: '8,192 tokens',
@@ -115,59 +312,19 @@ const MODEL_CATALOG: ModelCardData[] = [
         minTier: 'free',
         capabilities: ['hyper-fast', 'multimodal', 'chat', 'tool-calling'],
         aliases: ['nova-lite', 'amazon-nova-lite', 'amazon.nova-lite-v1:0'],
-        samplePrompt: 'Summarize the core benefits of edge caching over origin database read replicas.'
+        samplePrompt: 'Summarize the core benefits of edge caching over origin database read replicas.',
+        bannerColor: '#f08c73', // Warm Coral / Peach
+        illustrationType: 'cursor-node',
+        badgeText: 'Fastest',
+        workTags: ['Complex projects', 'Agents', 'Interactive UX']
     },
-    {
-        id: 'flux-turbo',
-        realName: 'Meta LLaMA 3.3 70B Versatile',
-        provider: 'Groq / Meta',
-        modality: 'text',
-        label: 'Flux Turbo',
-        description: 'Hyper-speed 300+ tokens/second inference powered by Groq LPUs. Ideal for real-time agents and rapid interactive UX.',
-        contextWindow: '128,000 tokens',
-        maxOutput: '8,192 tokens',
-        speedRating: '300+ tok/s (Hyper)',
-        minTier: 'free',
-        capabilities: ['hyper-fast', 'code', 'chat', 'tool-calling', 'json-mode'],
-        aliases: ['llama-3.3-70b', 'groq-llama-70b'],
-        samplePrompt: 'Write an optimized regex parser in Rust with benchmarks.'
-    },
-    {
-        id: 'flux-omni',
-        realName: 'Google Gemini 2.0 Flash',
-        provider: 'Google Gemini',
-        modality: 'text',
-        label: 'Flux Omni',
-        description: 'Massive 1M token context window, multimodal image understanding, and high-velocity reasoning.',
-        contextWindow: '1,048,576 tokens',
-        maxOutput: '8,192 tokens',
-        speedRating: 'Ultra-Fast Multimodal',
-        minTier: 'free',
-        capabilities: ['1m-context', 'vision', 'document-analysis', 'tool-calling'],
-        aliases: ['gemini-2.0-flash', 'gemini-flash'],
-        samplePrompt: 'Analyze this full application schema and generate an ER diagram in Mermaid format.'
-    },
-    {
-        id: 'flux-max',
-        realName: 'OpenAI GPT-4o Mini',
-        provider: 'OpenAI',
-        modality: 'text',
-        label: 'Flux Max',
-        description: 'Lightweight flagship intelligence with strong coding and instruction adherence at high velocity.',
-        contextWindow: '128,000 tokens',
-        maxOutput: '16,384 tokens',
-        speedRating: 'Fast & Robust',
-        minTier: 'free',
-        capabilities: ['instruction-following', 'vision', 'chat', 'json-mode'],
-        aliases: ['gpt-4o-mini'],
-        samplePrompt: 'Summarize the differences between optimistic and pessimistic locking in SQL.'
-    },
+    // 3. GLM-4 Flash (Default Workhorse)
     {
         id: 'flux',
         realName: 'Zhipu AI GLM-4 Flash',
         provider: 'Zhipu AI',
         modality: 'text',
-        label: 'Flux (Default)',
+        label: 'GLM-4 Flash',
         description: 'High-accuracy general reasoning, precision SQL query generation, and conversational code intelligence.',
         contextWindow: '128,000 tokens',
         maxOutput: '4,096 tokens',
@@ -175,163 +332,39 @@ const MODEL_CATALOG: ModelCardData[] = [
         minTier: 'free',
         capabilities: ['general-reasoning', 'sql-synthesis', 'tool-calling', 'json-mode'],
         aliases: ['default', 'flux-v4'],
-        samplePrompt: 'Write a SQL query using window functions to calculate 7-day rolling revenue per customer.'
+        samplePrompt: 'Write a SQL query using window functions to calculate 7-day rolling revenue per customer.',
+        bannerColor: '#ebe4d3', // Warm Ivory / Sand Cream
+        illustrationType: 'cluster-burst',
+        badgeText: 'Top Free',
+        workTags: ['Everyday tasks', 'Writing', 'Cost-efficient', 'SQL']
     },
+    // 4. Amazon Nova Micro (AWS Bedrock Ultra-Low Latency)
     {
-        id: 'flux-flash',
-        realName: 'Zhipu AI GLM-4 Flash (Turbo UX)',
-        provider: 'Zhipu AI',
-        modality: 'text',
-        label: 'Flux Flash',
-        description: 'Sub-100ms token throughput optimized for code autocomplete, real-time streaming, and interactive widgets.',
-        contextWindow: '128,000 tokens',
-        maxOutput: '4,096 tokens',
-        speedRating: 'Sub-100ms Low Latency',
-        minTier: 'free',
-        capabilities: ['real-time-ux', 'autocomplete', 'streaming', 'lightweight'],
-        aliases: ['fast-chat'],
-        samplePrompt: 'Autocomplete this JavaScript debounce utility function.'
-    },
-    {
-        id: 'flux-5.2',
-        realName: 'Zhipu AI GLM-4 Plus (Frontier Agent)',
-        provider: 'Zhipu AI',
-        modality: 'text',
-        label: 'Flux 5.2',
-        description: 'Specialized reasoning architecture engineered for multi-step agentic tool execution and recursive problem solving.',
-        contextWindow: '128,000 tokens',
-        maxOutput: '8,192 tokens',
-        speedRating: 'Balanced Cognitive',
-        minTier: 'free',
-        capabilities: ['agentic-execution', 'multi-step-tools', 'complex-reasoning'],
-        aliases: ['agent-v5'],
-        samplePrompt: 'Create a complete multi-step migration script that refactors table schema with rollback handling.'
-    },
-    {
-        id: 'flux-pro',
-        realName: 'Zhipu AI GLM-4 Air',
-        provider: 'Zhipu AI',
-        modality: 'text',
-        label: 'Flux Pro',
-        description: 'Enhanced instruction following, multi-table analytical queries, and strict JSON Schema output.',
-        contextWindow: '128,000 tokens',
-        maxOutput: '4,096 tokens',
-        speedRating: 'Reliable Enterprise',
-        minTier: 'free',
-        capabilities: ['strict-json', 'data-modeling', 'bi-analysis'],
-        samplePrompt: 'Generate a JSON Schema conforming API response model for a payment transaction.'
-    },
-    {
-        id: 'flux-ultra',
-        realName: 'Zhipu AI GLM-4 Plus (Deep Reasoning)',
-        provider: 'Zhipu AI',
-        modality: 'text',
-        label: 'Flux Ultra',
-        description: 'Maximum cognitive depth for database architectural blueprints, complex migrations, and audit trails.',
-        contextWindow: '128,000 tokens',
-        maxOutput: '8,192 tokens',
-        speedRating: 'Deep Analysis',
-        minTier: 'free',
-        capabilities: ['architectural-design', 'deep-verification', 'long-chain-thought'],
-        samplePrompt: 'Analyze this multi-tenant database schema for potential connection pool exhaustion vulnerabilities.'
-    },
-    {
-        id: 'flux-vision',
-        realName: 'Zhipu AI GLM-4V Multimodal',
-        provider: 'Zhipu AI',
-        modality: 'text',
-        label: 'Flux Vision',
-        description: 'High-speed visual comprehension, diagram recognition, screenshot-to-code, and receipt inspection.',
-        contextWindow: '128,000 tokens',
-        maxOutput: '4,096 tokens',
-        speedRating: 'Fast Multimodal',
-        minTier: 'free',
-        capabilities: ['vision-ocr', 'screenshot-to-code', 'diagram-analysis'],
-        samplePrompt: 'Extract table columns and data types from this database diagram screenshot.'
-    },
-    {
-        id: 'gpt-4o',
-        realName: 'OpenAI GPT-4o (Drop-in Alias)',
-        provider: 'OpenAI',
-        modality: 'text',
-        label: 'GPT-4o Alias',
-        description: 'OpenAI compatibility alias. Transparently routed to flux-ultra with zero code modifications.',
-        contextWindow: '128,000 tokens',
-        maxOutput: '8,192 tokens',
-        speedRating: 'Flagship Alias',
-        minTier: 'free',
-        capabilities: ['openai-drop-in', 'chat', 'coding'],
-        isDropinAlias: true,
-        samplePrompt: 'Write a Next.js App Router API route with session verification.'
-    },
-
-    // --- IMAGE GENERATION ---
-    {
-        id: 'flux-image-ultra',
-        realName: 'Stability AI Stable Image Ultra 1.0',
+        id: 'flux-nova-micro',
+        realName: 'Amazon Nova Micro',
         provider: 'AWS Bedrock',
-        modality: 'image',
-        label: 'Flux Image Ultra',
-        description: 'SOTA photorealism, exquisite typography rendering, complex composition, and automatic S3 cloud storage.',
-        contextWindow: 'N/A (Image)',
-        maxOutput: 'Up to 4K UHD',
-        speedRating: 'Ultra High Fidelity',
-        minTier: 'pro',
-        capabilities: ['photorealism-sota', 'typography', 'cinematic-lighting', 's3-auto-storage'],
-        aliases: ['stable-image-ultra', 'stable-diffusion-ultra'],
-        samplePrompt: 'A futuristic cybernetic database server room with neon orange coolant tubes, cinematic 8k photorealistic.'
-    },
-    {
-        id: 'flux-image-hd',
-        realName: 'Google Imagen 3.0',
-        provider: 'Google Gemini',
-        modality: 'image',
-        label: 'Flux Image HD',
-        description: 'High-definition 4K image generation with superior detail, natural skin tones, and crisp English text rendering.',
-        contextWindow: 'N/A (Image)',
-        maxOutput: 'Up to 4K',
-        speedRating: 'Fast High-Def',
+        modality: 'text',
+        label: 'Nova Micro',
+        description: 'Lowest latency text intelligence on AWS Bedrock engineered for extreme throughput and real-time agents.',
+        contextWindow: '128,000 tokens',
+        maxOutput: '4,096 tokens',
+        speedRating: 'Lowest Latency',
         minTier: 'free',
-        capabilities: ['4k-hd', 'typography', 'creative-scenes', 's3-auto-storage'],
-        aliases: ['imagen-3'],
-        samplePrompt: 'Vintage travel poster for Neo Tokyo with bold typography and retro color palette.'
+        capabilities: ['lowest-latency', 'high-throughput', 'agents', 'real-time'],
+        aliases: ['nova-micro', 'amazon-nova-micro', 'amazon.nova-micro-v1:0'],
+        samplePrompt: 'Validate and normalize this international telephone number string format.',
+        bannerColor: '#96c8b0', // Mint / Soft Sage
+        illustrationType: 'soaring-bird',
+        badgeText: 'Lowest Cost',
+        workTags: ['Fastest', 'Lowest cost', 'High volume']
     },
-    {
-        id: 'flux-image-pro',
-        realName: 'OpenAI DALL·E 3',
-        provider: 'OpenAI',
-        modality: 'image',
-        label: 'Flux Image Pro',
-        description: 'Premium prompt adherence with imaginative visual styling and composition accuracy.',
-        contextWindow: 'N/A (Image)',
-        maxOutput: '1024x1024 / 1792x1024',
-        speedRating: 'High Quality',
-        minTier: 'pro',
-        capabilities: ['prompt-adherence', 'creative', 's3-auto-storage'],
-        aliases: ['dall-e-3'],
-        samplePrompt: 'A minimal isometric 3D render of a cloud database architecture on a dark sleek background.'
-    },
-    {
-        id: 'flux-image',
-        realName: 'Zhipu AI CogView 4',
-        provider: 'Zhipu AI',
-        modality: 'image',
-        label: 'Flux Image',
-        description: 'High-quality photorealistic text-to-image synthesis with prompt refinement and direct S3 cloud asset delivery.',
-        contextWindow: 'N/A (Image)',
-        maxOutput: '1024x1024',
-        speedRating: 'Balanced',
-        minTier: 'free',
-        capabilities: ['photorealistic', 's3-auto-storage'],
-        aliases: ['cogview-4'],
-        samplePrompt: 'Modern minimalist logo for a high-performance database startup, vector style.'
-    },
+    // 5. CogView-3 Flash (Fast AI Image Generation)
     {
         id: 'flux-image-fast',
         realName: 'Zhipu AI CogView 3 Flash',
         provider: 'Zhipu AI',
         modality: 'image',
-        label: 'Flux Image Fast',
+        label: 'CogView-3 Flash',
         description: 'Ultra-fast low-latency image generation designed for user avatars, blog thumbnails, and rapid prototyping.',
         contextWindow: 'N/A (Image)',
         maxOutput: '1024x1024',
@@ -339,16 +372,316 @@ const MODEL_CATALOG: ModelCardData[] = [
         minTier: 'free',
         capabilities: ['ultra-fast', 'thumbnails', 's3-auto-storage'],
         aliases: ['dall-e-2'],
-        samplePrompt: 'Flat illustration of a cloud storage server icon, gradient colors.'
+        samplePrompt: 'Modern minimalist logo for a high-performance database startup, vector style.',
+        bannerColor: '#b8a4f0', // Soft Lavender Lilac
+        illustrationType: 'palette-canvas',
+        badgeText: 'Instant Gen',
+        workTags: ['Image synthesis', 'Avatars', 'Rapid prototyping']
     },
-
-    // --- VIDEO GENERATION ---
+    // 6. CogVideoX Flash (Fast AI Motion Video)
+    {
+        id: 'flux-video',
+        realName: 'Zhipu AI CogVideoX Flash',
+        provider: 'Zhipu AI',
+        modality: 'video',
+        label: 'CogVideoX Flash',
+        description: 'Text-to-video generation with dynamic lighting and camera pans. Dispatched via asynchronous task IDs.',
+        contextWindow: 'N/A (Video)',
+        maxOutput: '720p MP4 (5-10s)',
+        speedRating: 'Fast Async Video',
+        minTier: 'free',
+        capabilities: ['text-to-video', 'async-polling', 's3-auto-storage'],
+        aliases: ['cogvideox-flash'],
+        samplePrompt: 'Time-lapse of clouds racing over a bustling modern skyscraper city at sunset.',
+        bannerColor: '#f2b372', // Warm Apricot / Amber
+        illustrationType: 'film-motion',
+        badgeText: 'AI Video',
+        workTags: ['Video generation', 'Dynamic motion', 'Camera pans']
+    },
+    // 7. Amazon Titan Embeddings V2 (AWS Bedrock RAG)
+    {
+        id: 'flux-embed',
+        realName: 'Amazon Titan Embeddings V2',
+        provider: 'AWS Bedrock',
+        modality: 'embedding',
+        label: 'Titan Embeddings V2',
+        description: '1024-dimensional dense vector embeddings with flexible output dimensions for semantic search and RAG retrieval.',
+        contextWindow: '8,192 tokens',
+        maxOutput: '1024-dim Vector Float[]',
+        speedRating: 'Sub-50ms Fast Vector',
+        minTier: 'free',
+        capabilities: ['semantic-search', 'rag-retrieval', 'vector-index', '1024-dim'],
+        aliases: ['text-embedding-3-small', 'text-embedding-004', 'amazon.titan-embed-text-v2:0'],
+        samplePrompt: 'Generate embedding vector for documentation semantic search index.',
+        bannerColor: '#7ec9dc', // Azure Cyan
+        illustrationType: 'vector-cube',
+        badgeText: 'Vector RAG',
+        workTags: ['Semantic search', 'RAG retrieval', 'Vector index']
+    },
+    // 8. GLM-4V Multimodal (Vision & OCR)
+    {
+        id: 'flux-vision',
+        realName: 'Zhipu AI GLM-4V Multimodal',
+        provider: 'Zhipu AI',
+        modality: 'text',
+        label: 'GLM-4V Vision',
+        description: 'High-speed visual comprehension, diagram recognition, screenshot-to-code, and receipt inspection.',
+        contextWindow: '128,000 tokens',
+        maxOutput: '4,096 tokens',
+        speedRating: 'Fast Multimodal',
+        minTier: 'free',
+        capabilities: ['vision-ocr', 'screenshot-to-code', 'diagram-analysis'],
+        samplePrompt: 'Extract table columns and data types from this database diagram screenshot.',
+        bannerColor: '#ebd06a', // Golden Honey
+        illustrationType: 'vision-eye',
+        badgeText: 'Vision OCR',
+        workTags: ['Visual inspection', 'Diagram analysis', 'OCR']
+    },
+    // 9. Meta LLaMA 3.3 70B on Groq LPUs
+    {
+        id: 'flux-turbo',
+        realName: 'Meta LLaMA 3.3 70B Versatile',
+        provider: 'Groq / Meta',
+        modality: 'text',
+        label: 'LLaMA 3.3 70B',
+        description: 'Hyper-speed 300+ tokens/second inference powered by Groq LPUs. Ideal for real-time agents and rapid interactive UX.',
+        contextWindow: '128,000 tokens',
+        maxOutput: '8,192 tokens',
+        speedRating: '300+ tok/s (Hyper)',
+        minTier: 'free',
+        capabilities: ['hyper-fast', 'code', 'chat', 'tool-calling', 'json-mode'],
+        aliases: ['llama-3.3-70b', 'groq-llama-70b'],
+        samplePrompt: 'Write an optimized regex parser in Rust with benchmarks.',
+        bannerColor: '#e68ca4', // Berry Rose
+        illustrationType: 'soaring-bird',
+        badgeText: '300+ tok/s',
+        workTags: ['Real-time agents', 'Rust coding', 'Extreme speed']
+    },
+    // 10. Google Gemini 2.0 Flash (1M Context)
+    {
+        id: 'flux-omni',
+        realName: 'Google Gemini 2.0 Flash',
+        provider: 'Google Gemini',
+        modality: 'text',
+        label: 'Gemini 2.0 Flash',
+        description: 'Massive 1M token context window, multimodal image understanding, and high-velocity reasoning.',
+        contextWindow: '1,048,576 tokens',
+        maxOutput: '8,192 tokens',
+        speedRating: 'Ultra-Fast Multimodal',
+        minTier: 'free',
+        capabilities: ['1m-context', 'vision', 'document-analysis', 'tool-calling'],
+        aliases: ['gemini-2.0-flash', 'gemini-flash'],
+        samplePrompt: 'Analyze this full application schema and generate an ER diagram in Mermaid format.',
+        bannerColor: '#7bbef0', // Sky Blue
+        illustrationType: 'brain-head',
+        badgeText: '1M Context',
+        workTags: ['Long document', 'Entire codebase', 'Multimodal']
+    },
+    // 11. OpenAI GPT-4o Mini
+    {
+        id: 'flux-max',
+        realName: 'OpenAI GPT-4o Mini',
+        provider: 'OpenAI',
+        modality: 'text',
+        label: 'GPT-4o Mini',
+        description: 'Lightweight flagship intelligence with strong coding and instruction adherence at high velocity.',
+        contextWindow: '128,000 tokens',
+        maxOutput: '16,384 tokens',
+        speedRating: 'Fast & Robust',
+        minTier: 'free',
+        capabilities: ['instruction-following', 'vision', 'chat', 'json-mode'],
+        aliases: ['gpt-4o-mini'],
+        samplePrompt: 'Summarize the differences between optimistic and pessimistic locking in SQL.',
+        bannerColor: '#7ed4ad', // Emerald Mint
+        illustrationType: 'cluster-burst',
+        badgeText: 'Precise',
+        workTags: ['Instruction following', 'Strict JSON', 'Chat']
+    },
+    // 12. GLM-4 Flash (Turbo UX)
+    {
+        id: 'flux-flash',
+        realName: 'Zhipu AI GLM-4 Flash (Turbo UX)',
+        provider: 'Zhipu AI',
+        modality: 'text',
+        label: 'GLM Flash Turbo',
+        description: 'Sub-100ms token throughput optimized for code autocomplete, real-time streaming, and interactive widgets.',
+        contextWindow: '128,000 tokens',
+        maxOutput: '4,096 tokens',
+        speedRating: 'Sub-100ms Low Latency',
+        minTier: 'free',
+        capabilities: ['real-time-ux', 'autocomplete', 'streaming', 'lightweight'],
+        aliases: ['fast-chat'],
+        samplePrompt: 'Autocomplete this JavaScript debounce utility function.',
+        bannerColor: '#ebe4d3',
+        illustrationType: 'cursor-node',
+        badgeText: 'Sub-100ms',
+        workTags: ['Autocomplete', 'Real-time UX', 'Streaming']
+    },
+    // 13. GLM-4 Plus (Frontier Agent)
+    {
+        id: 'flux-5.2',
+        realName: 'Zhipu AI GLM-4 Plus (Frontier Agent)',
+        provider: 'Zhipu AI',
+        modality: 'text',
+        label: 'GLM-4 Agentic',
+        description: 'Specialized reasoning architecture engineered for multi-step agentic tool execution and recursive problem solving.',
+        contextWindow: '128,000 tokens',
+        maxOutput: '8,192 tokens',
+        speedRating: 'Balanced Cognitive',
+        minTier: 'free',
+        capabilities: ['agentic-execution', 'multi-step-tools', 'complex-reasoning'],
+        aliases: ['agent-v5'],
+        samplePrompt: 'Create a complete multi-step migration script that refactors table schema with rollback handling.',
+        bannerColor: '#a7b8e8',
+        illustrationType: 'cursor-node',
+        badgeText: 'Agentic',
+        workTags: ['Recursive reasoning', 'Multi-tool', 'Workflows']
+    },
+    // 14. GLM-4 Air (Strict JSON & Analysis)
+    {
+        id: 'flux-pro',
+        realName: 'Zhipu AI GLM-4 Air',
+        provider: 'Zhipu AI',
+        modality: 'text',
+        label: 'GLM-4 Air',
+        description: 'Enhanced instruction following, multi-table analytical queries, and strict JSON Schema output.',
+        contextWindow: '128,000 tokens',
+        maxOutput: '4,096 tokens',
+        speedRating: 'Reliable Enterprise',
+        minTier: 'free',
+        capabilities: ['strict-json', 'data-modeling', 'bi-analysis'],
+        samplePrompt: 'Generate a JSON Schema conforming API response model for a payment transaction.',
+        bannerColor: '#e8b394',
+        illustrationType: 'cluster-burst',
+        badgeText: 'Strict JSON',
+        workTags: ['Schema modeling', 'Structured JSON', 'BI Queries']
+    },
+    // 15. GLM-4 Plus (Deep Reasoning)
+    {
+        id: 'flux-ultra',
+        realName: 'Zhipu AI GLM-4 Plus (Deep Reasoning)',
+        provider: 'Zhipu AI',
+        modality: 'text',
+        label: 'GLM-4 Ultra',
+        description: 'Maximum cognitive depth for database architectural blueprints, complex migrations, and audit trails.',
+        contextWindow: '128,000 tokens',
+        maxOutput: '8,192 tokens',
+        speedRating: 'Deep Analysis',
+        minTier: 'free',
+        capabilities: ['architectural-design', 'deep-verification', 'long-chain-thought'],
+        samplePrompt: 'Analyze this multi-tenant database schema for potential connection pool exhaustion vulnerabilities.',
+        bannerColor: '#d1b0ea',
+        illustrationType: 'brain-head',
+        badgeText: 'Deep Thought',
+        workTags: ['Architecture blueprints', 'Security audits', 'Migrations']
+    },
+    // 16. OpenAI Drop-in Alias
+    {
+        id: 'gpt-4o',
+        realName: 'OpenAI GPT-4o (Drop-in Alias)',
+        provider: 'OpenAI',
+        modality: 'text',
+        label: 'GPT-4o Alias',
+        description: 'OpenAI compatibility alias. Transparently routed to flagship tier with zero code modifications.',
+        contextWindow: '128,000 tokens',
+        maxOutput: '8,192 tokens',
+        speedRating: 'Flagship Alias',
+        minTier: 'free',
+        capabilities: ['openai-drop-in', 'chat', 'coding'],
+        isDropinAlias: true,
+        samplePrompt: 'Write a Next.js App Router API route with session verification.',
+        bannerColor: '#98d9ba',
+        illustrationType: 'brain-head',
+        badgeText: 'Drop-In',
+        workTags: ['Drop-in OpenAI', 'Zero config', 'Compatibility']
+    },
+    // 17. Stable Image Ultra (Pro Tier)
+    {
+        id: 'flux-image-ultra',
+        realName: 'Stability AI Stable Image Ultra 1.0',
+        provider: 'AWS Bedrock',
+        modality: 'image',
+        label: 'Stable Image Ultra',
+        description: 'SOTA photorealism, exquisite typography rendering, complex composition, and automatic S3 cloud storage.',
+        contextWindow: 'N/A (Image)',
+        maxOutput: 'Up to 4K UHD',
+        speedRating: 'Ultra High Fidelity',
+        minTier: 'pro',
+        capabilities: ['photorealism-sota', 'typography', 'cinematic-lighting', 's3-auto-storage'],
+        aliases: ['stable-image-ultra', 'stable-diffusion-ultra'],
+        samplePrompt: 'A futuristic cybernetic database server room with neon orange coolant tubes, cinematic 8k photorealistic.',
+        bannerColor: '#c4a5f4',
+        illustrationType: 'palette-canvas',
+        badgeText: 'Pro SOTA',
+        workTags: ['Photorealism SOTA', 'Typography', '4K UHD']
+    },
+    // 18. Google Imagen 3.0
+    {
+        id: 'flux-image-hd',
+        realName: 'Google Imagen 3.0',
+        provider: 'Google Gemini',
+        modality: 'image',
+        label: 'Imagen 3.0 HD',
+        description: 'High-definition 4K image generation with superior detail, natural skin tones, and crisp English text rendering.',
+        contextWindow: 'N/A (Image)',
+        maxOutput: 'Up to 4K',
+        speedRating: 'Fast High-Def',
+        minTier: 'free',
+        capabilities: ['4k-hd', 'typography', 'creative-scenes', 's3-auto-storage'],
+        aliases: ['imagen-3'],
+        samplePrompt: 'Vintage travel poster for Neo Tokyo with bold typography and retro color palette.',
+        bannerColor: '#f4ad92',
+        illustrationType: 'palette-canvas',
+        badgeText: 'HD Creative',
+        workTags: ['Graphic design', 'Marketing assets', 'Fine detail']
+    },
+    // 19. OpenAI DALL·E 3 (Pro Tier)
+    {
+        id: 'flux-image-pro',
+        realName: 'OpenAI DALL·E 3',
+        provider: 'OpenAI',
+        modality: 'image',
+        label: 'DALL·E 3 Pro',
+        description: 'Premium prompt adherence with imaginative visual styling and composition accuracy.',
+        contextWindow: 'N/A (Image)',
+        maxOutput: '1024x1024 / 1792x1024',
+        speedRating: 'High Quality',
+        minTier: 'pro',
+        capabilities: ['prompt-adherence', 'creative', 's3-auto-storage'],
+        aliases: ['dall-e-3'],
+        samplePrompt: 'A minimal isometric 3D render of a cloud database architecture on a dark sleek background.',
+        bannerColor: '#8bc5ea',
+        illustrationType: 'palette-canvas',
+        badgeText: 'Pro',
+        workTags: ['Prompt adherence', 'Concept art', '3D Renders']
+    },
+    // 20. CogView 4
+    {
+        id: 'flux-image',
+        realName: 'Zhipu AI CogView 4',
+        provider: 'Zhipu AI',
+        modality: 'image',
+        label: 'CogView 4',
+        description: 'High-quality photorealistic text-to-image synthesis with prompt refinement and direct S3 cloud asset delivery.',
+        contextWindow: 'N/A (Image)',
+        maxOutput: '1024x1024',
+        speedRating: 'Balanced',
+        minTier: 'free',
+        capabilities: ['photorealistic', 's3-auto-storage'],
+        aliases: ['cogview-4'],
+        samplePrompt: 'Modern minimalist logo for a high-performance database startup, vector style.',
+        bannerColor: '#ebd475',
+        illustrationType: 'palette-canvas',
+        badgeText: 'Free',
+        workTags: ['General illustration', 'Logos', 'S3 cloud storage']
+    },
+    // 21. Luma Ray v2 (Pro Tier)
     {
         id: 'flux-video-ray',
         realName: 'Luma AI Ray v2',
         provider: 'AWS Bedrock',
         modality: 'video',
-        label: 'Flux Video Ray',
+        label: 'Luma Ray v2',
         description: 'Cinema-grade dynamic video generation with temporal consistency, physics rendering, and camera motion on AWS Bedrock.',
         contextWindow: 'N/A (Video)',
         maxOutput: '720p / 1080p MP4',
@@ -356,29 +689,19 @@ const MODEL_CATALOG: ModelCardData[] = [
         minTier: 'pro',
         capabilities: ['cinema-physics', 'camera-motion', 'async-polling', 's3-dest'],
         aliases: ['luma-ray-v2', 'ray-v2'],
-        samplePrompt: 'Cinematic drone shot flying through a bioluminescent redwood forest at twilight, mist rolling in.'
+        samplePrompt: 'Cinematic drone shot flying through a bioluminescent redwood forest at twilight, mist rolling in.',
+        bannerColor: '#f5a97f',
+        illustrationType: 'film-motion',
+        badgeText: 'Pro Cinema',
+        workTags: ['Cinema physics', 'Drone shots', 'Camera motion']
     },
-    {
-        id: 'flux-video',
-        realName: 'Zhipu AI CogVideoX Flash',
-        provider: 'Zhipu AI',
-        modality: 'video',
-        label: 'Flux Video',
-        description: 'Text-to-video generation with dynamic lighting and camera pans. Dispatched via asynchronous task IDs.',
-        contextWindow: 'N/A (Video)',
-        maxOutput: '720p MP4 (5-10s)',
-        speedRating: 'Fast Async Video',
-        minTier: 'pro',
-        capabilities: ['text-to-video', 'async-polling', 's3-auto-storage'],
-        aliases: ['cogvideox-flash'],
-        samplePrompt: 'Time-lapse of clouds racing over a bustling modern skyscraper city at sunset.'
-    },
+    // 22. CogVideoX HD (Max Tier)
     {
         id: 'flux-video-pro',
         realName: 'Zhipu AI CogVideoX HD',
         provider: 'Zhipu AI',
         modality: 'video',
-        label: 'Flux Video Pro',
+        label: 'CogVideoX HD',
         description: 'Cinematic 1080p video generation with high fidelity, rich motion dynamics, and crisp textures.',
         contextWindow: 'N/A (Video)',
         maxOutput: '1080p HD MP4',
@@ -386,16 +709,19 @@ const MODEL_CATALOG: ModelCardData[] = [
         minTier: 'max',
         capabilities: ['1080p-hd', 'motion-stability', 'async-polling'],
         aliases: ['cogvideox-hd'],
-        samplePrompt: 'Slow motion macro shot of water droplets splashing onto a shiny obsidian stone.'
+        samplePrompt: 'Slow motion macro shot of water droplets splashing onto a shiny obsidian stone.',
+        bannerColor: '#83cbe3',
+        illustrationType: 'film-motion',
+        badgeText: 'Max Tier',
+        workTags: ['1080p Studio', 'Macro motion', 'High resolution']
     },
-
-    // --- AUDIO: SPEECH-TO-TEXT (STT) ---
+    // 23. Whisper Large v3 Turbo on Groq LPUs
     {
         id: 'flux-listen',
         realName: 'OpenAI Whisper Large v3 Turbo',
         provider: 'Groq / Meta',
         modality: 'audio-stt',
-        label: 'Flux Listen',
+        label: 'Whisper v3 Turbo',
         description: 'Ultra-fast multilingual audio transcription with segment timestamps, powered by Groq LPUs at 10x real-time speed.',
         contextWindow: '25 MB Audio File',
         maxOutput: 'Full Transcript + Timestamps',
@@ -403,44 +729,57 @@ const MODEL_CATALOG: ModelCardData[] = [
         minTier: 'free',
         capabilities: ['multilingual-stt', 'word-timestamps', 'groq-accelerated'],
         aliases: ['whisper-1', 'whisper-large-v3-turbo'],
-        samplePrompt: 'Transcribe meeting audio recording with speaker timestamps.'
+        samplePrompt: 'Transcribe meeting audio recording with speaker timestamps.',
+        bannerColor: '#a49ee6',
+        illustrationType: 'audio-wave',
+        badgeText: '10x Speed',
+        workTags: ['Meeting transcripts', 'Subtitles', 'Word timestamps']
     },
+    // 24. Whisper Large v3
     {
         id: 'flux-listen-pro',
         realName: 'OpenAI Whisper Large v3',
         provider: 'Groq / Meta',
         modality: 'audio-stt',
-        label: 'Flux Listen Pro',
+        label: 'Whisper Large v3',
         description: 'Maximum precision transcription for noisy environments, technical terminology, accents, and multiple dialects.',
         contextWindow: '25 MB Audio File',
         maxOutput: 'Full Precision Transcript',
         speedRating: 'High Accuracy',
         minTier: 'free',
         capabilities: ['high-accuracy', 'noise-robust', 'multilingual'],
-        samplePrompt: 'Transcribe medical conference audio with technical jargon.'
+        samplePrompt: 'Transcribe medical conference audio with technical jargon.',
+        bannerColor: '#7acbe6',
+        illustrationType: 'audio-wave',
+        badgeText: 'High Accuracy',
+        workTags: ['Noisy audio', 'Technical jargon', 'Multilingual']
     },
+    // 25. Distil-Whisper Large v3
     {
         id: 'flux-listen-en',
         realName: 'Distil-Whisper Large v3 English',
         provider: 'Groq / Meta',
         modality: 'audio-stt',
-        label: 'Flux Listen English',
+        label: 'Distil-Whisper English',
         description: 'Lightweight, hyper-fast English-only speech recognition with near-zero latency for live voice assistants.',
         contextWindow: '25 MB Audio File',
         maxOutput: 'English Transcript',
         speedRating: 'Hyper-Fast English',
         minTier: 'free',
         capabilities: ['english-optimized', 'sub-second', 'voice-agents'],
-        samplePrompt: 'Instant transcription for live voice search command.'
+        samplePrompt: 'Instant transcription for live voice search command.',
+        bannerColor: '#94d6b6',
+        illustrationType: 'audio-wave',
+        badgeText: 'Sub-Second',
+        workTags: ['Voice assistants', 'Live speech', 'English-only']
     },
-
-    // --- AUDIO: TEXT-TO-SPEECH (TTS) ---
+    // 26. OpenAI TTS-1
     {
         id: 'flux-speak',
         realName: 'OpenAI TTS-1',
         provider: 'OpenAI',
         modality: 'audio-tts',
-        label: 'Flux Speak',
+        label: 'TTS-1 Speech',
         description: 'Natural, expressive text-to-speech voice synthesis across 6 voice personas (alloy, echo, fable, onyx, nova, shimmer).',
         contextWindow: '4,096 characters',
         maxOutput: 'MP3 / Opus Audio Stream',
@@ -448,14 +787,19 @@ const MODEL_CATALOG: ModelCardData[] = [
         minTier: 'free',
         capabilities: ['voice-synthesis', '6-voices', 'streaming-audio'],
         aliases: ['tts-1'],
-        samplePrompt: 'Synthesize audio narration: "Welcome to Fluxbase. Your serverless database is ready."'
+        samplePrompt: 'Synthesize audio narration: "Welcome to Fluxbase. Your serverless database is ready."',
+        bannerColor: '#e6b18c',
+        illustrationType: 'audio-wave',
+        badgeText: '6 Personas',
+        workTags: ['Speech synthesis', 'Podcasts', 'Narration']
     },
+    // 27. OpenAI TTS-1 HD (Pro Tier)
     {
         id: 'flux-speak-hd',
         realName: 'OpenAI TTS-1 HD',
         provider: 'OpenAI',
         modality: 'audio-tts',
-        label: 'Flux Speak HD',
+        label: 'TTS-1 HD Studio',
         description: 'Studio-grade high-definition audio synthesis for polished podcast intros, product walkthroughs, and audiobooks.',
         contextWindow: '4,096 characters',
         maxOutput: 'Lossless HD Audio',
@@ -463,24 +807,11 @@ const MODEL_CATALOG: ModelCardData[] = [
         minTier: 'pro',
         capabilities: ['studio-master', 'hd-audio', '6-voices'],
         aliases: ['tts-1-hd'],
-        samplePrompt: 'Synthesize studio HD audio for an enterprise customer onboarding guide.'
-    },
-
-    // --- TEXT EMBEDDINGS ---
-    {
-        id: 'flux-embed',
-        realName: 'Google Text Embedding 004',
-        provider: 'Google Gemini',
-        modality: 'embedding',
-        label: 'Flux Embed',
-        description: 'High-density 768-dimensional vector embeddings for semantic similarity, RAG retrieval, and vector search.',
-        contextWindow: '2,048 tokens',
-        maxOutput: '768-dim Vector Float[]',
-        speedRating: 'Sub-50ms Fast Vector',
-        minTier: 'free',
-        capabilities: ['semantic-search', 'rag-retrieval', 'vector-index', '768-dim'],
-        aliases: ['text-embedding-3-small', 'text-embedding-004'],
-        samplePrompt: 'Generate embedding vector for documentation semantic search index.'
+        samplePrompt: 'Synthesize studio HD audio for an enterprise customer onboarding guide.',
+        bannerColor: '#f096aa',
+        illustrationType: 'audio-wave',
+        badgeText: 'Pro HD',
+        workTags: ['Studio mastering', 'Audiobooks', 'Lossless audio']
     }
 ];
 
@@ -591,7 +922,6 @@ export default function AiModelsPage() {
     const [snippetModalOpen, setSnippetModalOpen] = useState(false);
     const [selectedSnippetModel, setSelectedSnippetModel] = useState<ModelCardData | null>(null);
     const [snippetLang, setSnippetLang] = useState<'curl' | 'python' | 'node'>('curl');
-    const [copiedSnippet, setCopiedSnippet] = useState(false);
 
     // Playground Modal
     const [playgroundModalOpen, setPlaygroundModalOpen] = useState(false);
@@ -599,6 +929,9 @@ export default function AiModelsPage() {
     const [playgroundPrompt, setPlaygroundPrompt] = useState('');
     const [playgroundResponse, setPlaygroundResponse] = useState<string | null>(null);
     const [isPlaying, setIsPlaying] = useState(false);
+
+    // Compare Models Modal
+    const [compareModalOpen, setCompareModalOpen] = useState(false);
 
     // 1. Fetch User Plan
     useEffect(() => {
@@ -641,10 +974,12 @@ export default function AiModelsPage() {
                 const q = searchQuery.toLowerCase();
                 const matchId = m.id.toLowerCase().includes(q);
                 const matchReal = m.realName.toLowerCase().includes(q);
+                const matchLabel = m.label.toLowerCase().includes(q);
                 const matchDesc = m.description.toLowerCase().includes(q);
                 const matchCap = m.capabilities.some(c => c.toLowerCase().includes(q));
+                const matchTags = m.workTags.some(t => t.toLowerCase().includes(q));
                 const matchAlias = m.aliases?.some(a => a.toLowerCase().includes(q));
-                if (!matchId && !matchReal && !matchDesc && !matchCap && !matchAlias) return false;
+                if (!matchId && !matchReal && !matchLabel && !matchDesc && !matchCap && !matchTags && !matchAlias) return false;
             }
             return true;
         });
@@ -876,7 +1211,6 @@ main();`;
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    // Use project header if in browser context
                     ...(selectedProject ? { 'X-Project-Id': selectedProject.project_id } : {})
                 },
                 body: JSON.stringify(body)
@@ -956,7 +1290,7 @@ main();`;
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 mt-6 pt-6 border-t border-border/60">
                     <div className="rounded-lg bg-secondary/50 p-3 border border-border/40">
                         <div className="text-xs text-muted-foreground font-medium">Models Available</div>
-                        <div className="text-xl font-bold text-foreground mt-0.5">33 Registered</div>
+                        <div className="text-xl font-bold text-foreground mt-0.5">{MODEL_CATALOG.length} Registered</div>
                     </div>
                     <div className="rounded-lg bg-secondary/50 p-3 border border-border/40">
                         <div className="text-xs text-muted-foreground font-medium">Supported Modalities</div>
@@ -973,7 +1307,7 @@ main();`;
                 </div>
             </div>
 
-            {/* ─── YOUR TIER & TOKEN QUOTAS BANNER (USER SPECIFIED REQUIREMENT) ─── */}
+            {/* ─── YOUR TIER & TOKEN QUOTAS BANNER ─────────────────────────────── */}
             <div className="rounded-xl border border-border bg-card p-6 shadow-md relative overflow-hidden">
                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-border/60">
                     <div className="flex items-center gap-3">
@@ -1057,7 +1391,7 @@ main();`;
                     <div className="mt-4 flex items-center justify-between p-3 rounded-lg bg-orange-500/5 border border-orange-500/20 text-xs">
                         <div className="flex items-center gap-2 text-orange-300">
                             <Info className="h-4 w-4 shrink-0 text-orange-400" />
-                            <span>Want uncapped tokens and video models? Switch to <strong>Pay-As-You-Go</strong> or <strong>Pro</strong> to unlock 100k+ TPM and cinematic video.</span>
+                            <span>Want uncapped tokens and high-resolution video models? Switch to <strong>Pay-As-You-Go</strong> or <strong>Pro</strong> to unlock 100k+ TPM and cinematic video.</span>
                         </div>
                         <Button size="sm" asChild className="h-7 text-xs bg-orange-500 hover:bg-orange-600 text-white font-semibold">
                             <Link href="/pricing">Upgrade Plan</Link>
@@ -1175,7 +1509,7 @@ main();`;
                     <div>
                         <h2 className="text-2xl font-bold text-foreground">Explore Frontier Models</h2>
                         <p className="text-xs text-muted-foreground">
-                            Browse all models with their official upstream architectures and real names.
+                            Browse all models with their official upstream architectures and real names. Free & top working models listed first.
                         </p>
                     </div>
 
@@ -1227,7 +1561,7 @@ main();`;
                 {/* Provider Filter Row */}
                 <div className="flex items-center gap-2 flex-wrap text-xs">
                     <span className="text-muted-foreground font-medium text-xs">Provider:</span>
-                    {['all', 'AWS Bedrock', 'Anthropic', 'Stability AI', 'Luma AI', 'OpenAI', 'Google Gemini', 'Groq / Meta', 'Zhipu AI'].map(p => (
+                    {['all', 'AWS Bedrock', 'Stability AI', 'Luma AI', 'OpenAI', 'Google Gemini', 'Groq / Meta', 'Zhipu AI'].map(p => (
                         <button
                             key={p}
                             onClick={() => setSelectedProvider(p)}
@@ -1243,150 +1577,210 @@ main();`;
                 </div>
             </div>
 
-            {/* ─── BOXED MODELS UI (USER SPECIFIED: "ui use boxed with real names") ─── */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-                {filteredModels.map(model => {
-                    const isBedrock = model.provider === 'AWS Bedrock';
-                    const isPro = model.minTier === 'pro';
-                    const isMax = model.minTier === 'max';
+            {/* ─── TWO-TONE ILLUSTRATED MODELS CARD GRID ───────────────────── */}
+            <div className="space-y-4">
+                <div className="flex items-center justify-between pt-2">
+                    <div className="flex items-center gap-2.5">
+                        <h2 className="text-2xl font-bold tracking-tight text-foreground">Models</h2>
+                        <span className="text-xs font-semibold text-muted-foreground bg-secondary px-2.5 py-0.5 rounded-full border border-border">
+                            {filteredModels.length} models
+                        </span>
+                    </div>
+                    <button 
+                        onClick={() => setCompareModalOpen(true)}
+                        className="text-xs sm:text-sm font-semibold text-orange-400 hover:text-orange-300 transition-colors flex items-center gap-1 group"
+                    >
+                        <span>Compare models</span>
+                        <ArrowUpRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
+                    </button>
+                </div>
 
-                    // Compute token capability text based on active user plan
-                    const userTokenAllocation = model.modality === 'text'
-                        ? `${quota.textTpm} on your ${activeTier.toUpperCase()} Plan`
-                        : model.modality === 'image'
-                            ? `${quota.imageLimit.split('(')[0].trim()} on ${activeTier.toUpperCase()}`
-                            : model.modality === 'video'
-                                ? (activeTier === 'free' ? 'Requires Pro / Max tier' : `${quota.videoLimit.split('(')[0].trim()} on ${activeTier.toUpperCase()}`)
-                                : `${quota.dailyReq.split('/')[0].trim()} daily quota`;
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5">
+                    {filteredModels.map(model => {
+                        const isFree = model.minTier === 'free';
+                        const isPro = model.minTier === 'pro';
+                        const isMax = model.minTier === 'max';
 
-                    return (
-                        <div 
-                            key={model.id}
-                            className={`group rounded-xl border border-border/70 bg-card p-5 shadow-sm hover:shadow-xl hover:border-primary/50 transition-all duration-200 flex flex-col justify-between relative overflow-hidden ${
-                                isBedrock ? 'ring-1 ring-orange-500/20' : ''
-                            }`}
-                        >
-                            {/* Accent Glow */}
-                            <div className="absolute top-0 right-0 h-24 w-24 bg-gradient-to-br from-primary/10 to-transparent rounded-bl-full pointer-events-none transition-all group-hover:scale-125" />
+                        return (
+                            <div 
+                                key={model.id}
+                                className="group rounded-2xl border border-zinc-800/90 bg-[#0d0f15] overflow-hidden shadow-md hover:shadow-2xl hover:border-zinc-700 transition-all duration-300 flex flex-col justify-between"
+                            >
+                                {/* 1. UPPER SECTION: COLORED BANNER WITH VECTOR ILLUSTRATION */}
+                                <div 
+                                    className="h-44 sm:h-48 w-full flex items-center justify-center relative overflow-hidden transition-transform duration-300 group-hover:brightness-[1.02]"
+                                    style={{ backgroundColor: model.bannerColor }}
+                                >
+                                    {/* Subtle gradient overlay */}
+                                    <div className="absolute inset-0 bg-gradient-to-b from-black/5 via-transparent to-black/15 pointer-events-none" />
 
-                            <div className="space-y-3.5 relative z-10">
-                                
-                                {/* Top Badges Row */}
-                                <div className="flex items-center justify-between gap-2">
-                                    <Badge variant="outline" className="text-[10px] font-mono tracking-wide uppercase px-2 py-0.5 border-border">
-                                        {model.provider}
-                                    </Badge>
-                                    <div className="flex items-center gap-1.5">
-                                        {isMax ? (
-                                            <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-500/10 text-amber-400 border border-amber-500/30">
-                                                MAX TIER
-                                            </span>
-                                        ) : isPro ? (
-                                            <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-blue-500/10 text-blue-400 border border-blue-500/30">
-                                                PRO TIER
-                                            </span>
-                                        ) : (
-                                            <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">
-                                                FREE TIER
+                                    {/* Centered Vector Illustration */}
+                                    <div className="transform transition-transform duration-300 group-hover:scale-105 drop-shadow-sm select-none">
+                                        <ModelIllustration type={model.illustrationType} className="w-24 h-24 sm:w-28 sm:h-28" />
+                                    </div>
+
+                                    {/* Floating Badges */}
+                                    <div className="absolute top-3 left-3 right-3 flex items-center justify-between pointer-events-none">
+                                        <span className="text-[10px] font-mono font-bold tracking-wider uppercase px-2 py-0.5 rounded-md bg-black/40 backdrop-blur-md text-white border border-white/20">
+                                            {model.provider}
+                                        </span>
+                                        {model.badgeText && (
+                                            <span className="text-[10px] font-bold tracking-wider uppercase px-2 py-0.5 rounded-md bg-black/45 backdrop-blur-md text-white border border-white/20">
+                                                {model.badgeText}
                                             </span>
                                         )}
                                     </div>
                                 </div>
 
-                                {/* REAL NAME BOXED (PROMINENT REAL NAME AS REQUESTED) */}
-                                <div className="p-3 rounded-lg bg-secondary/80 border border-border/80 group-hover:border-primary/40 transition-colors">
-                                    <div className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground/80">
-                                        Real Upstream Model
-                                    </div>
-                                    <div className="text-base font-extrabold text-foreground tracking-tight mt-0.5 flex items-center justify-between">
-                                        <span>{model.realName}</span>
-                                    </div>
-                                </div>
+                                {/* 2. LOWER SECTION: DARK SURFACE WITH TITLE & CAPABILITY PILLS */}
+                                <div className="p-4 sm:p-5 flex-1 flex flex-col justify-between space-y-4 bg-[#0d0f15]">
+                                    <div className="space-y-3">
+                                        {/* Title & Real Upstream Name */}
+                                        <div>
+                                            <div className="flex items-center justify-between gap-1.5">
+                                                <h3 className="text-lg sm:text-xl font-bold text-white tracking-tight group-hover:text-orange-400 transition-colors">
+                                                    {model.label}
+                                                </h3>
+                                                {isFree ? (
+                                                    <span className="text-[9px] font-bold tracking-wider px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
+                                                        FREE TIER
+                                                    </span>
+                                                ) : isMax ? (
+                                                    <span className="text-[9px] font-bold tracking-wider px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-400 border border-amber-500/30">
+                                                        MAX TIER
+                                                    </span>
+                                                ) : (
+                                                    <span className="text-[9px] font-bold tracking-wider px-1.5 py-0.5 rounded bg-blue-500/15 text-blue-400 border border-blue-500/30">
+                                                        PRO TIER
+                                                    </span>
+                                                )}
+                                            </div>
+                                            <div className="text-[11px] text-zinc-400 font-medium truncate mt-0.5">
+                                                {model.realName} • {model.contextWindow}
+                                            </div>
+                                        </div>
 
-                                {/* Gateway Identifier Box */}
-                                <div className="flex items-center justify-between gap-2 px-3 py-2 rounded-lg bg-background border border-border/60">
-                                    <div>
-                                        <div className="text-[10px] uppercase font-semibold text-muted-foreground">Gateway ID</div>
-                                        <code className="text-xs font-mono font-bold text-orange-400">{model.id}</code>
+                                        {/* Dark Pill Tags (Requested Feature) */}
+                                        <div className="flex flex-wrap gap-1.5 pt-0.5">
+                                            {model.workTags.map((tag, idx) => (
+                                                <span 
+                                                    key={idx}
+                                                    className="inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-medium bg-[#1a1d27] text-zinc-300 border border-white/[0.08]"
+                                                >
+                                                    {tag}
+                                                </span>
+                                            ))}
+                                        </div>
                                     </div>
-                                    <Button
-                                        size="icon"
-                                        variant="ghost"
-                                        onClick={() => copyText(model.id, 'Model ID')}
-                                        className="h-7 w-7 text-muted-foreground hover:text-foreground"
-                                        title="Copy Model ID"
-                                    >
-                                        <Copy className="h-3.5 w-3.5" />
-                                    </Button>
-                                </div>
 
-                                {/* Description */}
-                                <p className="text-xs text-muted-foreground leading-relaxed min-h-[36px]">
-                                    {model.description}
-                                </p>
-
-                                {/* Technical Specs Grid (Boxed) */}
-                                <div className="grid grid-cols-2 gap-2 text-xs">
-                                    <div className="p-2 rounded bg-secondary/40 border border-border/40">
-                                        <span className="text-[10px] text-muted-foreground font-medium block">Context Window</span>
-                                        <span className="font-mono font-semibold text-foreground text-xs">{model.contextWindow}</span>
+                                    {/* Quick Actions Footer */}
+                                    <div className="pt-3 border-t border-zinc-800/80 flex items-center justify-between gap-2">
+                                        <button
+                                            onClick={() => copyText(model.id, 'Gateway ID')}
+                                            className="text-[11px] font-mono text-zinc-400 hover:text-white flex items-center gap-1 px-1.5 py-1 rounded hover:bg-zinc-800/60 transition-colors"
+                                            title="Copy Gateway ID"
+                                        >
+                                            <code className="text-orange-400 font-semibold text-xs">{model.id}</code>
+                                            <Copy className="h-3 w-3 ml-0.5 text-zinc-400" />
+                                        </button>
+                                        <div className="flex items-center gap-1.5">
+                                            <Button
+                                                size="sm"
+                                                variant="ghost"
+                                                onClick={() => {
+                                                    setSelectedSnippetModel(model);
+                                                    setSnippetModalOpen(true);
+                                                }}
+                                                className="h-7 text-xs px-2 text-zinc-300 hover:text-white hover:bg-zinc-800"
+                                                title="View Code Snippet"
+                                            >
+                                                <Terminal className="h-3.5 w-3.5" />
+                                            </Button>
+                                            <Button
+                                                size="sm"
+                                                onClick={() => {
+                                                    setSelectedPlaygroundModel(model);
+                                                    setPlaygroundPrompt(model.samplePrompt || '');
+                                                    setPlaygroundResponse(null);
+                                                    setPlaygroundModalOpen(true);
+                                                }}
+                                                className="h-7 text-xs px-2.5 bg-orange-500/20 hover:bg-orange-500 text-orange-300 hover:text-white border border-orange-500/30 transition-all font-semibold"
+                                            >
+                                                <Play className="h-3 w-3 mr-1" />
+                                                Try Live
+                                            </Button>
+                                        </div>
                                     </div>
-                                    <div className="p-2 rounded bg-secondary/40 border border-border/40">
-                                        <span className="text-[10px] text-muted-foreground font-medium block">Max Output</span>
-                                        <span className="font-mono font-semibold text-foreground text-xs">{model.maxOutput}</span>
-                                    </div>
-                                </div>
-
-                                {/* User Token Allocation Box */}
-                                <div className="p-2.5 rounded-lg bg-primary/5 border border-primary/20 text-xs">
-                                    <div className="text-[10px] font-semibold text-primary uppercase">Your Active Tier Quota</div>
-                                    <div className="font-mono font-bold text-foreground text-[11px] mt-0.5">
-                                        {userTokenAllocation}
-                                    </div>
-                                </div>
-
-                                {/* Capabilities Tags */}
-                                <div className="flex flex-wrap gap-1 pt-1">
-                                    {model.capabilities.slice(0, 4).map(cap => (
-                                        <span key={cap} className="px-1.5 py-0.5 rounded text-[10px] font-mono bg-secondary text-muted-foreground">
-                                            #{cap}
-                                        </span>
-                                    ))}
                                 </div>
                             </div>
-
-                            {/* Bottom Card Actions */}
-                            <div className="pt-4 mt-4 border-t border-border/60 flex items-center justify-between gap-2 relative z-10">
-                                <Button
-                                    size="sm"
-                                    variant="outline"
-                                    onClick={() => {
-                                        setSelectedSnippetModel(model);
-                                        setSnippetModalOpen(true);
-                                    }}
-                                    className="w-1/2 text-xs h-8 border-border hover:bg-secondary font-medium"
-                                >
-                                    <Terminal className="h-3.5 w-3.5 mr-1 text-primary" />
-                                    cURL / SDK
-                                </Button>
-                                <Button
-                                    size="sm"
-                                    onClick={() => {
-                                        setSelectedPlaygroundModel(model);
-                                        setPlaygroundPrompt(model.samplePrompt || '');
-                                        setPlaygroundResponse(null);
-                                        setPlaygroundModalOpen(true);
-                                    }}
-                                    className="w-1/2 text-xs h-8 bg-secondary hover:bg-primary hover:text-primary-foreground text-foreground border border-border/80 font-medium transition-colors"
-                                >
-                                    <Play className="h-3 w-3 mr-1" />
-                                    Test Live
-                                </Button>
-                            </div>
-                        </div>
-                    );
-                })}
+                        );
+                    })}
+                </div>
             </div>
+
+            {/* ─── COMPARE MODELS MODAL ────────────────────────────────────── */}
+            <Dialog open={compareModalOpen} onOpenChange={setCompareModalOpen}>
+                <DialogContent className="max-w-4xl max-h-[85vh] overflow-y-auto">
+                    <DialogHeader>
+                        <DialogTitle className="flex items-center justify-between text-xl font-bold">
+                            <div className="flex items-center gap-2">
+                                <Sliders className="h-5 w-5 text-orange-400" />
+                                <span>Compare AI Models & Specifications</span>
+                            </div>
+                        </DialogTitle>
+                        <DialogDescription className="text-xs text-muted-foreground">
+                            Side-by-side technical benchmarks, context windows, and minimum tier access across all models.
+                        </DialogDescription>
+                    </DialogHeader>
+
+                    <div className="rounded-lg border border-border overflow-hidden text-xs mt-3">
+                        <table className="w-full text-left bg-card">
+                            <thead>
+                                <tr className="bg-secondary border-b border-border uppercase tracking-wide text-muted-foreground text-[11px]">
+                                    <th className="px-3.5 py-2.5">Model</th>
+                                    <th className="px-3.5 py-2.5">Real Architecture</th>
+                                    <th className="px-3.5 py-2.5">Modality</th>
+                                    <th className="px-3.5 py-2.5">Context Window</th>
+                                    <th className="px-3.5 py-2.5">Speed / Latency</th>
+                                    <th className="px-3.5 py-2.5">Plan Tier</th>
+                                    <th className="px-3.5 py-2.5 text-right">Gateway ID</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-border/60">
+                                {MODEL_CATALOG.map(m => (
+                                    <tr key={m.id} className="hover:bg-secondary/60 transition-colors">
+                                        <td className="px-3.5 py-2.5 font-bold text-foreground whitespace-nowrap">{m.label}</td>
+                                        <td className="px-3.5 py-2.5 text-muted-foreground whitespace-nowrap">{m.realName}</td>
+                                        <td className="px-3.5 py-2.5 font-mono text-cyan-400 capitalize whitespace-nowrap">{m.modality}</td>
+                                        <td className="px-3.5 py-2.5 font-mono font-semibold text-foreground whitespace-nowrap">{m.contextWindow}</td>
+                                        <td className="px-3.5 py-2.5 text-muted-foreground whitespace-nowrap">{m.speedRating}</td>
+                                        <td className="px-3.5 py-2.5 whitespace-nowrap">
+                                            <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                                                m.minTier === 'free' 
+                                                    ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30' 
+                                                    : m.minTier === 'pro'
+                                                        ? 'bg-blue-500/10 text-blue-400 border border-blue-500/30'
+                                                        : 'bg-amber-500/10 text-amber-400 border border-amber-500/30'
+                                            }`}>
+                                                {m.minTier.toUpperCase()}
+                                            </span>
+                                        </td>
+                                        <td className="px-3.5 py-2.5 text-right font-mono text-orange-400 font-semibold whitespace-nowrap">
+                                            <button 
+                                                onClick={() => copyText(m.id, 'Gateway ID')}
+                                                className="hover:underline flex items-center gap-1 justify-end ml-auto"
+                                            >
+                                                <span>{m.id}</span>
+                                                <Copy className="h-3 w-3" />
+                                            </button>
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                </DialogContent>
+            </Dialog>
 
             {/* ─── CREATE API KEY MODAL ─────────────────────────────────────── */}
             <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
@@ -1406,7 +1800,7 @@ main();`;
                             <div className="space-y-1.5">
                                 <label className="text-xs font-semibold text-foreground">Key Label / Name</label>
                                 <Input
-                                    placeholder="e.g. Cursor Assistant, Production App, Web Scraper"
+                                    placeholder="e.g. Cursor Assistant, Production App, Autonomous Agent"
                                     value={keyName}
                                     onChange={e => setKeyName(e.target.value)}
                                     className="text-xs"
