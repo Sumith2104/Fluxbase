@@ -279,16 +279,16 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
         // [STABILITY FIX]: Removed client-side redirect to root.
         // Middleware handles this before page load. Removing this prevents the infinite "ping-pong" redirect loop
         // that occurs when the client state is briefly null during hydration.
-        if (!userLoading && !userId && !isOffline) {
+        if (!userLoading && !userId && !isOffline && !pathname.startsWith('/ai-models') && !pathname.startsWith('/models')) {
             router.push('/');
             return;
         }
 
         const isProjectSelectionPage = pathname.startsWith('/dashboard/projects');
-        const isSettingsPage = pathname.startsWith('/settings');
+        const isSettingsPage = pathname.startsWith('/settings') || pathname.startsWith('/ai-models') || pathname.startsWith('/models');
 
         // If user is logged-in but no project is selected, redirect to project selection page
-        // [Requirement 4] Allow settings page access even without a project
+        // [Requirement 4] Allow settings and ai-models page access even without a project
         if (!selectedProject && !isProjectSelectionPage && !isSettingsPage) {
             router.push('/dashboard/projects');
         }
@@ -424,7 +424,7 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
         );
     }
 
-    if (!isLoading && !userId && !pathname.startsWith('/login') && !pathname.startsWith('/signup')) {
+    if (!isLoading && !userId && !pathname.startsWith('/login') && !pathname.startsWith('/signup') && !pathname.startsWith('/ai-models') && !pathname.startsWith('/models')) {
         return <div className="flex items-center justify-center h-screen">Redirecting to login...</div>;
     }
 

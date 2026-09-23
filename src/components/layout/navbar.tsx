@@ -53,6 +53,16 @@ export default function Navbar({ children }: { children: React.ReactNode }) {
                         </Link>
 
                         <Link
+                            href="/ai-models"
+                            className={`transition-colors ${pathname === "/ai-models"
+                                ? "text-primary font-semibold"
+                                : "text-muted-foreground hover:text-primary"
+                                }`}
+                        >
+                            AI Models
+                        </Link>
+
+                        <Link
                             href="/docs"
                             className={`transition-colors ${pathname === "/docs"
                                 ? "text-primary"
