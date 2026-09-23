@@ -98,8 +98,8 @@ export function checkOffTopicPolicy(userText: string, hasAttachedImages: boolean
             };
         }
 
-        // Attached image with plant/leaf terms or general "look at this" prompt
-        if (hasAttachedImages && (hasPlantOrLeafTerms || hasDiseaseOrHealthTerms || /\b(?:photo|picture|look\s+at|what\s+is\s+this|what\s+kind\s+of|analyze\s+this)\b/i.test(text))) {
+        // Attached image with plant/leaf/crop disease terms (e.g. "look at this photo of my crop", "what kind of plant is this")
+        if (hasAttachedImages && (hasPlantOrLeafTerms || hasDiseaseOrHealthTerms)) {
             return {
                 isOffTopic: true,
                 reason: 'non_database_image_upload',

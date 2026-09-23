@@ -116,6 +116,16 @@ describe('Fluxbase AI Policy Guard', () => {
             const res = checkOffTopicPolicy('What tables exist in my database schema?');
             expect(res.isOffTopic).toBe(false);
         });
+
+        it('allows dashboard and ERD screenshots with generic queries like "what is this"', () => {
+            const res = checkOffTopicPolicy('what is this', true);
+            expect(res.isOffTopic).toBe(false);
+        });
+
+        it('allows attached images with "look at this" or "analyze this"', () => {
+            const res = checkOffTopicPolicy('can you look at this?', true);
+            expect(res.isOffTopic).toBe(false);
+        });
     });
 
     describe('Immediate Stop & Cancellation Handling', () => {

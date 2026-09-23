@@ -502,7 +502,7 @@ AVAILABLE ACTION TAGS (append at the end of response):
                 model: model || 'flux-fast',
                 messages: modelMessages,
                 temperature: 0.2,
-                max_tokens: 4096
+                max_tokens: hasMultimodalAttachments ? 1024 : 4096
             });
 
             const transformStream = createAgentSseTransformStream(rag.sources, (stats) => {
@@ -546,7 +546,7 @@ AVAILABLE ACTION TAGS (append at the end of response):
             model: model || 'flux-fast',
             messages: modelMessages,
             temperature: 0.2,
-            max_tokens: 4096
+            max_tokens: hasMultimodalAttachments ? 1024 : 4096
         });
 
         const latencyMs = Date.now() - callStartTime;

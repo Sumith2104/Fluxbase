@@ -191,7 +191,6 @@ export class ModelGateway {
       // 2. GLM Vision (Active GLM_API_KEY, high-speed, 100% free multimodal vision)
       if (hasGlmKey) {
         add('glm', 'glm-4v-flash');
-        add('glm', 'glm-4v');
       }
 
       // 3. Gemini vision fallback
@@ -291,8 +290,13 @@ export class ModelGateway {
       stream: false
     };
 
+    let maxTokens = options.max_tokens;
+    if (provider === 'glm' && model.includes('4v') && (maxTokens === undefined || maxTokens > 1024)) {
+      maxTokens = 1024;
+    }
+
     if (options.top_p !== undefined) payload.top_p = options.top_p;
-    if (options.max_tokens !== undefined) payload.max_tokens = options.max_tokens;
+    if (maxTokens !== undefined) payload.max_tokens = maxTokens;
     if (options.response_format) payload.response_format = options.response_format;
     if (options.tools && options.tools.length > 0) payload.tools = options.tools;
     if (options.tool_choice) payload.tool_choice = options.tool_choice;
@@ -382,8 +386,13 @@ export class ModelGateway {
       stream: true
     };
 
+    let streamMaxTokens = options.max_tokens;
+    if (provider === 'glm' && model.includes('4v') && (streamMaxTokens === undefined || streamMaxTokens > 1024)) {
+      streamMaxTokens = 1024;
+    }
+
     if (options.top_p !== undefined) payload.top_p = options.top_p;
-    if (options.max_tokens !== undefined) payload.max_tokens = options.max_tokens;
+    if (streamMaxTokens !== undefined) payload.max_tokens = streamMaxTokens;
     if (options.tools && options.tools.length > 0) payload.tools = options.tools;
     if (options.tool_choice) payload.tool_choice = options.tool_choice;
 
