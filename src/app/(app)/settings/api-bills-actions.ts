@@ -41,6 +41,11 @@ export interface ModalityUsageBreakdown {
   percentage: number;
 }
 
+export interface ApiBillsProjectItem {
+  id: string;
+  name: string;
+}
+
 export interface ApiBillsData {
   summary: {
     totalAiRequests: number;
@@ -59,6 +64,7 @@ export interface ApiBillsData {
   modelBreakdown: ModelUsageBreakdown[];
   modalityBreakdown: ModalityUsageBreakdown[];
   ledger: ApiUsageLedgerItem[];
+  projects?: ApiBillsProjectItem[];
 }
 
 const USD_TO_INR_RATE = 85.00;
@@ -75,8 +81,12 @@ export async function getApiBillsAction(projectId?: string): Promise<{ success: 
     const aiParams: any[] = [userId];
     let aiProjectClause = '';
     if (projectId && projectId !== 'all') {
-      aiParams.push(projectId);
-      aiProjectClause = 'AND project_id = $2';
+      if (projectId === 'unassigned') {
+        aiProjectClause = 'AND project_id IS NULL';
+      } else {
+        aiParams.push(projectId);
+        aiProjectClause = 'AND project_id = $2';
+      }
     }
 
     const aiSummaryQuery = `
@@ -111,7 +121,7 @@ export async function getApiBillsAction(projectId?: string): Promise<{ success: 
       FROM fluxbase_global.ai_usage_log
       WHERE user_id = $1 ${aiProjectClause}
       GROUP BY modality
-      ORDER BY request_count DESC;
+      ORDER BY cost_usd DESC, request_count DESC;
     `;
 
     const ledgerQuery = `
@@ -130,15 +140,19 @@ export async function getApiBillsAction(projectId?: string): Promise<{ success: 
       FROM fluxbase_global.ai_usage_log
       WHERE user_id = $1 ${aiProjectClause}
       ORDER BY created_at DESC
-      LIMIT 100;
+      LIMIT 500;
     `;
 
     // 2. Fetch Active PAYG Meter & API Keys counts
     const paygParams: any[] = [userId];
     let paygProjectClause = '';
     if (projectId && projectId !== 'all') {
-      paygParams.push(projectId);
-      paygProjectClause = 'AND project_id = $2';
+      if (projectId === 'unassigned') {
+        paygProjectClause = 'AND project_id IS NULL';
+      } else {
+        paygParams.push(projectId);
+        paygProjectClause = 'AND project_id = $2';
+      }
     }
 
     const paygQuery = `
@@ -157,14 +171,22 @@ export async function getApiBillsAction(projectId?: string): Promise<{ success: 
       WHERE user_id = $1;
     `;
 
+    const userProjectsQuery = `
+      SELECT project_id, display_name 
+      FROM fluxbase_global.projects 
+      WHERE user_id = $1 
+      ORDER BY display_name ASC;
+    `;
+
     // Run queries concurrently
-    const [aiSummaryRes, modelRes, modalityRes, ledgerRes, paygRes, apiKeyRes] = await Promise.all([
+    const [aiSummaryRes, modelRes, modalityRes, ledgerRes, paygRes, apiKeyRes, userProjectsRes] = await Promise.all([
       pool.query(aiSummaryQuery, aiParams),
       pool.query(modelBreakdownQuery, aiParams),
       pool.query(modalityBreakdownQuery, aiParams),
       pool.query(ledgerQuery, aiParams),
       pool.query(paygQuery, paygParams),
-      pool.query(apiKeyQuery, [userId])
+      pool.query(apiKeyQuery, [userId]),
+      pool.query(userProjectsQuery, [userId])
     ]);
 
     const totalAiReqs = parseInt(aiSummaryRes.rows[0]?.total_requests || '0', 10);
@@ -181,6 +203,11 @@ export async function getApiBillsAction(projectId?: string): Promise<{ success: 
 
     const activeApiKeys = parseInt(apiKeyRes.rows[0]?.count || '0', 10);
 
+    const projects: ApiBillsProjectItem[] = userProjectsRes.rows.map(r => ({
+      id: r.project_id,
+      name: r.display_name || r.project_id
+    }));
+
     // Format Model Breakdown
     const modelBreakdown: ModelUsageBreakdown[] = modelRes.rows.map(row => {
       const cUsd = parseFloat(row.cost_usd || '0');
@@ -189,15 +216,28 @@ export async function getApiBillsAction(projectId?: string): Promise<{ success: 
         ? Number(((cUsd / totalAiCostUsd) * 100).toFixed(1)) 
         : (totalAiReqs > 0 ? Number(((reqCount / totalAiReqs) * 100).toFixed(1)) : 0);
 
-      const mId = row.model_id || 'flux-fast';
-      let label = mId;
-      if (mId.includes('flash') && mId.includes('4v')) label = 'Flux Vision (GLM-4V)';
+      const mId = (row.model_id || 'flux-fast').toLowerCase();
+      let label = row.model_id || 'flux-fast';
+      if (mId === 'flux-video') label = 'Flux Video Motion (CogVideoX)';
+      else if (mId === 'flux-image') label = 'Flux Image (CogView-3 / DALL-E)';
+      else if (mId === 'flux-image-fast') label = 'Flux Image Fast (CogView-3 Flash)';
+      else if (mId === 'flux-embed' || mId.includes('titan-embed') || mId.includes('embed')) label = 'Flux Vector Embeddings (Titan V2)';
+      else if (mId.includes('stt') || mId.includes('whisper')) label = 'Flux Audio STT (Whisper)';
+      else if (mId.includes('tts') || mId.includes('speech')) label = 'Flux Audio TTS (Polly / Speech)';
+      else if (mId.includes('nova-pro')) label = 'Flux Ultra (Amazon Nova Pro)';
+      else if (mId.includes('nova-lite')) label = 'Flux Lite (Amazon Nova Lite)';
+      else if (mId.includes('nova-micro')) label = 'Flux Micro (Amazon Nova Micro)';
+      else if (mId.includes('flash') && mId.includes('4v')) label = 'Flux Vision (GLM-4V)';
       else if (mId.includes('flash')) label = 'Flux Fast (GLM-4 Flash)';
       else if (mId.includes('air')) label = 'Flux Pro (GLM-4 Air)';
       else if (mId.includes('plus')) label = 'Flux Ultra (GLM-4 Plus)';
-      else if (mId.includes('llama')) label = 'Flux Turbo (Groq LLaMA)';
-      else if (mId.includes('gemini')) label = 'Flux Omni (Gemini 2.0)';
+      else if (mId.includes('llama') || mId.includes('turbo')) label = 'Flux Turbo (Groq LLaMA)';
+      else if (mId.includes('gemini') || mId.includes('omni')) label = 'Flux Omni (Gemini 2.0)';
       else if (mId.includes('gpt-4o')) label = 'Flux Max (GPT-4o)';
+      else if (mId === 'flux-pro') label = 'Flux Pro (GLM-4 Air / Nova Pro)';
+      else if (mId === 'flux-ultra') label = 'Flux Ultra (GLM-4 Plus / Nova Pro)';
+      else if (mId === 'flux-5.2') label = 'Flux 5.2 (Amazon Nova Pro)';
+      else if (mId === 'flux') label = 'Flux Standard (GLM / Nova)';
 
       return {
         modelId: mId,
@@ -267,7 +307,8 @@ export async function getApiBillsAction(projectId?: string): Promise<{ success: 
         },
         modelBreakdown,
         modalityBreakdown,
-        ledger
+        ledger,
+        projects
       }
     };
   } catch (err: any) {

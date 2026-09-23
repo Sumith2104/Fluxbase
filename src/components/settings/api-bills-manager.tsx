@@ -45,24 +45,29 @@ import { useToast } from '@/hooks/use-toast';
 
 interface ApiBillsManagerProps {
   projectId?: string;
+  defaultScope?: 'all' | 'project';
 }
 
-export function ApiBillsManager({ projectId }: ApiBillsManagerProps) {
+export function ApiBillsManager({ projectId, defaultScope = 'all' }: ApiBillsManagerProps) {
   const { toast } = useToast();
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [data, setData] = useState<ApiBillsData | null>(null);
+  const [selectedProjectScope, setSelectedProjectScope] = useState<string>(
+    defaultScope === 'all' ? 'all' : (projectId || 'all')
+  );
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedModality, setSelectedModality] = useState<string>('all');
   const [currencyMode, setCurrencyMode] = useState<'INR' | 'USD'>('INR');
   const [isLedgerExpanded, setIsLedgerExpanded] = useState(false);
 
-  const fetchData = async (isManualSync = false) => {
+  const fetchData = async (isManualSync = false, targetScope?: string) => {
+    const scopeToFetch = targetScope !== undefined ? targetScope : selectedProjectScope;
     if (isManualSync) setRefreshing(true);
     else setLoading(true);
 
     try {
-      const res = await getApiBillsAction(projectId);
+      const res = await getApiBillsAction(scopeToFetch);
       if (res.success && res.data) {
         setData(res.data);
         if (isManualSync) {
@@ -81,8 +86,8 @@ export function ApiBillsManager({ projectId }: ApiBillsManagerProps) {
   };
 
   useEffect(() => {
-    fetchData();
-  }, [projectId]);
+    fetchData(false, selectedProjectScope);
+  }, [selectedProjectScope]);
 
   // Filter ledger items
   const filteredLedger = useMemo(() => {
@@ -242,7 +247,25 @@ export function ApiBillsManager({ projectId }: ApiBillsManagerProps) {
               </div>
             </div>
 
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
+              {/* Project Scope Filter */}
+              <div className="flex items-center gap-1.5 bg-secondary/50 rounded-lg px-2.5 py-1 border border-border/60 text-xs font-mono">
+                <span className="text-muted-foreground text-[11px] hidden sm:inline">Scope:</span>
+                <select
+                  value={selectedProjectScope}
+                  onChange={(e) => setSelectedProjectScope(e.target.value)}
+                  className="bg-transparent text-foreground text-xs font-mono focus:outline-none cursor-pointer max-w-[180px] sm:max-w-[220px] truncate"
+                >
+                  <option value="all" className="bg-popover text-popover-foreground">🌐 All Projects (Account-wide)</option>
+                  {data?.projects?.map((proj) => (
+                    <option key={proj.id} value={proj.id} className="bg-popover text-popover-foreground">
+                      📁 {proj.name}
+                    </option>
+                  ))}
+                  <option value="unassigned" className="bg-popover text-popover-foreground">⚡ Playground / Direct API</option>
+                </select>
+              </div>
+
               {/* Currency Toggle */}
               <div className="flex items-center bg-secondary/50 rounded-lg p-0.5 border border-border/60 text-xs font-mono">
                 <button
@@ -579,6 +602,7 @@ export function ApiBillsManager({ projectId }: ApiBillsManagerProps) {
                       <option value="all">All Modalities</option>
                       <option value="text">Text / Reasoning</option>
                       <option value="image">Image / Vision</option>
+                      <option value="video">Video Generation</option>
                       <option value="audio-stt">Audio STT</option>
                       <option value="audio-tts">Audio TTS</option>
                       <option value="embedding">Embeddings</option>

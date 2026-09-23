@@ -93,11 +93,17 @@ export async function authenticateAiRequest(req: NextRequest): Promise<Authentic
         };
       }
 
+      const explicitProjectId = 
+        req.headers.get('x-project-id') || 
+        req.headers.get('x-fluxbase-project') || 
+        req.nextUrl?.searchParams?.get('projectId') || 
+        undefined;
+
       const tier = await getUserPlan(keyData.userId);
       return {
         auth: {
           userId: keyData.userId,
-          projectId: keyData.projectId,
+          projectId: keyData.projectId || explicitProjectId,
           tier,
           scopes: keyScopes,
           isApiKey: true,
@@ -126,11 +132,17 @@ export async function authenticateAiRequest(req: NextRequest): Promise<Authentic
         }
       }
 
+      const explicitProjectId = 
+        req.headers.get('x-project-id') || 
+        req.headers.get('x-fluxbase-project') || 
+        req.nextUrl?.searchParams?.get('projectId') || 
+        undefined;
+
       const tier = await getUserPlan(sessionAuth.userId);
       return {
         auth: {
           userId: sessionAuth.userId,
-          projectId: sessionAuth.allowedProjectId,
+          projectId: sessionAuth.allowedProjectId || explicitProjectId,
           tier,
           scopes: sessionAuth.scopes || ['*'],
           isApiKey: Boolean(sessionAuth.scopes),

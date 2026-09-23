@@ -64,7 +64,7 @@ export default function BillingSettingsPage() {
 
                 <TabsContent value="api-bills" className="space-y-6 m-0">
                     <div className="w-full">
-                        <ApiBillsManager projectId={selectedProject?.project_id} />
+                        <ApiBillsManager projectId={selectedProject?.project_id} defaultScope="all" />
                     </div>
                 </TabsContent>
             </Tabs>

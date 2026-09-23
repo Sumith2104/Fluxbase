@@ -44,7 +44,7 @@ export default function ApiBillsPage() {
 
       {/* Real-time API Bills Manager */}
       <div className="w-full">
-        <ApiBillsManager projectId={selectedProject?.project_id} />
+        <ApiBillsManager projectId={selectedProject?.project_id} defaultScope="all" />
       </div>
     </div>
   );
