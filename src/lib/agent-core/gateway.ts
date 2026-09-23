@@ -68,14 +68,15 @@ export const MODEL_CATALOG: Record<string, { provider: 'glm' | 'groq' | 'gemini'
   'glm': { provider: 'glm', upstreamModel: 'glm-4-flash', label: 'Flux Fast', description: 'Ultra-fast general reasoning & SQL' },
   'glm-4-flash': { provider: 'glm', upstreamModel: 'glm-4-flash', label: 'Flux Fast', description: 'Ultra-fast general reasoning & SQL' },
 
-  // Flux Pro Tier (Balanced deep reasoning)
-  'flux-pro': { provider: 'glm', upstreamModel: 'glm-4-air', label: 'Flux Pro', description: 'High precision schema & BI analysis' },
-  'glm-4-air': { provider: 'glm', upstreamModel: 'glm-4-air', label: 'Flux Pro', description: 'High precision schema & BI analysis' },
+  // Flux Pro Tier (Balanced deep reasoning via Bedrock Nova Pro)
+  'flux-pro': { provider: 'bedrock', upstreamModel: 'amazon.nova-pro-v1:0', label: 'Flux Pro', description: 'High precision schema & BI analysis powered by Amazon Nova Pro' },
+  'glm-4-air': { provider: 'bedrock', upstreamModel: 'amazon.nova-pro-v1:0', label: 'Flux Pro', description: 'High precision schema & BI analysis powered by Amazon Nova Pro' },
 
-  // Flux Ultra Tier (Deep reasoning & complex migrations)
-  'flux-ultra': { provider: 'glm', upstreamModel: 'glm-4-plus', label: 'Flux Ultra', description: 'Maximum intelligence for complex databases' },
-  'glm-4-plus': { provider: 'glm', upstreamModel: 'glm-4-plus', label: 'Flux Ultra', description: 'Maximum intelligence for complex databases' },
-  'glm-5.2': { provider: 'glm', upstreamModel: 'glm-4-plus', label: 'Flux Ultra', description: 'Maximum intelligence for complex databases' },
+  // Flux Ultra Tier (Deep reasoning & complex migrations via Bedrock Nova Pro)
+  'flux-ultra': { provider: 'bedrock', upstreamModel: 'amazon.nova-pro-v1:0', label: 'Flux Ultra', description: 'Maximum intelligence for complex databases powered by Amazon Nova Pro' },
+  'glm-4-plus': { provider: 'bedrock', upstreamModel: 'amazon.nova-pro-v1:0', label: 'Flux Ultra', description: 'Maximum intelligence for complex databases powered by Amazon Nova Pro' },
+  'glm-5.2': { provider: 'bedrock', upstreamModel: 'amazon.nova-pro-v1:0', label: 'Flux Ultra', description: 'Maximum intelligence for complex databases powered by Amazon Nova Pro' },
+  'flux-5.2': { provider: 'bedrock', upstreamModel: 'amazon.nova-pro-v1:0', label: 'Flux 5.2', description: 'Next-generation reasoning architecture powered by Amazon Nova Pro' },
 
   // Flux Turbo Tier (Hyper-speed 300+ tokens/sec)
   'flux-turbo': { provider: 'groq', upstreamModel: 'llama-3.3-70b-versatile', label: 'Flux Turbo', description: 'Hyper-speed 300 tps inference' },
@@ -89,7 +90,7 @@ export const MODEL_CATALOG: Record<string, { provider: 'glm' | 'groq' | 'gemini'
   'gemini-2.0-flash': { provider: 'gemini', upstreamModel: 'gemini-2.0-flash', label: 'Flux Omni', description: 'Multimodal Agentic AI' },
   'gemini-1.5-flash': { provider: 'gemini', upstreamModel: 'gemini-1.5-flash', label: 'Flux Omni', description: 'Multimodal Agentic AI' },
   'glm-4v-flash': { provider: 'glm', upstreamModel: 'glm-4v-flash', label: 'Flux Vision', description: 'Multimodal Vision' },
-  'glm-4v': { provider: 'glm', upstreamModel: 'glm-4v', label: 'Flux Vision', description: 'Multimodal Vision' },
+  'glm-4v': { provider: 'glm', upstreamModel: 'glm-4v-flash', label: 'Flux Vision', description: 'Multimodal Vision' },
 
   // Flux Max Tier (Flagship Intelligence)
   'flux-max': { provider: 'openai', upstreamModel: 'gpt-4o-mini', label: 'Flux Max', description: 'Flagship Intelligence' },
@@ -231,15 +232,17 @@ export class ModelGateway {
       // 1. Primary requested provider
       add(primary.provider, primary.upstreamModel);
 
-      // 2. GLM flash fallback if primary is not GLM-flash
+      // 2. Bedrock Nova Pro fallback (Active AWS credentials, frontier 300k reasoning)
+      add('bedrock', 'amazon.nova-pro-v1:0');
+      add('bedrock', 'amazon.nova-lite-v1:0');
+
+      // 3. GLM flash fallback if primary is not GLM-flash (100% free models only)
       if (process.env.GLM_API_KEY) {
         add('glm', 'glm-4-flash');
         add('glm', 'glm-4v-flash');
-        add('glm', 'glm-4-air');
-        add('glm', 'glm-4-plus');
       }
 
-      // 3. Groq fallback
+      // 4. Groq fallback
       if (process.env.GROQ_API_KEY) {
         add('groq', 'llama-3.3-70b-versatile');
       }

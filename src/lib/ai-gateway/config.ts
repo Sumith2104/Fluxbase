@@ -107,15 +107,15 @@ export const FLUX_MODEL_REGISTRY: Record<string, FluxModelSpec> = {
   'flux-5.2': {
     id: 'flux-5.2',
     modality: 'text',
-    provider: 'glm',
-    upstreamModel: 'glm-4-plus',
-    upstreamEndpoint: PROVIDER_ENDPOINTS.glm.chat,
+    provider: 'bedrock',
+    upstreamModel: 'amazon.nova-pro-v1:0',
+    upstreamEndpoint: 'bedrock://converse',
     label: 'Flux 5.2',
-    description: 'Next-generation reasoning architecture specialized in multi-step agentic execution',
-    contextWindow: 128000,
+    description: 'Next-generation reasoning architecture specialized in multi-step agentic execution powered by Amazon Nova Pro',
+    contextWindow: 300000,
     maxOutputTokens: 8192,
     minTier: 'free',
-    capabilities: ['text-generation', 'chat', 'tool-calling', 'json-mode'],
+    capabilities: ['text-generation', 'chat', 'tool-calling', 'json-mode', 'coding'],
   },
   'flux-fast': {
     id: 'flux-fast',
@@ -124,7 +124,7 @@ export const FLUX_MODEL_REGISTRY: Record<string, FluxModelSpec> = {
     upstreamModel: 'glm-4-flash',
     upstreamEndpoint: PROVIDER_ENDPOINTS.glm.chat,
     label: 'Flux Fast',
-    description: 'Ultra-fast general reasoning and SQL generation',
+    description: 'Ultra-fast general reasoning and SQL generation powered by GLM-4 Flash',
     contextWindow: 128000,
     maxOutputTokens: 4096,
     minTier: 'free',
@@ -133,28 +133,28 @@ export const FLUX_MODEL_REGISTRY: Record<string, FluxModelSpec> = {
   'flux-pro': {
     id: 'flux-pro',
     modality: 'text',
-    provider: 'glm',
-    upstreamModel: 'glm-4-air',
-    upstreamEndpoint: PROVIDER_ENDPOINTS.glm.chat,
+    provider: 'bedrock',
+    upstreamModel: 'amazon.nova-pro-v1:0',
+    upstreamEndpoint: 'bedrock://converse',
     label: 'Flux Pro',
-    description: 'High-precision schema architecture and BI analysis',
-    contextWindow: 128000,
-    maxOutputTokens: 4096,
+    description: 'High-precision schema architecture and BI analysis powered by Amazon Nova Pro on AWS Bedrock',
+    contextWindow: 300000,
+    maxOutputTokens: 8192,
     minTier: 'free',
-    capabilities: ['text-generation', 'chat', 'tool-calling', 'json-mode'],
+    capabilities: ['text-generation', 'chat', 'tool-calling', 'json-mode', 'coding'],
   },
   'flux-ultra': {
     id: 'flux-ultra',
     modality: 'text',
-    provider: 'glm',
-    upstreamModel: 'glm-4-plus',
-    upstreamEndpoint: PROVIDER_ENDPOINTS.glm.chat,
+    provider: 'bedrock',
+    upstreamModel: 'amazon.nova-pro-v1:0',
+    upstreamEndpoint: 'bedrock://converse',
     label: 'Flux Ultra',
-    description: 'Maximum intelligence for deep reasoning and complex migrations',
-    contextWindow: 128000,
+    description: 'Maximum intelligence for deep reasoning and complex migrations powered by Amazon Nova Pro on AWS Bedrock',
+    contextWindow: 300000,
     maxOutputTokens: 8192,
     minTier: 'free',
-    capabilities: ['text-generation', 'chat', 'tool-calling', 'json-mode'],
+    capabilities: ['text-generation', 'chat', 'tool-calling', 'json-mode', 'coding'],
   },
   'flux-turbo': {
     id: 'flux-turbo',
@@ -393,12 +393,12 @@ export const FLUX_MODEL_REGISTRY: Record<string, FluxModelSpec> = {
     id: 'flux-video-pro',
     modality: 'video',
     provider: 'glm',
-    upstreamModel: 'cogvideox',
+    upstreamModel: 'cogvideox-flash',
     upstreamEndpoint: PROVIDER_ENDPOINTS.glm.videos,
     label: 'Flux Video Pro',
-    description: 'Cinematic 1080p video generation with high fidelity',
-    minTier: 'max',
-    capabilities: ['text-to-video', 'image-to-video', 'hd', 'async-polling'],
+    description: 'Cinematic video generation with high fidelity powered by CogVideoX Flash',
+    minTier: 'free',
+    capabilities: ['text-to-video', 'image-to-video', 'async-polling'],
     supportedFormats: ['mp4'],
   },
   'flux-video-ray': {
@@ -486,9 +486,14 @@ export const MODEL_ALIASES: Record<string, string> = {
   'text-embedding-ada-002': 'flux-embed',
 
   // Upstream direct IDs
+  'glm': 'flux',
+  'zhipu': 'flux',
+  'glm-4': 'flux',
   'glm-4-flash': 'flux-fast',
   'glm-4-air': 'flux-pro',
   'glm-4-plus': 'flux-ultra',
+  'glm-4-long': 'flux-ultra',
+  'glm-3-turbo': 'flux-fast',
   'glm-4v-flash': 'flux-vision',
   'glm-4v': 'flux-vision',
   'flux-vision': 'flux-vision',
@@ -613,8 +618,14 @@ export function getProviderConfig(provider: Provider): ProviderConfig {
  * STRICT ROUTING: If allowFallback is false (default), only the requested primarySpec is returned.
  */
 export function buildFallbackChain(primarySpec: FluxModelSpec, hasMultimodal = false, allowFallback = false): FluxModelSpec[] {
-  // When a user requests a specific model, do NOT secretly fallback to another model.
+  // If allowFallback is disabled, include primarySpec plus a reliable Bedrock backstop if primary is external
   if (!allowFallback) {
+    if (primarySpec.provider !== 'bedrock' && primarySpec.modality === 'text') {
+      const backup = FLUX_MODEL_REGISTRY['flux-nova-pro'];
+      if (backup && backup.id !== primarySpec.id) {
+        return [primarySpec, backup];
+      }
+    }
     return [primarySpec];
   }
 

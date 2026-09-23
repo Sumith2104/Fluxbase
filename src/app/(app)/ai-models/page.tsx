@@ -477,83 +477,85 @@ const MODEL_CATALOG: ModelCardData[] = [
         badgeText: 'Sub-100ms',
         workTags: ['Autocomplete', 'Real-time UX', 'Streaming']
     },
-    // 11. GLM-4 Plus (Frontier Agent)
+    // 11. Amazon Nova Pro Agentic (Frontier Agent)
     {
         id: 'flux-5.2',
-        realName: 'Zhipu AI GLM-4 Plus (Frontier Agent)',
-        provider: 'Zhipu AI',
+        realName: 'Amazon Nova Pro (Agentic Architecture)',
+        provider: 'AWS Bedrock',
         modality: 'text',
-        label: 'GLM-4 Agentic',
-        description: 'Specialized reasoning architecture engineered for multi-step agentic tool execution and recursive problem solving.',
-        contextWindow: '128,000 tokens',
+        label: 'Nova Pro Agentic',
+        description: 'Specialized reasoning architecture engineered for multi-step agentic tool execution and recursive problem solving powered by Amazon Nova Pro.',
+        contextWindow: '300,000 tokens',
         maxOutput: '8,192 tokens',
-        speedRating: 'Balanced Cognitive',
+        speedRating: 'Fast Agentic',
         minTier: 'free',
-        capabilities: ['agentic-execution', 'multi-step-tools', 'complex-reasoning'],
-        aliases: ['agent-v5'],
+        capabilities: ['agentic-execution', 'multi-step-tools', 'complex-reasoning', 'coding'],
+        aliases: ['agent-v5', 'flux-5.2'],
         samplePrompt: 'Create a complete multi-step migration script that refactors table schema with rollback handling.',
         bannerColor: '#a7b8e8',
         illustrationType: 'cursor-node',
         badgeText: 'Agentic',
-        workTags: ['Recursive reasoning', 'Multi-tool', 'Workflows']
+        workTags: ['Recursive reasoning', 'Multi-tool', 'Workflows', 'AWS Bedrock']
     },
-    // 12. GLM-4 Air (Strict JSON & Analysis)
+    // 12. Amazon Nova Pro Analysis (Strict JSON & Analysis)
     {
         id: 'flux-pro',
-        realName: 'Zhipu AI GLM-4 Air',
-        provider: 'Zhipu AI',
+        realName: 'Amazon Nova Pro (Strict JSON & Analysis)',
+        provider: 'AWS Bedrock',
         modality: 'text',
-        label: 'GLM-4 Air',
-        description: 'Enhanced instruction following, multi-table analytical queries, and strict JSON Schema output.',
-        contextWindow: '128,000 tokens',
-        maxOutput: '4,096 tokens',
+        label: 'Nova Pro Analysis',
+        description: 'High-precision schema architecture, multi-table analytical queries, and strict JSON Schema output powered by Amazon Nova Pro on AWS Bedrock.',
+        contextWindow: '300,000 tokens',
+        maxOutput: '8,192 tokens',
         speedRating: 'Reliable Enterprise',
         minTier: 'free',
-        capabilities: ['strict-json', 'data-modeling', 'bi-analysis'],
+        capabilities: ['strict-json', 'data-modeling', 'bi-analysis', 'coding'],
+        aliases: ['flux-pro'],
         samplePrompt: 'Generate a JSON Schema conforming API response model for a payment transaction.',
         bannerColor: '#e8b394',
         illustrationType: 'cluster-burst',
         badgeText: 'Strict JSON',
-        workTags: ['Schema modeling', 'Structured JSON', 'BI Queries']
+        workTags: ['Schema modeling', 'Structured JSON', 'BI Queries', 'AWS Bedrock']
     },
-    // 13. GLM-4 Plus (Deep Reasoning)
+    // 13. Amazon Nova Pro Ultra (Deep Reasoning)
     {
         id: 'flux-ultra',
-        realName: 'Zhipu AI GLM-4 Plus (Deep Reasoning)',
-        provider: 'Zhipu AI',
+        realName: 'Amazon Nova Pro (Deep Cognitive Reasoning)',
+        provider: 'AWS Bedrock',
         modality: 'text',
-        label: 'GLM-4 Ultra',
-        description: 'Maximum cognitive depth for database architectural blueprints, complex migrations, and audit trails.',
-        contextWindow: '128,000 tokens',
+        label: 'Nova Pro Ultra',
+        description: 'Maximum cognitive depth for database architectural blueprints, complex migrations, and audit trails powered by Amazon Nova Pro on AWS Bedrock.',
+        contextWindow: '300,000 tokens',
         maxOutput: '8,192 tokens',
         speedRating: 'Deep Analysis',
         minTier: 'free',
-        capabilities: ['architectural-design', 'deep-verification', 'long-chain-thought'],
+        capabilities: ['architectural-design', 'deep-verification', 'long-chain-thought', 'coding'],
+        aliases: ['flux-ultra'],
         samplePrompt: 'Analyze this multi-tenant database schema for potential connection pool exhaustion vulnerabilities.',
         bannerColor: '#d1b0ea',
         illustrationType: 'brain-head',
         badgeText: 'Deep Thought',
-        workTags: ['Architecture blueprints', 'Security audits', 'Migrations']
+        workTags: ['Architecture blueprints', 'Security audits', 'Migrations', 'AWS Bedrock']
     },
-    // 14. CogVideoX HD (Studio Video)
+    // 14. CogVideoX Flash (Motion Video)
     {
         id: 'flux-video-pro',
-        realName: 'Zhipu AI CogVideoX HD',
+        realName: 'Zhipu AI CogVideoX Flash (Motion Pro)',
         provider: 'Zhipu AI',
         modality: 'video',
-        label: 'CogVideoX HD',
-        description: 'Cinematic 1080p video generation with high fidelity, rich motion dynamics, and crisp textures.',
+        label: 'CogVideoX Motion',
+        description: 'Cinematic dynamic video generation with high fidelity, rich motion dynamics, and crisp textures powered by CogVideoX Flash.',
         contextWindow: 'N/A (Video)',
-        maxOutput: '1080p HD MP4',
-        speedRating: 'Studio Render',
+        maxOutput: '720p HD MP4',
+        speedRating: 'Fast Async Video',
         minTier: 'free',
-        capabilities: ['1080p-hd', 'motion-stability', 'async-polling'],
-        aliases: ['cogvideox-hd'],
+        capabilities: ['dynamic-motion', 'motion-stability', 'async-polling'],
+        aliases: ['cogvideox-flash', 'flux-video-pro'],
         samplePrompt: 'Slow motion macro shot of water droplets splashing onto a shiny obsidian stone.',
         bannerColor: '#83cbe3',
         illustrationType: 'film-motion',
-        badgeText: '1080p Studio',
-        workTags: ['1080p Studio', 'Macro motion', 'High resolution']
+        badgeText: 'Motion Pro',
+        workTags: ['Dynamic motion', 'Macro motion', 'Free Tier']
     },
     // 15. OpenAI GPT-4o Drop-in Alias (Served by Amazon Nova Pro)
     {

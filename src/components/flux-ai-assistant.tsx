@@ -1771,13 +1771,13 @@ export function FluxAiAssistant({ userId, isOpen, onOpenChange }: { userId: stri
                   className="h-7 px-2 mr-1 rounded border border-border bg-background text-[11px] font-medium text-foreground/85 focus:outline-none focus:ring-1 focus:ring-border cursor-pointer max-w-[115px] sm:max-w-[130px] truncate shadow-xs opacity-95"
                   title="AI Model"
                 >
-                  <option value="flux-fast">Flux Fast</option>
-                  <option value="flux-pro">Flux Pro</option>
-                  <option value="flux-ultra">Flux Ultra</option>
-                  <option value="flux-turbo">Flux Turbo</option>
-                  <option value="flux-omni">Flux Omni (Vision)</option>
-                  <option value="flux-max">Flux Max (Vision)</option>
-                  <option value="flux-pro-max">Flux Pro Max (Claude 3.7)</option>
+                  <option value="flux-fast">Flux Fast (GLM-4)</option>
+                  <option value="flux-pro">Flux Pro (Nova Pro)</option>
+                  <option value="flux-ultra">Flux Ultra (Nova Pro)</option>
+                  <option value="flux-turbo">Flux Turbo (Nova Lite)</option>
+                  <option value="flux-omni">Flux Omni (Nova Vision)</option>
+                  <option value="flux-max">Flux Max (Nova Pro)</option>
+                  <option value="flux-nova-pro">Flux Nova Pro (Bedrock)</option>
                 </select>
                 <button onClick={() => setVoiceEnabled(v => !v)} className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors cursor-pointer" title={voiceEnabled ? 'Mute' : 'Unmute'}>{voiceEnabled ? <Volume2 size={15} /> : <VolumeX size={15} />}</button>
                 <button onClick={toggleFullScreen} className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors cursor-pointer" title={isFullScreen ? "Restore sidebar size" : "Expand to full screen"}>{isFullScreen ? <Minimize2 size={15} /> : <Maximize2 size={15} />}</button>

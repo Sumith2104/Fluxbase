@@ -87,7 +87,7 @@ async function tryThirdPartyProvider(provider: string, prompt: string, schema: a
   }
 
   if (provider === 'glm') {
-    const glmModels = [process.env.GLM_MODEL || 'glm-4-flash', 'glm-4-flash', 'glm-4-air', 'glm-4-plus'];
+    const glmModels = [process.env.GLM_MODEL || 'glm-4-flash', 'glm-4-flash', 'glm-4v-flash'];
     const uniqueModels = Array.from(new Set(glmModels));
     let lastGlmErr: any = null;
 

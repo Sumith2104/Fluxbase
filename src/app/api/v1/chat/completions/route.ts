@@ -77,10 +77,12 @@ export async function POST(req: NextRequest) {
   const fallbackChain = buildFallbackChain(primarySpec, hasMultimodal, allowFallback);
   let lastError: any = null;
 
-  for (const spec of fallbackChain) {
+  for (let i = 0; i < fallbackChain.length; i++) {
+    const spec = fallbackChain[i];
+    const isLastInChain = i === fallbackChain.length - 1;
     const providerConfig = getProviderConfig(spec.provider);
     if (!providerConfig.isAvailable) {
-      if (!allowFallback) {
+      if (!allowFallback && isLastInChain) {
         return aiError(
           `Provider '${spec.provider}' for model '${spec.id}' is not configured or missing API credentials (${spec.provider.toUpperCase()}_API_KEY or AWS credentials).`,
           'configuration_error',
@@ -254,7 +256,11 @@ export async function POST(req: NextRequest) {
     } catch (err: any) {
       logger.warn(`[ChatCompletions] Model ${spec.id} (${spec.provider}) failed: ${err?.message || err}`);
       lastError = err;
-      if (!allowFallback) {
+
+      const errMsg = String(err?.message || err);
+      const isBalanceOrOutage = errMsg.includes('1113') || errMsg.includes('余额不足') || errMsg.includes('insufficient') || errMsg.includes('quota') || errMsg.includes('429') || errMsg.includes('502') || errMsg.includes('503');
+
+      if (isLastInChain || (!allowFallback && !isBalanceOrOutage)) {
         return aiError(
           `[${spec.provider}] ${err?.message || err}`,
           'upstream_error',
@@ -262,6 +268,7 @@ export async function POST(req: NextRequest) {
           rl.headers
         );
       }
+      logger.info(`[ChatCompletions] Recovering from ${spec.id} failure by advancing to fallback candidate...`);
     }
   }
 
