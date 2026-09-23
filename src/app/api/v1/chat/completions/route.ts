@@ -252,7 +252,7 @@ export async function POST(req: NextRequest) {
         },
       });
     } catch (err: any) {
-      logger.warn(`[ChatCompletions] Model ${spec.id} (${spec.provider}) failed:`, err?.message || err);
+      logger.warn(`[ChatCompletions] Model ${spec.id} (${spec.provider}) failed: ${err?.message || err}`);
       lastError = err;
       if (!allowFallback) {
         return aiError(

@@ -9,21 +9,28 @@ import {
 } from '@aws-sdk/client-bedrock-runtime';
 
 let cachedClient: BedrockRuntimeClient | null = null;
+let cachedAccessKey = '';
+let cachedRegion = '';
 
 export function getBedrockClient(): BedrockRuntimeClient {
-  if (!cachedClient) {
-    // Bedrock Anthropic Claude cross-region inference profiles use us-east-1
-    const region = process.env.AWS_BEDROCK_REGION || 'us-east-1';
+  const region = process.env.AWS_BEDROCK_REGION || 'us-east-1';
+  const accessKeyId = process.env.AWS_ACCESS_KEY_ID || '';
+  const secretAccessKey = process.env.AWS_SECRET_ACCESS_KEY || '';
+
+  // Invalidate cache if keys or region change (e.g. after .env.local reload)
+  if (!cachedClient || cachedAccessKey !== accessKeyId || cachedRegion !== region) {
     const config: any = { region };
 
-    if (process.env.AWS_ACCESS_KEY_ID && process.env.AWS_SECRET_ACCESS_KEY) {
+    if (accessKeyId && secretAccessKey) {
       config.credentials = {
-        accessKeyId: process.env.AWS_ACCESS_KEY_ID,
-        secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
+        accessKeyId,
+        secretAccessKey,
       };
     }
 
     cachedClient = new BedrockRuntimeClient(config);
+    cachedAccessKey = accessKeyId;
+    cachedRegion = region;
   }
   return cachedClient;
 }
