@@ -45,11 +45,20 @@ export interface BedrockChatOptions {
 export function resolveBedrockModelId(modelId: string): string {
   const envModel = process.env.AWS_BEDROCK_CLAUDE_MODEL;
   if (envModel) return envModel;
+  if (modelId.includes('nova-pro') || modelId === 'amazon.nova-pro-v1:0') {
+    return 'amazon.nova-pro-v1:0';
+  }
+  if (modelId.includes('nova-lite') || modelId === 'amazon.nova-lite-v1:0') {
+    return 'amazon.nova-lite-v1:0';
+  }
+  if (modelId.includes('nova-micro') || modelId === 'amazon.nova-micro-v1:0') {
+    return 'amazon.nova-micro-v1:0';
+  }
   if (modelId.includes('sonnet-4-5') || modelId.includes('sonnet-4.5')) {
     return 'us.anthropic.claude-sonnet-4-5-20250929-v1:0';
   }
-  if (!modelId || modelId.includes('3-7-sonnet') || modelId.includes('3.7') || modelId.includes('legacy') || modelId === 'us.anthropic.claude-3-7-sonnet-20250219-v1:0') {
-    return 'us.anthropic.claude-sonnet-4-6';
+  if (!modelId || modelId.includes('3-7-sonnet') || modelId.includes('3.7')) {
+    return 'us.anthropic.claude-3-7-sonnet-20250219-v1:0';
   }
   return modelId;
 }
@@ -172,15 +181,19 @@ export async function executeBedrockConverse(opts: BedrockChatOptions) {
     inferenceConfig.topP = opts.top_p;
   }
 
+  const targetModelId = resolveBedrockModelId(opts.modelId);
+  const isClaudeThinking = Boolean(opts.enableThinking && (targetModelId.includes('3-7') || targetModelId.includes('claude-3.7')));
   const additionalModelRequestFields: Record<string, any> = {};
-  if (opts.enableThinking) {
+  if (isClaudeThinking) {
     additionalModelRequestFields.thinking = {
       type: 'enabled',
       budget_tokens: opts.thinkingBudget || 2048,
     };
+    // Anthropic requires temperature/top_p to not conflict with thinking
+    delete inferenceConfig.temperature;
+    delete inferenceConfig.topP;
   }
 
-  const targetModelId = resolveBedrockModelId(opts.modelId);
   const command = new ConverseCommand({
     modelId: targetModelId,
     system: system.length > 0 ? system : undefined,
@@ -189,23 +202,7 @@ export async function executeBedrockConverse(opts: BedrockChatOptions) {
     additionalModelRequestFields: Object.keys(additionalModelRequestFields).length > 0 ? additionalModelRequestFields : undefined,
   });
 
-  let response;
-  try {
-    response = await client.send(command);
-  } catch (err: any) {
-    if (err?.name === 'ResourceNotFoundException' || err?.message?.includes('end of its life') || err?.name === 'AccessDeniedException') {
-      const fallbackCommand = new ConverseCommand({
-        modelId: 'us.anthropic.claude-sonnet-4-6',
-        system: system.length > 0 ? system : undefined,
-        messages,
-        inferenceConfig,
-        additionalModelRequestFields: Object.keys(additionalModelRequestFields).length > 0 ? additionalModelRequestFields : undefined,
-      });
-      response = await client.send(fallbackCommand);
-    } else {
-      throw err;
-    }
-  }
+  const response = await client.send(command);
 
   let responseText = '';
   if (response.output?.message?.content) {
@@ -262,15 +259,19 @@ export async function executeBedrockConverseStream(opts: BedrockChatOptions): Pr
     inferenceConfig.topP = opts.top_p;
   }
 
+  const targetModelId = resolveBedrockModelId(opts.modelId);
+  const isClaudeThinking = Boolean(opts.enableThinking && (targetModelId.includes('3-7') || targetModelId.includes('claude-3.7')));
   const additionalModelRequestFields: Record<string, any> = {};
-  if (opts.enableThinking) {
+  if (isClaudeThinking) {
     additionalModelRequestFields.thinking = {
       type: 'enabled',
       budget_tokens: opts.thinkingBudget || 2048,
     };
+    // Anthropic requires temperature/top_p to not conflict with thinking
+    delete inferenceConfig.temperature;
+    delete inferenceConfig.topP;
   }
 
-  const targetModelId = resolveBedrockModelId(opts.modelId);
   const command = new ConverseStreamCommand({
     modelId: targetModelId,
     system: system.length > 0 ? system : undefined,
@@ -279,23 +280,7 @@ export async function executeBedrockConverseStream(opts: BedrockChatOptions): Pr
     additionalModelRequestFields: Object.keys(additionalModelRequestFields).length > 0 ? additionalModelRequestFields : undefined,
   });
 
-  let response;
-  try {
-    response = await client.send(command);
-  } catch (err: any) {
-    if (err?.name === 'ResourceNotFoundException' || err?.message?.includes('end of its life') || err?.name === 'AccessDeniedException') {
-      const fallbackCommand = new ConverseStreamCommand({
-        modelId: 'us.anthropic.claude-sonnet-4-6',
-        system: system.length > 0 ? system : undefined,
-        messages,
-        inferenceConfig,
-        additionalModelRequestFields: Object.keys(additionalModelRequestFields).length > 0 ? additionalModelRequestFields : undefined,
-      });
-      response = await client.send(fallbackCommand);
-    } else {
-      throw err;
-    }
-  }
+  const response = await client.send(command);
   const streamId = `chatcmpl-bedrock-${Date.now()}`;
   const encoder = new TextEncoder();
 

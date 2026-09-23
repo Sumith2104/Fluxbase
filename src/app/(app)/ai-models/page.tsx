@@ -88,6 +88,36 @@ const MODEL_CATALOG: ModelCardData[] = [
         samplePrompt: 'Perform a full security and performance audit of a PostgreSQL foreign data wrapper implementation.'
     },
     {
+        id: 'flux-nova-pro',
+        realName: 'Amazon Nova Pro',
+        provider: 'AWS Bedrock',
+        modality: 'text',
+        label: 'Flux Nova Pro',
+        description: 'Amazon Bedrock flagship multimodal intelligence with high speed reasoning, native vision, and fast document analysis.',
+        contextWindow: '300,000 tokens',
+        maxOutput: '8,192 tokens',
+        speedRating: 'Fast Multimodal',
+        minTier: 'free',
+        capabilities: ['multimodal', 'vision', 'tool-calling', 'json-mode', 'coding'],
+        aliases: ['nova-pro', 'amazon-nova-pro', 'amazon.nova-pro-v1:0'],
+        samplePrompt: 'Analyze this distributed system architecture and suggest failure recovery mechanisms.'
+    },
+    {
+        id: 'flux-nova-lite',
+        realName: 'Amazon Nova Lite',
+        provider: 'AWS Bedrock',
+        modality: 'text',
+        label: 'Flux Nova Lite',
+        description: 'Ultra-fast multimodal reasoning, high-throughput interactive processing, and real-time generation on AWS Bedrock.',
+        contextWindow: '300,000 tokens',
+        maxOutput: '8,192 tokens',
+        speedRating: 'Sub-200ms First Token',
+        minTier: 'free',
+        capabilities: ['hyper-fast', 'multimodal', 'chat', 'tool-calling'],
+        aliases: ['nova-lite', 'amazon-nova-lite', 'amazon.nova-lite-v1:0'],
+        samplePrompt: 'Summarize the core benefits of edge caching over origin database read replicas.'
+    },
+    {
         id: 'flux-turbo',
         realName: 'Meta LLaMA 3.3 70B Versatile',
         provider: 'Groq / Meta',

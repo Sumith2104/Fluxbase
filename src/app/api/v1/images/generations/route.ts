@@ -50,12 +50,23 @@ export async function POST(req: NextRequest) {
   const responseFormat = body?.response_format || 'url';
 
   const startTime = Date.now();
-  const fallbackChain = buildFallbackChain(primarySpec);
+  const allowFallback = Boolean(body?.allow_fallback);
+  const fallbackChain = buildFallbackChain(primarySpec, false, allowFallback);
   let lastError: any = null;
 
   for (const spec of fallbackChain) {
     const providerConfig = getProviderConfig(spec.provider);
-    if (!providerConfig.isAvailable) continue;
+    if (!providerConfig.isAvailable) {
+      if (!allowFallback) {
+        return aiError(
+          `Provider '${spec.provider}' for model '${spec.id}' is not configured or missing API credentials (${spec.provider.toUpperCase()}_API_KEY or AWS credentials).`,
+          'configuration_error',
+          503,
+          rl.headers
+        );
+      }
+      continue;
+    }
 
     try {
       const generatedItems = await dispatchImageGeneration(spec, providerConfig.apiKey, prompt, n, size);
@@ -116,8 +127,16 @@ export async function POST(req: NextRequest) {
         );
       }
     } catch (err: any) {
-      logger.warn(`[ImageGen] Model ${spec.id} failed, trying fallback:`, err?.message || err);
+      logger.warn(`[ImageGen] Model ${spec.id} failed:`, err?.message || err);
       lastError = err;
+      if (!allowFallback) {
+        return aiError(
+          `[${spec.provider}] ${err?.message || err}`,
+          'upstream_error',
+          502,
+          rl.headers
+        );
+      }
     }
   }
 

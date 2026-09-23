@@ -234,6 +234,32 @@ export const FLUX_MODEL_REGISTRY: Record<string, FluxModelSpec> = {
     minTier: 'pro',
     capabilities: ['text-generation', 'chat', 'reasoning', 'extended-thinking', 'tool-calling', 'json-mode', 'vision'],
   },
+  'flux-nova-pro': {
+    id: 'flux-nova-pro',
+    modality: 'text',
+    provider: 'bedrock',
+    upstreamModel: 'amazon.nova-pro-v1:0',
+    upstreamEndpoint: 'bedrock://converse',
+    label: 'Flux Nova Pro',
+    description: 'Amazon Bedrock flagship multimodal intelligence with high speed reasoning and native vision',
+    contextWindow: 300000,
+    maxOutputTokens: 8192,
+    minTier: 'free',
+    capabilities: ['text-generation', 'chat', 'reasoning', 'tool-calling', 'json-mode', 'vision'],
+  },
+  'flux-nova-lite': {
+    id: 'flux-nova-lite',
+    modality: 'text',
+    provider: 'bedrock',
+    upstreamModel: 'amazon.nova-lite-v1:0',
+    upstreamEndpoint: 'bedrock://converse',
+    label: 'Flux Nova Lite',
+    description: 'Ultra-fast multimodal reasoning and conversational intelligence on AWS Bedrock',
+    contextWindow: 300000,
+    maxOutputTokens: 8192,
+    minTier: 'free',
+    capabilities: ['text-generation', 'chat', 'fast', 'tool-calling', 'json-mode', 'vision'],
+  },
 
   // --- IMAGE GENERATION ---
   'flux-image': {
@@ -595,9 +621,15 @@ export function getProviderConfig(provider: Provider): ProviderConfig {
 }
 
 /**
- * Builds a fallback chain of alternative models if primary fails
+ * Builds a fallback chain of alternative models if primary fails.
+ * STRICT ROUTING: If allowFallback is false (default), only the requested primarySpec is returned.
  */
-export function buildFallbackChain(primarySpec: FluxModelSpec, hasMultimodal = false): FluxModelSpec[] {
+export function buildFallbackChain(primarySpec: FluxModelSpec, hasMultimodal = false, allowFallback = false): FluxModelSpec[] {
+  // When a user requests a specific model, do NOT secretly fallback to another model.
+  if (!allowFallback) {
+    return [primarySpec];
+  }
+
   const chain: FluxModelSpec[] = [];
 
   if (hasMultimodal) {

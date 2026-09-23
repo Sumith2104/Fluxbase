@@ -28,7 +28,7 @@ export async function POST(req: NextRequest) {
     return aiError('Invalid JSON in request body.', 'invalid_request_error', 400);
   }
 
-  const { messages, model: requestedModel = 'flux-fast', stream = false, temperature, top_p, max_tokens, tools, tool_choice, response_format } = body;
+  const { messages, model: requestedModel = 'flux-fast', stream = false, temperature, top_p, max_tokens, tools, tool_choice, response_format, allow_fallback = false } = body;
 
   if (!Array.isArray(messages) || messages.length === 0) {
     return aiError('Invalid request: "messages" must be a non-empty array.', 'invalid_request_error', 400);
@@ -73,25 +73,37 @@ export async function POST(req: NextRequest) {
 
   const outboundModelName = primarySpec.id;
   const startTime = Date.now();
-  const fallbackChain = buildFallbackChain(primarySpec, hasMultimodal);
+  const allowFallback = Boolean(allow_fallback);
+  const fallbackChain = buildFallbackChain(primarySpec, hasMultimodal, allowFallback);
   let lastError: any = null;
 
   for (const spec of fallbackChain) {
     const providerConfig = getProviderConfig(spec.provider);
-    if (!providerConfig.isAvailable) continue;
+    if (!providerConfig.isAvailable) {
+      if (!allowFallback) {
+        return aiError(
+          `Provider '${spec.provider}' for model '${spec.id}' is not configured or missing API credentials (${spec.provider.toUpperCase()}_API_KEY or AWS credentials).`,
+          'configuration_error',
+          503,
+          rl.headers
+        );
+      }
+      continue;
+    }
 
     try {
       // Direct AWS Bedrock Converse API Dispatch
       if (spec.provider === 'bedrock') {
+        const isThinkingCapable = Boolean(spec.capabilities?.includes('extended-thinking') && spec.upstreamModel.includes('3-7'));
         const bedrockOpts = {
           modelId: spec.upstreamModel,
           messages: formattedMessages,
-          temperature,
-          top_p,
+          temperature: isThinkingCapable ? undefined : temperature,
+          top_p: isThinkingCapable ? undefined : top_p,
           max_tokens,
           outboundModelName,
-          enableThinking: true,
-          thinkingBudget: 2048,
+          enableThinking: isThinkingCapable,
+          thinkingBudget: isThinkingCapable ? 2048 : undefined,
         };
 
         if (stream) {
@@ -240,8 +252,16 @@ export async function POST(req: NextRequest) {
         },
       });
     } catch (err: any) {
-      logger.warn(`[ChatCompletions] Model ${spec.id} (${spec.provider}) failed, attempting fallback:`, err?.message || err);
+      logger.warn(`[ChatCompletions] Model ${spec.id} (${spec.provider}) failed:`, err?.message || err);
       lastError = err;
+      if (!allowFallback) {
+        return aiError(
+          `[${spec.provider}] ${err?.message || err}`,
+          'upstream_error',
+          502,
+          rl.headers
+        );
+      }
     }
   }
 
