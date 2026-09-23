@@ -167,7 +167,7 @@ export function formatOpenAiToBedrock(messages: any[]): {
 export async function executeBedrockConverse(opts: BedrockChatOptions) {
   const client = getBedrockClient();
   const { system, messages } = formatOpenAiToBedrock(opts.messages);
-  const outboundModel = opts.outboundModelName || 'flux-pro-max';
+  const outboundModel = opts.outboundModelName || opts.modelId || 'flux-nova-pro';
 
   const inferenceConfig: any = {
     maxTokens: opts.max_tokens || 4096,
@@ -245,7 +245,7 @@ export async function executeBedrockConverseStream(opts: BedrockChatOptions): Pr
 }> {
   const client = getBedrockClient();
   const { system, messages } = formatOpenAiToBedrock(opts.messages);
-  const outboundModel = opts.outboundModelName || 'flux-pro-max';
+  const outboundModel = opts.outboundModelName || opts.modelId || 'flux-nova-pro';
 
   const inferenceConfig: any = {
     maxTokens: opts.max_tokens || 4096,
