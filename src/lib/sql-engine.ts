@@ -624,7 +624,7 @@ export class SqlEngine {
 
                 const client = await pool.connect();
                 try {
-                    await client.query("SELECT set_config('synchronous_commit', 'off', false), set_config('work_mem', '64MB', false)");
+                    await client.query("SELECT set_config('synchronous_commit', 'off', false), set_config('work_mem', '16MB', false)");
                     const t0 = Date.now();
                     await client.query(`
                         INSERT INTO "${schemaName}"."${safeTableName}" (${quotedCols})
