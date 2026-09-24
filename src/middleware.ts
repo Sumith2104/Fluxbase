@@ -45,12 +45,16 @@ export async function middleware(request: NextRequest) {
     const { pathname } = request.nextUrl;
     
     // 0. Path normalization and exclusion
-    // Skip static files, images, favicon etc. to avoid infinite loops or overhead
+    // Skip static files, images, favicon, robots.txt, sitemap.xml etc. to avoid infinite loops or blocking SEO crawlers
     if (
         pathname.startsWith('/_next/') || 
         pathname.startsWith('/static/') || 
         pathname === '/favicon.ico' || 
-        /\.(?:png|jpg|jpeg|gif|webp|svg|ico|css|js|map|woff2?|ttf|eot)$/i.test(pathname)
+        pathname === '/robots.txt' || 
+        pathname === '/sitemap.xml' || 
+        pathname === '/manifest.webmanifest' || 
+        pathname.startsWith('/.well-known/') || 
+        /\.(?:png|jpg|jpeg|gif|webp|svg|ico|css|js|map|woff2?|ttf|eot|txt|xml|json|pdf)$/i.test(pathname)
     ) {
         return NextResponse.next();
     }
@@ -128,7 +132,7 @@ export async function middleware(request: NextRequest) {
 
         // allow public access to marketing pages: '/', '/pricing', etc., and '/checkout' for payment handoffs & returns
         const isPublicStaticPage = [
-            '/', '/pricing', '/privacy', '/terms', '/docs', '/doc', '/contact', '/reset-password', '/checkout', '/ai-models', '/models'
+            '/', '/pricing', '/privacy', '/terms', '/docs', '/doc', '/contact', '/reset-password', '/checkout', '/ai-models', '/models', '/robots.txt', '/sitemap.xml', '/manifest.webmanifest'
         ].includes(pathname) || pathname.startsWith('/docs') || pathname.startsWith('/doc') || pathname.startsWith('/ai-models') || pathname.startsWith('/models');
 
         // and tries to access a protected page (non-public, non-api), redirect to root
@@ -157,6 +161,6 @@ export async function middleware(request: NextRequest) {
 // Config matcher is still useful but simpler to avoid issues with standard assets
 export const config = {
   matcher: [
-    '/((?!_next/static|_next/image|favicon.ico).*)',
+    '/((?!_next/static|_next/image|favicon.ico|robots.txt|sitemap.xml|manifest.webmanifest).*)',
   ],
 };
