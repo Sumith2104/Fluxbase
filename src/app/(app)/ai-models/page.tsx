@@ -981,7 +981,7 @@ response = client.embeddings.create(
     input="${model.samplePrompt || 'Generate embedding vector for semantic search'}"
 )
 
-print("Titan Embedding Vector (1024-dim):", response.data[0].embedding[:5], "... len:", len(response.data[0].embedding))`;
+print("Flux Embedding Vector (1024-dim):", response.data[0].embedding[:5], "... len:", len(response.data[0].embedding))`;
             }
             return `import OpenAI from 'openai';
 
@@ -1345,7 +1345,7 @@ main();`;
                             <Volume2 className="h-3.5 w-3.5 text-emerald-400" />
                         </div>
                         <div className="text-lg font-bold text-foreground mt-1">{quota.audioLimit.split('(')[0]}</div>
-                        <div className="text-[11px] text-muted-foreground mt-0.5">Whisper + Studio TTS</div>
+                        <div className="text-[11px] text-muted-foreground mt-0.5">Flux Listen STT + Neural TTS</div>
                     </div>
                 </div>
 

@@ -48,9 +48,14 @@ export async function getUserPlanAction() {
         );
 
         if (rows.length > 0) {
+            let plan = rows[0].planType || 'free';
+            const role = rows[0].userRole || rows[0].planType || 'student';
+            if (role === 'student' && plan === 'pay_as_you_go') {
+                plan = 'free';
+            }
             return {
-                plan: rows[0].planType || 'free',
-                role: rows[0].userRole || rows[0].planType || 'student',
+                plan,
+                role,
                 billing_cycle_end: rows[0].billingCycleEnd,
                 status: rows[0].status || 'active'
             };

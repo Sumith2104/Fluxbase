@@ -15,11 +15,17 @@ export async function getUserPlanAction(): Promise<{ success: boolean; plan?: st
         const { getPgPool } = await import('@/lib/pg');
         const pool = getPgPool();
         const { rows } = await pool.query(
-            'SELECT plan_type, status FROM fluxbase_global.users WHERE id = $1',
+            'SELECT plan_type, user_role, status FROM fluxbase_global.users WHERE id = $1',
             [userId]
         );
 
-        return { success: true, plan: rows[0]?.plan_type || 'free', status: rows[0]?.status || 'active' };
+        let plan = rows[0]?.plan_type || 'free';
+        const role = rows[0]?.user_role || 'student';
+        if (role === 'student' && plan === 'pay_as_you_go') {
+            plan = 'free';
+        }
+
+        return { success: true, plan, status: rows[0]?.status || 'active' };
     } catch (error: any) {
         return { success: false, error: error.message };
     }

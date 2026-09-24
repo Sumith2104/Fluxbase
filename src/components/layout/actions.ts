@@ -147,7 +147,7 @@ export async function createProjectAction(formData: FormData) {
     if (billingPreference === 'pay_as_you_go') {
       try {
         await pool.query(
-          "UPDATE fluxbase_global.users SET plan_type = 'pay_as_you_go', status = 'active' WHERE id = $1 AND plan_type NOT IN ('org_owner', 'max')",
+          "UPDATE fluxbase_global.users SET plan_type = 'pay_as_you_go', status = 'active' WHERE id = $1 AND plan_type NOT IN ('org_owner', 'max') AND COALESCE(user_role, 'student') != 'student'",
           [userId]
         );
         const { getOrCreateCurrentCycle } = await import('@/lib/payg-engine');
