@@ -54,7 +54,8 @@ export async function middleware(request: NextRequest) {
         pathname === '/sitemap.xml' || 
         pathname === '/manifest.webmanifest' || 
         pathname.startsWith('/.well-known/') || 
-        /\.(?:png|jpg|jpeg|gif|webp|svg|ico|css|js|map|woff2?|ttf|eot|txt|xml|json|pdf)$/i.test(pathname)
+        pathname.startsWith('/google') || 
+        /\.(?:png|jpg|jpeg|gif|webp|svg|ico|css|js|map|woff2?|ttf|eot|txt|xml|json|pdf|html)$/i.test(pathname)
     ) {
         return NextResponse.next();
     }
@@ -133,7 +134,7 @@ export async function middleware(request: NextRequest) {
         // allow public access to marketing pages: '/', '/pricing', etc., and '/checkout' for payment handoffs & returns
         const isPublicStaticPage = [
             '/', '/pricing', '/privacy', '/terms', '/docs', '/doc', '/contact', '/reset-password', '/checkout', '/ai-models', '/models', '/robots.txt', '/sitemap.xml', '/manifest.webmanifest'
-        ].includes(pathname) || pathname.startsWith('/docs') || pathname.startsWith('/doc') || pathname.startsWith('/ai-models') || pathname.startsWith('/models');
+        ].includes(pathname) || pathname.startsWith('/docs') || pathname.startsWith('/doc') || pathname.startsWith('/ai-models') || pathname.startsWith('/models') || pathname.startsWith('/google');
 
         // and tries to access a protected page (non-public, non-api), redirect to root
         if (!isPublicStaticPage && !pathname.startsWith('/api/')) {
@@ -161,6 +162,6 @@ export async function middleware(request: NextRequest) {
 // Config matcher is still useful but simpler to avoid issues with standard assets
 export const config = {
   matcher: [
-    '/((?!_next/static|_next/image|favicon.ico|robots.txt|sitemap.xml|manifest.webmanifest).*)',
+    '/((?!_next/static|_next/image|favicon.ico|robots.txt|sitemap.xml|manifest.webmanifest|google.*).*)',
   ],
 };
