@@ -62,6 +62,7 @@ class HighThroughputIngestionEngine {
 
     private flushTimer: NodeJS.Timeout | null = null;
     private isFlushing: boolean = false;
+    private lastWarnTime: number = 0;
 
     constructor() {
         this.startFlusher();
@@ -170,8 +171,11 @@ class HighThroughputIngestionEngine {
                         pipe.hincrby('ingestion:stats', 'flushes_total', 1);
                         await pipe.exec();
                     } catch (e: any) {
-                        // Redis warning handled gracefully without interrupting memory buffer
-                        logger.warn('[IngestEngine] Background Redis flush warning:', e?.message || e);
+                        const now = Date.now();
+                        if (now - this.lastWarnTime > 30000) {
+                            this.lastWarnTime = now;
+                            logger.warn('[IngestEngine] Background Redis flush deferred (operating in-memory buffer):', e?.message || e);
+                        }
                     }
 
                     this.totalFlushed += batch.length;
