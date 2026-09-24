@@ -578,6 +578,26 @@ export class SqlEngine {
                 const pool = await getTenantPgPool(this.projectObj!);
                 const { schemaName } = getProjectDbAndSchema(this.projectObj!);
                 const safeTableName = tableName.replace(/[^a-zA-Z0-9_]/g, '');
+
+                // Option B: Automatically route bulk generation (>=10k rows) to multi-threaded chunk workers
+                if (count >= 10_000) {
+                    const { runParallelGenerateJob } = await import('@/lib/chunked-parallel-worker');
+                    const parallelResult = await runParallelGenerateJob({
+                        pool,
+                        schemaName,
+                        tableName: safeTableName,
+                        totalCount: count,
+                        columns,
+                    });
+
+                    return {
+                        rows: [],
+                        columns: [],
+                        message: `Successfully generated ${count.toLocaleString()} rows for ${tableName} across ${parallelResult.workersUsed} parallel workers in ${(parallelResult.durationMs / 1000).toFixed(2)}s (${parallelResult.rowsPerSecond.toLocaleString()} rows/s)`,
+                        explanation: [`Parallel Multi-Worker Streaming Engine (${parallelResult.workersUsed} workers)`]
+                    };
+                }
+
                 const insertableCols = columns.filter(col => col.column_name !== 'id' && col.column_name !== '_id');
                 if (insertableCols.length === 0) throw new Error("No insertable columns found in table");
 

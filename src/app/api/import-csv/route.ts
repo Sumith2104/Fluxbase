@@ -367,8 +367,29 @@ export async function POST(req: NextRequest) {
 
                     // Ultra-fast streaming COPY protocol fast-path
                     let copySuccess = false;
-                    const copySp = `sp_copy_${savepointIdx++}`;
-                    await client.query(`SAVEPOINT ${copySp}`);
+
+                    // Option B: For large bulk imports (>=20,000 rows), split across parallel multi-threaded workers
+                    if (groupRows.length >= 20_000) {
+                        try {
+                            const { runParallelRowsJob } = await import('@/lib/chunked-parallel-worker');
+                            const parallelResult = await runParallelRowsJob({
+                                pool,
+                                schemaName,
+                                tableName: safeTableName,
+                                rows: groupRows,
+                                quotedCols,
+                                formatRowFn: (r) => r.vals.map(formatCsvValue).join(',') + '\n',
+                            });
+                            importedCount += parallelResult.totalRows;
+                            copySuccess = true;
+                        } catch {
+                            // If parallel worker encounters an issue, seamlessly continue to single-stream COPY
+                        }
+                    }
+
+                    if (!copySuccess) {
+                        const copySp = `sp_copy_${savepointIdx++}`;
+                        await client.query(`SAVEPOINT ${copySp}`);
 
                     try {
                         const copySql = `COPY "${schemaName}"."${safeTableName}" (${quotedCols}) FROM STDIN WITH (FORMAT csv, NULL '')`;
@@ -394,6 +415,7 @@ export async function POST(req: NextRequest) {
                         // Rollback savepoint if COPY fails and fall back to row-by-row / batching for error diagnosis
                         await client.query(`ROLLBACK TO SAVEPOINT ${copySp}`);
                         await client.query(`RELEASE SAVEPOINT ${copySp}`);
+                    }
                     }
 
                     if (!copySuccess) {
