@@ -218,31 +218,34 @@ export async function getApiBillsAction(projectId?: string): Promise<{ success: 
 
       const mId = (row.model_id || 'flux-fast').toLowerCase();
       let label = row.model_id || 'flux-fast';
-      if (mId === 'flux-video') label = 'Flux Video Motion (CogVideoX)';
-      else if (mId === 'flux-image') label = 'Flux Image (CogView-3 / DALL-E)';
-      else if (mId === 'flux-image-fast') label = 'Flux Image Fast (CogView-3 Flash)';
-      else if (mId === 'flux-embed' || mId.includes('titan-embed') || mId.includes('embed')) label = 'Flux Vector Embeddings (Titan V2)';
-      else if (mId.includes('stt') || mId.includes('whisper')) label = 'Flux Audio STT (Whisper)';
-      else if (mId.includes('tts') || mId.includes('speech')) label = 'Flux Audio TTS (Polly / Speech)';
-      else if (mId.includes('nova-pro')) label = 'Flux Ultra (Amazon Nova Pro)';
-      else if (mId.includes('nova-lite')) label = 'Flux Lite (Amazon Nova Lite)';
-      else if (mId.includes('nova-micro')) label = 'Flux Micro (Amazon Nova Micro)';
-      else if (mId.includes('flash') && mId.includes('4v')) label = 'Flux Vision (GLM-4V)';
-      else if (mId.includes('flash')) label = 'Flux Fast (GLM-4 Flash)';
-      else if (mId.includes('air')) label = 'Flux Pro (GLM-4 Air)';
-      else if (mId.includes('plus')) label = 'Flux Ultra (GLM-4 Plus)';
-      else if (mId.includes('llama') || mId.includes('turbo')) label = 'Flux Turbo (Groq LLaMA)';
-      else if (mId.includes('gemini') || mId.includes('omni')) label = 'Flux Omni (Gemini 2.0)';
-      else if (mId.includes('gpt-4o')) label = 'Flux Max (GPT-4o)';
-      else if (mId === 'flux-pro') label = 'Flux Pro (GLM-4 Air / Nova Pro)';
-      else if (mId === 'flux-ultra') label = 'Flux Ultra (GLM-4 Plus / Nova Pro)';
-      else if (mId === 'flux-5.2') label = 'Flux 5.2 (Amazon Nova Pro)';
-      else if (mId === 'flux') label = 'Flux Standard (GLM / Nova)';
+      if (mId === 'flux-video' || mId === 'flux-video-pro') label = 'Flux Video Motion';
+      else if (mId === 'flux-video-ray') label = 'Flux Video Ray';
+      else if (mId === 'flux-image-ultra') label = 'Flux Image Ultra';
+      else if (mId === 'flux-image-hd') label = 'Flux Image HD';
+      else if (mId === 'flux-image-pro') label = 'Flux Image Pro';
+      else if (mId === 'flux-image-fast') label = 'Flux Image Fast';
+      else if (mId === 'flux-image') label = 'Flux Image';
+      else if (mId.includes('embed')) label = 'Flux Vector Embeddings';
+      else if (mId.includes('listen') || mId.includes('stt') || mId.includes('whisper')) label = 'Flux Listen (Audio STT)';
+      else if (mId.includes('speak') || mId.includes('tts') || mId.includes('speech')) label = 'Flux Speak (Audio TTS)';
+      else if (mId === 'flux-5.2') label = 'Flux 5.2 (Agentic)';
+      else if (mId === 'flux-ultra') label = 'Flux Ultra';
+      else if (mId === 'flux-pro' || mId.includes('nova-pro')) label = 'Flux Pro';
+      else if (mId === 'flux-lite' || mId.includes('nova-lite')) label = 'Flux Lite';
+      else if (mId === 'flux-micro' || mId.includes('nova-micro')) label = 'Flux Micro';
+      else if (mId === 'flux-vision' || mId.includes('4v')) label = 'Flux Vision';
+      else if (mId === 'flux-turbo' || mId.includes('turbo')) label = 'Flux Turbo';
+      else if (mId === 'flux-omni' || mId.includes('omni')) label = 'Flux Omni';
+      else if (mId === 'flux-max' || mId.includes('max')) label = 'Flux Max';
+      else if (mId === 'flux-flash') label = 'Flux Flash';
+      else if (mId === 'flux-fast') label = 'Flux Fast';
+      else if (mId === 'flux') label = 'Flux Standard';
+      else label = `Flux ${mId.replace(/^flux-?/, '').toUpperCase() || 'Engine'}`;
 
       return {
         modelId: mId,
         label,
-        provider: row.provider || 'glm',
+        provider: 'Flux AI',
         requestCount: reqCount,
         inputTokens: parseInt(row.input_tokens || '0', 10),
         outputTokens: parseInt(row.output_tokens || '0', 10),
@@ -276,7 +279,7 @@ export async function getApiBillsAction(projectId?: string): Promise<{ success: 
         projectId: row.project_id,
         modelId: row.model_id,
         modality: row.modality,
-        provider: row.provider,
+        provider: 'Flux AI',
         inputTokens: inTok,
         outputTokens: outTok,
         totalTokens: inTok + outTok,

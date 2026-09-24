@@ -51,16 +51,16 @@ export interface BedrockChatOptions {
  * Resolves requested model ID to active Bedrock cross-region inference profile
  */
 export function resolveBedrockModelId(modelId: string): string {
-  if (modelId.includes('nova-pro') || modelId === 'amazon.nova-pro-v1:0') {
+  if (modelId === 'flux-pro' || modelId === 'flux-ultra' || modelId === 'flux-5.2' || modelId === 'flux-max' || modelId.includes('nova-pro') || modelId === 'amazon.nova-pro-v1:0') {
     return 'amazon.nova-pro-v1:0';
   }
-  if (modelId.includes('nova-lite') || modelId === 'amazon.nova-lite-v1:0') {
+  if (modelId === 'flux-lite' || modelId === 'flux-turbo' || modelId.includes('nova-lite') || modelId === 'amazon.nova-lite-v1:0') {
     return 'amazon.nova-lite-v1:0';
   }
-  if (modelId.includes('nova-micro') || modelId === 'amazon.nova-micro-v1:0') {
+  if (modelId === 'flux-micro' || modelId.includes('nova-micro') || modelId === 'amazon.nova-micro-v1:0') {
     return 'amazon.nova-micro-v1:0';
   }
-  if (modelId.includes('titan-embed') || modelId.includes('titan')) {
+  if (modelId === 'flux-embed' || modelId.includes('titan-embed') || modelId.includes('titan')) {
     return 'amazon.titan-embed-text-v2:0';
   }
   if (!modelId || modelId === 'default' || modelId === 'bedrock') {
@@ -175,7 +175,7 @@ export function formatOpenAiToBedrock(messages: any[]): {
 export async function executeBedrockConverse(opts: BedrockChatOptions) {
   const client = getBedrockClient();
   const { system, messages } = formatOpenAiToBedrock(opts.messages);
-  const outboundModel = opts.outboundModelName || opts.modelId || 'flux-nova-pro';
+  const outboundModel = opts.outboundModelName || opts.modelId || 'flux-pro';
 
   const inferenceConfig: any = {
     maxTokens: opts.max_tokens || 4096,
@@ -253,7 +253,7 @@ export async function executeBedrockConverseStream(opts: BedrockChatOptions): Pr
 }> {
   const client = getBedrockClient();
   const { system, messages } = formatOpenAiToBedrock(opts.messages);
-  const outboundModel = opts.outboundModelName || opts.modelId || 'flux-nova-pro';
+  const outboundModel = opts.outboundModelName || opts.modelId || 'flux-pro';
 
   const inferenceConfig: any = {
     maxTokens: opts.max_tokens || 4096,

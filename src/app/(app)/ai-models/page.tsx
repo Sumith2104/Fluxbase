@@ -51,7 +51,7 @@ export type IllustrationType =
 export interface ModelCardData {
     id: string;
     realName: string;
-    provider: 'AWS Bedrock' | 'OpenAI' | 'Google Gemini' | 'Groq / Meta' | 'Zhipu AI';
+    provider: string;
     modality: ModalityType;
     label: string;
     description: string;
@@ -278,53 +278,53 @@ function ModelIllustration({ type, className }: { type: IllustrationType; classN
 // ─── COMPLETE CATALOG: FREE & TOP MODELS FIRST (NO CLAUDE) ─────────────────
 
 const MODEL_CATALOG: ModelCardData[] = [
-    // 1. Amazon Nova Pro (AWS Bedrock Flagship Multimodal)
+    // 1. Flux Pro (Frontier High-Precision Intelligence)
     {
-        id: 'flux-nova-pro',
-        realName: 'Amazon Nova Pro',
-        provider: 'AWS Bedrock',
+        id: 'flux-pro',
+        realName: 'Flux Pro Neural Engine',
+        provider: 'Flux AI',
         modality: 'text',
-        label: 'Nova Pro',
-        description: 'Amazon Bedrock flagship multimodal intelligence with high speed reasoning, native vision, and fast document analysis.',
+        label: 'Flux Pro',
+        description: 'Frontier intelligence for schema architecture, data modeling, multi-table analysis, and strict JSON output.',
         contextWindow: '300,000 tokens',
         maxOutput: '8,192 tokens',
-        speedRating: 'Fast Multimodal',
+        speedRating: 'Frontier Reasoning',
         minTier: 'free',
         capabilities: ['multimodal', 'vision', 'tool-calling', 'json-mode', 'coding'],
-        aliases: ['nova-pro', 'amazon-nova-pro', 'amazon.nova-pro-v1:0'],
+        aliases: ['flux-pro', 'pro'],
         samplePrompt: 'Analyze this distributed system architecture and suggest failure recovery mechanisms.',
         bannerColor: '#7aa7e8', // Soft Sky Blue
         illustrationType: 'brain-head',
         badgeText: 'Flagship',
         workTags: ['Most capable', 'Research', 'Multi-day tasks', 'Coding']
     },
-    // 2. Amazon Nova Lite (AWS Bedrock High Velocity)
+    // 2. Flux Lite (High Velocity Intelligence)
     {
-        id: 'flux-nova-lite',
-        realName: 'Amazon Nova Lite',
-        provider: 'AWS Bedrock',
+        id: 'flux-lite',
+        realName: 'Flux Lite High-Velocity Engine',
+        provider: 'Flux AI',
         modality: 'text',
-        label: 'Nova Lite',
-        description: 'Ultra-fast multimodal reasoning, high-throughput interactive processing, and real-time generation on AWS Bedrock.',
+        label: 'Flux Lite',
+        description: 'Ultra-fast multimodal reasoning, high-throughput interactive processing, and real-time generation.',
         contextWindow: '300,000 tokens',
         maxOutput: '8,192 tokens',
         speedRating: 'Sub-200ms First Token',
         minTier: 'free',
         capabilities: ['hyper-fast', 'multimodal', 'chat', 'tool-calling'],
-        aliases: ['nova-lite', 'amazon-nova-lite', 'amazon.nova-lite-v1:0'],
+        aliases: ['flux-lite', 'lite'],
         samplePrompt: 'Summarize the core benefits of edge caching over origin database read replicas.',
         bannerColor: '#f08c73', // Warm Coral / Peach
         illustrationType: 'cursor-node',
         badgeText: 'Fastest',
         workTags: ['Complex projects', 'Agents', 'Interactive UX']
     },
-    // 3. GLM-4 Flash (Default Workhorse)
+    // 3. Flux Standard (Default Workhorse)
     {
         id: 'flux',
-        realName: 'Zhipu AI GLM-4 Flash',
-        provider: 'Zhipu AI',
+        realName: 'Flux Standard Engine',
+        provider: 'Flux AI',
         modality: 'text',
-        label: 'GLM-4 Flash',
+        label: 'Flux Standard',
         description: 'High-accuracy general reasoning, precision SQL query generation, and conversational code intelligence.',
         contextWindow: '128,000 tokens',
         maxOutput: '4,096 tokens',
@@ -338,33 +338,33 @@ const MODEL_CATALOG: ModelCardData[] = [
         badgeText: 'Top Free',
         workTags: ['Everyday tasks', 'Writing', 'Cost-efficient', 'SQL']
     },
-    // 4. Amazon Nova Micro (AWS Bedrock Ultra-Low Latency)
+    // 4. Flux Micro (Ultra-Low Latency)
     {
-        id: 'flux-nova-micro',
-        realName: 'Amazon Nova Micro',
-        provider: 'AWS Bedrock',
+        id: 'flux-micro',
+        realName: 'Flux Micro Ultra-Low Latency',
+        provider: 'Flux AI',
         modality: 'text',
-        label: 'Nova Micro',
-        description: 'Lowest latency text intelligence on AWS Bedrock engineered for extreme throughput and real-time agents.',
+        label: 'Flux Micro',
+        description: 'Lowest latency text intelligence engineered for extreme throughput and real-time agents.',
         contextWindow: '128,000 tokens',
         maxOutput: '4,096 tokens',
         speedRating: 'Lowest Latency',
         minTier: 'free',
         capabilities: ['lowest-latency', 'high-throughput', 'agents', 'real-time'],
-        aliases: ['nova-micro', 'amazon-nova-micro', 'amazon.nova-micro-v1:0'],
+        aliases: ['flux-micro', 'micro'],
         samplePrompt: 'Validate and normalize this international telephone number string format.',
         bannerColor: '#96c8b0', // Mint / Soft Sage
         illustrationType: 'soaring-bird',
         badgeText: 'Lowest Cost',
         workTags: ['Fastest', 'Lowest cost', 'High volume']
     },
-    // 5. CogView-3 Flash (Fast AI Image Generation)
+    // 5. Flux Image Fast (Fast AI Image Generation)
     {
         id: 'flux-image-fast',
-        realName: 'Zhipu AI CogView 3 Flash',
-        provider: 'Zhipu AI',
+        realName: 'Flux Image Fast Engine',
+        provider: 'Flux AI',
         modality: 'image',
-        label: 'CogView-3 Flash',
+        label: 'Flux Image Fast',
         description: 'Ultra-fast low-latency image generation designed for user avatars, blog thumbnails, and rapid prototyping.',
         contextWindow: 'N/A (Image)',
         maxOutput: '1024x1024',
@@ -378,13 +378,13 @@ const MODEL_CATALOG: ModelCardData[] = [
         badgeText: 'Instant Gen',
         workTags: ['Image synthesis', 'Avatars', 'Rapid prototyping']
     },
-    // 6. CogView 3 Flash HD (High Definition Image Generation)
+    // 6. Flux Image (High Definition Image Generation)
     {
         id: 'flux-image',
-        realName: 'Zhipu AI CogView 3 Flash HD',
-        provider: 'Zhipu AI',
+        realName: 'Flux Image HD Engine',
+        provider: 'Flux AI',
         modality: 'image',
-        label: 'CogView 3 Flash HD',
+        label: 'Flux Image',
         description: 'High-quality photorealistic text-to-image synthesis with fast rendering and direct cloud asset delivery.',
         contextWindow: 'N/A (Image)',
         maxOutput: '1024x1024',
@@ -398,13 +398,13 @@ const MODEL_CATALOG: ModelCardData[] = [
         badgeText: 'HD Image',
         workTags: ['General illustration', 'Logos', 'S3 cloud storage']
     },
-    // 7. CogVideoX Flash (Fast AI Motion Video)
+    // 7. Flux Video (Fast AI Motion Video)
     {
         id: 'flux-video',
-        realName: 'Zhipu AI CogVideoX Flash',
-        provider: 'Zhipu AI',
+        realName: 'Flux Video Motion Engine',
+        provider: 'Flux AI',
         modality: 'video',
-        label: 'CogVideoX Flash',
+        label: 'Flux Video',
         description: 'Text-to-video generation with dynamic lighting and camera pans. Dispatched via asynchronous task IDs.',
         contextWindow: 'N/A (Video)',
         maxOutput: '720p MP4 (5-10s)',
@@ -418,13 +418,13 @@ const MODEL_CATALOG: ModelCardData[] = [
         badgeText: 'AI Video',
         workTags: ['Video generation', 'Dynamic motion', 'Camera pans']
     },
-    // 8. Amazon Titan Embeddings V2 (AWS Bedrock RAG)
+    // 8. Flux Embed (Vector Embeddings)
     {
         id: 'flux-embed',
-        realName: 'Amazon Titan Embeddings V2',
-        provider: 'AWS Bedrock',
+        realName: 'Flux Dense Vector Embeddings',
+        provider: 'Flux AI',
         modality: 'embedding',
-        label: 'Titan Embeddings V2',
+        label: 'Flux Embed',
         description: '1024-dimensional dense vector embeddings with flexible output dimensions for semantic search and RAG retrieval.',
         contextWindow: '8,192 tokens',
         maxOutput: '1024-dim Vector Float[]',
@@ -438,13 +438,13 @@ const MODEL_CATALOG: ModelCardData[] = [
         badgeText: 'Vector RAG',
         workTags: ['Semantic search', 'RAG retrieval', 'Vector index']
     },
-    // 9. GLM-4V Multimodal (Vision & OCR)
+    // 9. Flux Vision (Vision & OCR)
     {
         id: 'flux-vision',
-        realName: 'Zhipu AI GLM-4V Multimodal',
-        provider: 'Zhipu AI',
+        realName: 'Flux Vision OCR Engine',
+        provider: 'Flux AI',
         modality: 'text',
-        label: 'GLM-4V Vision',
+        label: 'Flux Vision',
         description: 'High-speed visual comprehension, diagram recognition, screenshot-to-code, and receipt inspection.',
         contextWindow: '128,000 tokens',
         maxOutput: '4,096 tokens',
@@ -457,13 +457,13 @@ const MODEL_CATALOG: ModelCardData[] = [
         badgeText: 'Vision OCR',
         workTags: ['Visual inspection', 'Diagram analysis', 'OCR']
     },
-    // 10. GLM-4 Flash (Turbo UX)
+    // 10. Flux Flash (Turbo UX)
     {
         id: 'flux-flash',
-        realName: 'Zhipu AI GLM-4 Flash (Turbo UX)',
-        provider: 'Zhipu AI',
+        realName: 'Flux Flash Turbo UX',
+        provider: 'Flux AI',
         modality: 'text',
-        label: 'GLM Flash Turbo',
+        label: 'Flux Flash',
         description: 'Sub-100ms token throughput optimized for code autocomplete, real-time streaming, and interactive widgets.',
         contextWindow: '128,000 tokens',
         maxOutput: '4,096 tokens',
@@ -477,14 +477,14 @@ const MODEL_CATALOG: ModelCardData[] = [
         badgeText: 'Sub-100ms',
         workTags: ['Autocomplete', 'Real-time UX', 'Streaming']
     },
-    // 11. Amazon Nova Pro Agentic (Frontier Agent)
+    // 11. Flux 5.2 (Frontier Agent)
     {
         id: 'flux-5.2',
-        realName: 'Amazon Nova Pro (Agentic Architecture)',
-        provider: 'AWS Bedrock',
+        realName: 'Flux 5.2 Agentic Reasoning Engine',
+        provider: 'Flux AI',
         modality: 'text',
-        label: 'Nova Pro Agentic',
-        description: 'Specialized reasoning architecture engineered for multi-step agentic tool execution and recursive problem solving powered by Amazon Nova Pro.',
+        label: 'Flux 5.2',
+        description: 'Specialized reasoning architecture engineered for multi-step agentic tool execution and recursive problem solving.',
         contextWindow: '300,000 tokens',
         maxOutput: '8,192 tokens',
         speedRating: 'Fast Agentic',
@@ -495,36 +495,16 @@ const MODEL_CATALOG: ModelCardData[] = [
         bannerColor: '#a7b8e8',
         illustrationType: 'cursor-node',
         badgeText: 'Agentic',
-        workTags: ['Recursive reasoning', 'Multi-tool', 'Workflows', 'AWS Bedrock']
+        workTags: ['Recursive reasoning', 'Multi-tool', 'Workflows', 'Autonomous']
     },
-    // 12. Amazon Nova Pro Analysis (Strict JSON & Analysis)
-    {
-        id: 'flux-pro',
-        realName: 'Amazon Nova Pro (Strict JSON & Analysis)',
-        provider: 'AWS Bedrock',
-        modality: 'text',
-        label: 'Nova Pro Analysis',
-        description: 'High-precision schema architecture, multi-table analytical queries, and strict JSON Schema output powered by Amazon Nova Pro on AWS Bedrock.',
-        contextWindow: '300,000 tokens',
-        maxOutput: '8,192 tokens',
-        speedRating: 'Reliable Enterprise',
-        minTier: 'free',
-        capabilities: ['strict-json', 'data-modeling', 'bi-analysis', 'coding'],
-        aliases: ['flux-pro'],
-        samplePrompt: 'Generate a JSON Schema conforming API response model for a payment transaction.',
-        bannerColor: '#e8b394',
-        illustrationType: 'cluster-burst',
-        badgeText: 'Strict JSON',
-        workTags: ['Schema modeling', 'Structured JSON', 'BI Queries', 'AWS Bedrock']
-    },
-    // 13. Amazon Nova Pro Ultra (Deep Reasoning)
+    // 12. Flux Ultra (Deep Reasoning)
     {
         id: 'flux-ultra',
-        realName: 'Amazon Nova Pro (Deep Cognitive Reasoning)',
-        provider: 'AWS Bedrock',
+        realName: 'Flux Ultra Deep Cognitive Engine',
+        provider: 'Flux AI',
         modality: 'text',
-        label: 'Nova Pro Ultra',
-        description: 'Maximum cognitive depth for database architectural blueprints, complex migrations, and audit trails powered by Amazon Nova Pro on AWS Bedrock.',
+        label: 'Flux Ultra',
+        description: 'Maximum cognitive depth for database architectural blueprints, complex migrations, and audit trails.',
         contextWindow: '300,000 tokens',
         maxOutput: '8,192 tokens',
         speedRating: 'Deep Analysis',
@@ -535,16 +515,16 @@ const MODEL_CATALOG: ModelCardData[] = [
         bannerColor: '#d1b0ea',
         illustrationType: 'brain-head',
         badgeText: 'Deep Thought',
-        workTags: ['Architecture blueprints', 'Security audits', 'Migrations', 'AWS Bedrock']
+        workTags: ['Architecture blueprints', 'Security audits', 'Migrations', 'Deep analysis']
     },
-    // 14. CogVideoX Flash (Motion Video)
+    // 13. Flux Video Pro (Motion Video)
     {
         id: 'flux-video-pro',
-        realName: 'Zhipu AI CogVideoX Flash (Motion Pro)',
-        provider: 'Zhipu AI',
+        realName: 'Flux Video Motion Pro Engine',
+        provider: 'Flux AI',
         modality: 'video',
-        label: 'CogVideoX Motion',
-        description: 'Cinematic dynamic video generation with high fidelity, rich motion dynamics, and crisp textures powered by CogVideoX Flash.',
+        label: 'Flux Video Pro',
+        description: 'Cinematic dynamic video generation with high fidelity, rich motion dynamics, and crisp textures.',
         contextWindow: 'N/A (Video)',
         maxOutput: '720p HD MP4',
         speedRating: 'Fast Async Video',
@@ -557,14 +537,74 @@ const MODEL_CATALOG: ModelCardData[] = [
         badgeText: 'Motion Pro',
         workTags: ['Dynamic motion', 'Macro motion', 'Free Tier']
     },
-    // 15. OpenAI GPT-4o Drop-in Alias (Served by Amazon Nova Pro)
+    // 14. Flux Turbo (Hyper-Speed)
+    {
+        id: 'flux-turbo',
+        realName: 'Flux Turbo Hyper-Speed Engine',
+        provider: 'Flux AI',
+        modality: 'text',
+        label: 'Flux Turbo',
+        description: 'Hyper-speed 300+ tokens/second inference engine for high-velocity streaming and low-latency interaction.',
+        contextWindow: '128,000 tokens',
+        maxOutput: '8,192 tokens',
+        speedRating: '300+ TPS',
+        minTier: 'free',
+        capabilities: ['hyper-speed', 'low-latency', 'chat', 'fast'],
+        aliases: ['flux-turbo'],
+        samplePrompt: 'Write a fast debounce implementation in TypeScript.',
+        bannerColor: '#f7c28b',
+        illustrationType: 'cursor-node',
+        badgeText: '300+ TPS',
+        workTags: ['Hyper-speed', '300+ TPS', 'Low latency']
+    },
+    // 15. Flux Omni (Multimodal Intelligence)
+    {
+        id: 'flux-omni',
+        realName: 'Flux Omni Multimodal Engine',
+        provider: 'Flux AI',
+        modality: 'text',
+        label: 'Flux Omni',
+        description: 'Massive context window, multimodal vision understanding, and high-velocity document comprehension.',
+        contextWindow: '300,000 tokens',
+        maxOutput: '8,192 tokens',
+        speedRating: 'Multimodal',
+        minTier: 'free',
+        capabilities: ['multimodal', 'vision', 'documents', 'chat'],
+        aliases: ['flux-omni'],
+        samplePrompt: 'Analyze this architecture diagram and explain the data flow.',
+        bannerColor: '#8ecae6',
+        illustrationType: 'vision-eye',
+        badgeText: 'Multimodal',
+        workTags: ['Multimodal', 'Vision', 'Documents', 'Fast']
+    },
+    // 16. Flux Max (Flagship Intelligence)
+    {
+        id: 'flux-max',
+        realName: 'Flux Max Flagship Engine',
+        provider: 'Flux AI',
+        modality: 'text',
+        label: 'Flux Max',
+        description: 'Flagship reasoning, robust coding benchmarks, and advanced instruction following.',
+        contextWindow: '300,000 tokens',
+        maxOutput: '8,192 tokens',
+        speedRating: 'Flagship',
+        minTier: 'free',
+        capabilities: ['flagship', 'coding', 'reasoning', 'instruction-following'],
+        aliases: ['flux-max'],
+        samplePrompt: 'Refactor this database connection pool for optimal concurrency and zero leaks.',
+        bannerColor: '#ffb703',
+        illustrationType: 'brain-head',
+        badgeText: 'Flagship',
+        workTags: ['Flagship reasoning', 'Coding benchmarks', 'Instruction following']
+    },
+    // 17. OpenAI GPT-4o Drop-in Alias
     {
         id: 'gpt-4o',
-        realName: 'OpenAI GPT-4o Drop-in (Amazon Nova Pro)',
-        provider: 'AWS Bedrock',
+        realName: 'Flux Drop-in Compatibility Engine',
+        provider: 'Flux AI',
         modality: 'text',
         label: 'GPT-4o Drop-in',
-        description: 'OpenAI compatibility alias. Transparently served by Amazon Nova Pro on AWS Bedrock with zero code modifications.',
+        description: 'OpenAI compatibility alias. Transparently served by the Flux Neural Engine with zero code modifications.',
         contextWindow: '300,000 tokens',
         maxOutput: '8,192 tokens',
         speedRating: 'Flagship Drop-in',
@@ -577,14 +617,14 @@ const MODEL_CATALOG: ModelCardData[] = [
         badgeText: 'Drop-In',
         workTags: ['Drop-in OpenAI', 'Zero config', 'Compatibility']
     },
-    // 16. OpenAI GPT-4o Mini Drop-in Alias (Served by Amazon Nova Lite)
+    // 18. OpenAI GPT-4o Mini Drop-in Alias
     {
         id: 'gpt-4o-mini',
-        realName: 'OpenAI GPT-4o Mini Drop-in (Amazon Nova Lite)',
-        provider: 'AWS Bedrock',
+        realName: 'Flux Mini Compatibility Engine',
+        provider: 'Flux AI',
         modality: 'text',
         label: 'GPT-4o Mini Drop-in',
-        description: 'OpenAI compatibility alias. Transparently served by Amazon Nova Lite on AWS Bedrock at sub-200ms velocity.',
+        description: 'OpenAI compatibility alias. Transparently served by Flux Lite at sub-200ms velocity.',
         contextWindow: '300,000 tokens',
         maxOutput: '8,192 tokens',
         speedRating: 'Sub-200ms Drop-in',
@@ -1482,8 +1522,8 @@ main();`;
 
                 {/* Provider Filter Row */}
                 <div className="flex items-center gap-2 flex-wrap text-xs">
-                    <span className="text-muted-foreground font-medium text-xs">Provider:</span>
-                    {['all', 'AWS Bedrock', 'Stability AI', 'Luma AI', 'OpenAI', 'Google Gemini', 'Groq / Meta', 'Zhipu AI'].map(p => (
+                    <span className="text-muted-foreground font-medium text-xs">Engine:</span>
+                    {['all', 'Flux AI'].map(p => (
                         <button
                             key={p}
                             onClick={() => setSelectedProvider(p)}
@@ -1493,7 +1533,7 @@ main();`;
                                     : 'bg-transparent text-muted-foreground hover:text-foreground border-border/50'
                             }`}
                         >
-                            {p === 'all' ? 'All Providers' : p}
+                            {p === 'all' ? 'All Models' : 'Flux Proprietary'}
                         </button>
                     ))}
                 </div>

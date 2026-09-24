@@ -43,60 +43,60 @@ export interface ModelGatewayResult {
 
 // Model alias mapper
 export const MODEL_CATALOG: Record<string, { provider: 'glm' | 'groq' | 'gemini' | 'openai' | 'bedrock'; upstreamModel: string; label: string; description: string }> = {
-  // Flux Nova Pro (Amazon Bedrock Flagship Multimodal Intelligence)
-  'flux-nova-pro': { provider: 'bedrock', upstreamModel: 'amazon.nova-pro-v1:0', label: 'Flux Nova Pro', description: 'Flagship multimodal reasoning, vision, and coding powered by Amazon Nova Pro on AWS Bedrock' },
-  'nova-pro': { provider: 'bedrock', upstreamModel: 'amazon.nova-pro-v1:0', label: 'Flux Nova Pro', description: 'Flagship multimodal reasoning, vision, and coding powered by Amazon Nova Pro on AWS Bedrock' },
-  'amazon.nova-pro-v1:0': { provider: 'bedrock', upstreamModel: 'amazon.nova-pro-v1:0', label: 'Flux Nova Pro', description: 'Amazon Nova Pro' },
+  // Flux Pro (Frontier High-Precision Intelligence)
+  'flux-pro': { provider: 'bedrock', upstreamModel: 'amazon.nova-pro-v1:0', label: 'Flux Pro', description: 'Frontier intelligence for schema architecture, data modeling, and BI analysis' },
+  'flux-nova-pro': { provider: 'bedrock', upstreamModel: 'amazon.nova-pro-v1:0', label: 'Flux Pro', description: 'Frontier intelligence for schema architecture, data modeling, and BI analysis' },
+  'nova-pro': { provider: 'bedrock', upstreamModel: 'amazon.nova-pro-v1:0', label: 'Flux Pro', description: 'Frontier intelligence for schema architecture, data modeling, and BI analysis' },
+  'amazon.nova-pro-v1:0': { provider: 'bedrock', upstreamModel: 'amazon.nova-pro-v1:0', label: 'Flux Pro', description: 'Frontier intelligence for schema architecture, data modeling, and BI analysis' },
 
-  // Flux Nova Lite (Amazon Bedrock High-Velocity Multimodal)
-  'flux-nova-lite': { provider: 'bedrock', upstreamModel: 'amazon.nova-lite-v1:0', label: 'Flux Nova Lite', description: 'Ultra-fast multimodal reasoning and interactive processing on AWS Bedrock' },
-  'nova-lite': { provider: 'bedrock', upstreamModel: 'amazon.nova-lite-v1:0', label: 'Flux Nova Lite', description: 'Ultra-fast multimodal reasoning and interactive processing on AWS Bedrock' },
-  'amazon.nova-lite-v1:0': { provider: 'bedrock', upstreamModel: 'amazon.nova-lite-v1:0', label: 'Flux Nova Lite', description: 'Amazon Nova Lite' },
+  // Flux Lite (High-Velocity Multimodal Intelligence)
+  'flux-lite': { provider: 'bedrock', upstreamModel: 'amazon.nova-lite-v1:0', label: 'Flux Lite', description: 'High-velocity multimodal reasoning and sub-200ms interactive processing' },
+  'flux-nova-lite': { provider: 'bedrock', upstreamModel: 'amazon.nova-lite-v1:0', label: 'Flux Lite', description: 'High-velocity multimodal reasoning and sub-200ms interactive processing' },
+  'nova-lite': { provider: 'bedrock', upstreamModel: 'amazon.nova-lite-v1:0', label: 'Flux Lite', description: 'High-velocity multimodal reasoning and sub-200ms interactive processing' },
+  'amazon.nova-lite-v1:0': { provider: 'bedrock', upstreamModel: 'amazon.nova-lite-v1:0', label: 'Flux Lite', description: 'High-velocity multimodal reasoning and sub-200ms interactive processing' },
 
-  // Flux Nova Micro (Amazon Bedrock Ultra-Low Latency Text)
-  'flux-nova-micro': { provider: 'bedrock', upstreamModel: 'amazon.nova-micro-v1:0', label: 'Flux Nova Micro', description: 'Lowest latency text intelligence engineered for extreme throughput on AWS Bedrock' },
-  'nova-micro': { provider: 'bedrock', upstreamModel: 'amazon.nova-micro-v1:0', label: 'Flux Nova Micro', description: 'Lowest latency text intelligence engineered for extreme throughput on AWS Bedrock' },
-  'amazon.nova-micro-v1:0': { provider: 'bedrock', upstreamModel: 'amazon.nova-micro-v1:0', label: 'Flux Nova Micro', description: 'Amazon Nova Micro' },
+  // Flux Micro (Ultra-Low Latency Text Intelligence)
+  'flux-micro': { provider: 'bedrock', upstreamModel: 'amazon.nova-micro-v1:0', label: 'Flux Micro', description: 'Lowest latency text intelligence engineered for extreme throughput' },
+  'flux-nova-micro': { provider: 'bedrock', upstreamModel: 'amazon.nova-micro-v1:0', label: 'Flux Micro', description: 'Lowest latency text intelligence engineered for extreme throughput' },
+  'nova-micro': { provider: 'bedrock', upstreamModel: 'amazon.nova-micro-v1:0', label: 'Flux Micro', description: 'Lowest latency text intelligence engineered for extreme throughput' },
+  'amazon.nova-micro-v1:0': { provider: 'bedrock', upstreamModel: 'amazon.nova-micro-v1:0', label: 'Flux Micro', description: 'Lowest latency text intelligence engineered for extreme throughput' },
 
-  // Legacy mappings smoothly redirected to Nova Pro
-  'flux-sonnet': { provider: 'bedrock', upstreamModel: 'amazon.nova-pro-v1:0', label: 'Flux Nova Pro', description: 'Mapped to Amazon Nova Pro on AWS Bedrock' },
-  'flux-pro-max': { provider: 'bedrock', upstreamModel: 'amazon.nova-pro-v1:0', label: 'Flux Nova Pro', description: 'Mapped to Amazon Nova Pro on AWS Bedrock' },
+  // Legacy mappings smoothly redirected to Flux Pro
+  'flux-sonnet': { provider: 'bedrock', upstreamModel: 'amazon.nova-pro-v1:0', label: 'Flux Pro', description: 'High-precision schema architecture and BI analysis' },
+  'flux-pro-max': { provider: 'bedrock', upstreamModel: 'amazon.nova-pro-v1:0', label: 'Flux Pro', description: 'High-precision schema architecture and BI analysis' },
 
   // Flux Fast Tier (Default - Ultra Fast & Cost-Free)
-  'flux-fast': { provider: 'glm', upstreamModel: 'glm-4-flash', label: 'Flux Fast', description: 'Ultra-fast general reasoning & SQL' },
-  'flux': { provider: 'glm', upstreamModel: 'glm-4-flash', label: 'Flux Fast', description: 'Ultra-fast general reasoning & SQL' },
-  'glm': { provider: 'glm', upstreamModel: 'glm-4-flash', label: 'Flux Fast', description: 'Ultra-fast general reasoning & SQL' },
-  'glm-4-flash': { provider: 'glm', upstreamModel: 'glm-4-flash', label: 'Flux Fast', description: 'Ultra-fast general reasoning & SQL' },
+  'flux-fast': { provider: 'glm', upstreamModel: 'glm-4-flash', label: 'Flux Fast', description: 'Ultra-fast general reasoning and high-throughput SQL generation' },
+  'flux': { provider: 'glm', upstreamModel: 'glm-4-flash', label: 'Flux Fast', description: 'Ultra-fast general reasoning and high-throughput SQL generation' },
+  'glm': { provider: 'glm', upstreamModel: 'glm-4-flash', label: 'Flux Fast', description: 'Ultra-fast general reasoning and high-throughput SQL generation' },
+  'glm-4-flash': { provider: 'glm', upstreamModel: 'glm-4-flash', label: 'Flux Fast', description: 'Ultra-fast general reasoning and high-throughput SQL generation' },
 
-  // Flux Pro Tier (Balanced deep reasoning via Bedrock Nova Pro)
-  'flux-pro': { provider: 'bedrock', upstreamModel: 'amazon.nova-pro-v1:0', label: 'Flux Pro', description: 'High precision schema & BI analysis powered by Amazon Nova Pro' },
-  'glm-4-air': { provider: 'bedrock', upstreamModel: 'amazon.nova-pro-v1:0', label: 'Flux Pro', description: 'High precision schema & BI analysis powered by Amazon Nova Pro' },
-
-  // Flux Ultra Tier (Deep reasoning & complex migrations via Bedrock Nova Pro)
-  'flux-ultra': { provider: 'bedrock', upstreamModel: 'amazon.nova-pro-v1:0', label: 'Flux Ultra', description: 'Maximum intelligence for complex databases powered by Amazon Nova Pro' },
-  'glm-4-plus': { provider: 'bedrock', upstreamModel: 'amazon.nova-pro-v1:0', label: 'Flux Ultra', description: 'Maximum intelligence for complex databases powered by Amazon Nova Pro' },
-  'glm-5.2': { provider: 'bedrock', upstreamModel: 'amazon.nova-pro-v1:0', label: 'Flux Ultra', description: 'Maximum intelligence for complex databases powered by Amazon Nova Pro' },
-  'flux-5.2': { provider: 'bedrock', upstreamModel: 'amazon.nova-pro-v1:0', label: 'Flux 5.2', description: 'Next-generation reasoning architecture powered by Amazon Nova Pro' },
+  // Flux Ultra Tier (Deep reasoning & complex migrations)
+  'flux-ultra': { provider: 'bedrock', upstreamModel: 'amazon.nova-pro-v1:0', label: 'Flux Ultra', description: 'Maximum intelligence for deep reasoning and complex migrations' },
+  'glm-4-air': { provider: 'bedrock', upstreamModel: 'amazon.nova-pro-v1:0', label: 'Flux Pro', description: 'High-precision schema architecture and BI analysis' },
+  'glm-4-plus': { provider: 'bedrock', upstreamModel: 'amazon.nova-pro-v1:0', label: 'Flux Ultra', description: 'Maximum intelligence for complex database architecture' },
+  'glm-5.2': { provider: 'bedrock', upstreamModel: 'amazon.nova-pro-v1:0', label: 'Flux Ultra', description: 'Maximum intelligence for complex database architecture' },
+  'flux-5.2': { provider: 'bedrock', upstreamModel: 'amazon.nova-pro-v1:0', label: 'Flux 5.2', description: 'Next-generation reasoning architecture specialized in agentic execution' },
 
   // Flux Turbo Tier (Hyper-speed 300+ tokens/sec)
-  'flux-turbo': { provider: 'groq', upstreamModel: 'llama-3.3-70b-versatile', label: 'Flux Turbo', description: 'Hyper-speed 300 tps inference' },
-  'groq': { provider: 'groq', upstreamModel: 'llama-3.3-70b-versatile', label: 'Flux Turbo', description: 'Hyper-speed 300 tps inference' },
-  'groq-llama': { provider: 'groq', upstreamModel: 'llama-3.3-70b-versatile', label: 'Flux Turbo', description: 'Hyper-speed 300 tps inference' },
+  'flux-turbo': { provider: 'groq', upstreamModel: 'llama-3.3-70b-versatile', label: 'Flux Turbo', description: 'Hyper-speed 300+ tokens/sec inference engine' },
+  'groq': { provider: 'groq', upstreamModel: 'llama-3.3-70b-versatile', label: 'Flux Turbo', description: 'Hyper-speed 300+ tokens/sec inference engine' },
+  'groq-llama': { provider: 'groq', upstreamModel: 'llama-3.3-70b-versatile', label: 'Flux Turbo', description: 'Hyper-speed 300+ tokens/sec inference engine' },
 
-  // Flux Omni Tier (Multimodal Agentic AI)
-  'flux-omni': { provider: 'gemini', upstreamModel: 'gemini-2.0-flash', label: 'Flux Omni', description: 'Multimodal Agentic AI' },
-  'flux-vision': { provider: 'glm', upstreamModel: 'glm-4v-flash', label: 'Flux Vision', description: 'Multimodal Vision' },
-  'gemini': { provider: 'gemini', upstreamModel: 'gemini-2.0-flash', label: 'Flux Omni', description: 'Multimodal Agentic AI' },
-  'gemini-2.0-flash': { provider: 'gemini', upstreamModel: 'gemini-2.0-flash', label: 'Flux Omni', description: 'Multimodal Agentic AI' },
-  'gemini-1.5-flash': { provider: 'gemini', upstreamModel: 'gemini-1.5-flash', label: 'Flux Omni', description: 'Multimodal Agentic AI' },
-  'glm-4v-flash': { provider: 'glm', upstreamModel: 'glm-4v-flash', label: 'Flux Vision', description: 'Multimodal Vision' },
-  'glm-4v': { provider: 'glm', upstreamModel: 'glm-4v-flash', label: 'Flux Vision', description: 'Multimodal Vision' },
+  // Flux Omni Tier (Multimodal Vision)
+  'flux-omni': { provider: 'gemini', upstreamModel: 'gemini-2.0-flash', label: 'Flux Omni', description: 'Multimodal vision and document comprehension' },
+  'flux-vision': { provider: 'glm', upstreamModel: 'glm-4v-flash', label: 'Flux Vision', description: 'Multimodal vision and diagram comprehension' },
+  'gemini': { provider: 'gemini', upstreamModel: 'gemini-2.0-flash', label: 'Flux Omni', description: 'Multimodal vision and document comprehension' },
+  'gemini-2.0-flash': { provider: 'gemini', upstreamModel: 'gemini-2.0-flash', label: 'Flux Omni', description: 'Multimodal vision and document comprehension' },
+  'gemini-1.5-flash': { provider: 'gemini', upstreamModel: 'gemini-1.5-flash', label: 'Flux Omni', description: 'Multimodal vision and document comprehension' },
+  'glm-4v-flash': { provider: 'glm', upstreamModel: 'glm-4v-flash', label: 'Flux Vision', description: 'Multimodal vision and diagram comprehension' },
+  'glm-4v': { provider: 'glm', upstreamModel: 'glm-4v-flash', label: 'Flux Vision', description: 'Multimodal vision and diagram comprehension' },
 
   // Flux Max Tier (Flagship Intelligence)
-  'flux-max': { provider: 'openai', upstreamModel: 'gpt-4o-mini', label: 'Flux Max', description: 'Flagship Intelligence' },
-  'openai': { provider: 'openai', upstreamModel: 'gpt-4o-mini', label: 'Flux Max', description: 'Flagship Intelligence' },
-  'gpt-4o-mini': { provider: 'openai', upstreamModel: 'gpt-4o-mini', label: 'Flux Max', description: 'Flagship Intelligence' },
-  'gpt-4o': { provider: 'openai', upstreamModel: 'gpt-4o', label: 'Flux Max', description: 'Flagship Intelligence' }
+  'flux-max': { provider: 'openai', upstreamModel: 'gpt-4o-mini', label: 'Flux Max', description: 'Flagship reasoning and robust coding benchmarks' },
+  'openai': { provider: 'openai', upstreamModel: 'gpt-4o-mini', label: 'Flux Max', description: 'Flagship reasoning and robust coding benchmarks' },
+  'gpt-4o-mini': { provider: 'openai', upstreamModel: 'gpt-4o-mini', label: 'Flux Max', description: 'Flagship reasoning and robust coding benchmarks' },
+  'gpt-4o': { provider: 'openai', upstreamModel: 'gpt-4o', label: 'Flux Max', description: 'Flagship reasoning and robust coding benchmarks' }
 };
 
 /**
@@ -158,7 +158,7 @@ export class ModelGateway {
       try {
         logger.info(`[ModelGateway] Attempting streaming tier: ${step.provider} (${step.upstreamModel})${hasMultimodal ? ' [multimodal]' : ''}`);
         const stream = await this.executeProviderStream(step.provider, step.upstreamModel, options);
-        return { stream, provider: step.provider, model: step.upstreamModel };
+        return { stream, provider: 'flux', model: options.model || requestedKey };
       } catch (err: any) {
         logger.warn(`[ModelGateway] Streaming tier ${step.provider} (${step.upstreamModel}) failed: ${err?.message || err}`);
         lastError = err;
@@ -277,7 +277,7 @@ export class ModelGateway {
         temperature: options.temperature,
         top_p: options.top_p,
         max_tokens: options.max_tokens,
-        outboundModelName: 'flux-pro-max',
+        outboundModelName: options.model || 'flux-pro',
         enableThinking: true,
         thinkingBudget: 2048,
       });
@@ -288,8 +288,8 @@ export class ModelGateway {
         output: null,
         tool_calls: [],
         usage: result.usage,
-        provider: 'bedrock',
-        model,
+        provider: 'flux',
+        model: options.model || 'flux-pro',
       };
     }
 
@@ -362,8 +362,8 @@ export class ModelGateway {
       output,
       tool_calls: toolCalls,
       usage: json.usage,
-      provider,
-      model
+      provider: 'flux',
+      model: options.model || 'flux-fast'
     };
   }
 
@@ -382,7 +382,7 @@ export class ModelGateway {
         temperature: options.temperature,
         top_p: options.top_p,
         max_tokens: options.max_tokens,
-        outboundModelName: 'flux-pro-max',
+        outboundModelName: options.model || 'flux-pro',
         enableThinking: true,
         thinkingBudget: 2048,
       });

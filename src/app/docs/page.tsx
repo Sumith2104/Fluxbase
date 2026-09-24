@@ -377,43 +377,42 @@ Content-Type: application/json`} />
                                     <thead>
                                         <tr className="bg-secondary border-b border-border text-xs uppercase tracking-wide text-muted-foreground/75">
                                             <th className="px-4 py-3">Modality</th>
-                                            <th className="px-4 py-3">Flux Gateway ID</th>
-                                            <th className="px-4 py-3">Real Upstream Model</th>
-                                            <th className="px-4 py-3">Provider</th>
+                                            <th className="px-4 py-3">Flux Model ID</th>
+                                            <th className="px-4 py-3">Engine Designation</th>
+                                            <th className="px-4 py-3">Architecture</th>
                                             <th className="px-4 py-3">Min Tier</th>
                                             <th className="px-4 py-3">Capabilities & Specs</th>
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-border/60">
                                         {[
-                                            { mod: 'Text / Chat', id: 'flux-nova-pro', real: 'Amazon Nova Pro', prov: 'AWS Bedrock', tier: 'Free', desc: 'Amazon flagship multimodal frontier intelligence with deep reasoning, native vision, and fast document analysis. 300k context.' },
-                                            { mod: 'Text / Chat', id: 'flux-nova-lite', real: 'Amazon Nova Lite', prov: 'AWS Bedrock', tier: 'Free', desc: 'Ultra-fast multimodal reasoning, high-throughput interactive processing, sub-200ms latency. 300k context.' },
-                                            { mod: 'Text / Chat', id: 'flux', real: 'GLM-4 Flash', prov: 'Zhipu AI', tier: 'Free', desc: 'Flagship default. High-accuracy general reasoning, precision SQL synthesis. 128k context.' },
-                                            { mod: 'Text / Chat', id: 'flux-nova-micro', real: 'Amazon Nova Micro', prov: 'AWS Bedrock', tier: 'Free', desc: 'Lowest latency text intelligence engineered for extreme throughput and real-time agents. 128k context.' },
-                                            { mod: 'Text / Chat', id: 'flux-turbo', real: 'LLaMA 3.3 70B Versatile', prov: 'Groq / Meta', tier: 'Free', desc: 'Hyper-speed 300+ tokens/second inference. Ideal for real-time agents. 128k context.' },
-                                            { mod: 'Text / Chat', id: 'flux-omni', real: 'Gemini 2.0 Flash', prov: 'Google Gemini', tier: 'Free', desc: 'Massive 1M token context window, multimodal vision understanding, high velocity.' },
-                                            { mod: 'Text / Chat', id: 'flux-max', real: 'GPT-4o Mini', prov: 'OpenAI', tier: 'Free', desc: 'Flagship coding, instruction following, and vision benchmarks. 128k context.' },
-                                            { mod: 'Text / Chat', id: 'flux-flash', real: 'GLM-4 Flash (Turbo UX)', prov: 'Zhipu AI', tier: 'Free', desc: 'Sub-100ms token throughput. Ideal for autocompletion, real-time UX, streaming.' },
-                                            { mod: 'Text / Chat', id: 'flux-5.2', real: 'GLM-4 Plus (Agentic)', prov: 'Zhipu AI', tier: 'Free', desc: 'Frontier reasoning architecture engineered for multi-step agentic execution.' },
-                                            { mod: 'Text / Chat', id: 'flux-pro', real: 'GLM-4 Air', prov: 'Zhipu AI', tier: 'Free', desc: 'Enhanced instruction following, multi-table analysis, strict JSON Schema formatting.' },
-                                            { mod: 'Text / Chat', id: 'flux-ultra', real: 'GLM-4 Plus (Deep Reasoning)', prov: 'Zhipu AI', tier: 'Free', desc: 'Maximum cognitive depth for database architectural blueprints and complex migrations.' },
-                                            { mod: 'Text / Chat', id: 'flux-vision', real: 'GLM-4V Multimodal', prov: 'Zhipu AI', tier: 'Free', desc: 'Visual schema comprehension, diagram recognition, screenshot-to-code.' },
-                                            { mod: 'Text / Chat', id: 'gpt-4o', real: 'GPT-4o Alias', prov: 'OpenAI', tier: 'Free', desc: 'OpenAI compatibility alias automatically mapped to flux-ultra.' },
-                                            { mod: 'Text / Chat', id: 'gpt-3.5-turbo', real: 'GPT-3.5 Turbo Alias', prov: 'OpenAI', tier: 'Free', desc: 'OpenAI compatibility alias automatically mapped to flux-flash.' },
-                                            { mod: 'Image Generation', id: 'flux-image-fast', real: 'CogView 3 Flash', prov: 'Zhipu AI', tier: 'Free', desc: 'Ultra-fast low-latency image generation for avatars and thumbnails.' },
-                                            { mod: 'Image Generation', id: 'flux-image-ultra', real: 'Stable Image Ultra 1.0', prov: 'AWS Bedrock', tier: 'Pro', desc: 'SOTA photorealism, typography rendering, and cinematic lighting with automatic S3 storage.' },
-                                            { mod: 'Image Generation', id: 'flux-image-hd', real: 'Imagen 3.0', prov: 'Google Gemini', tier: 'Free', desc: 'High-definition 4K image generation with superior detail and typography.' },
-                                            { mod: 'Image Generation', id: 'flux-image-pro', real: 'DALL·E 3', prov: 'OpenAI', tier: 'Pro', desc: 'Premium creative composition with prompt adherence and S3 storage.' },
-                                            { mod: 'Image Generation', id: 'flux-image', real: 'CogView 4', prov: 'Zhipu AI', tier: 'Free', desc: 'High-quality photorealistic text-to-image synthesis with automatic S3 cloud hosting.' },
-                                            { mod: 'Video Generation', id: 'flux-video', real: 'CogVideoX Flash', prov: 'Zhipu AI', tier: 'Free', desc: 'Text-to-video synthesis with dynamic motion and lighting (HTTP 202 async polling).' },
-                                            { mod: 'Video Generation', id: 'flux-video-ray', real: 'Luma Ray v2', prov: 'AWS Bedrock', tier: 'Pro', desc: 'Cinema-grade video generation with realistic physics and camera motion on AWS Bedrock.' },
-                                            { mod: 'Video Generation', id: 'flux-video-pro', real: 'CogVideoX HD', prov: 'Zhipu AI', tier: 'Max', desc: 'Cinematic 1080p high-fidelity video generation.' },
-                                            { mod: 'Speech-to-Text', id: 'flux-listen', real: 'Whisper Large v3 Turbo', prov: 'Groq / Meta', tier: 'Free', desc: '10x real-time multilingual transcription with timestamps on Groq LPUs.' },
-                                            { mod: 'Speech-to-Text', id: 'flux-listen-pro', real: 'Whisper Large v3', prov: 'Groq / Meta', tier: 'Free', desc: 'Maximum precision transcription for noisy, technical audio.' },
-                                            { mod: 'Speech-to-Text', id: 'flux-listen-en', real: 'Distil-Whisper Large v3 En', prov: 'Groq / Meta', tier: 'Free', desc: 'Lightweight, hyper-fast English-only speech recognition.' },
-                                            { mod: 'Text-to-Speech', id: 'flux-speak', real: 'TTS-1', prov: 'OpenAI', tier: 'Free', desc: 'Natural voice synthesis across 6 voices (alloy, echo, fable, onyx, nova, shimmer).' },
-                                            { mod: 'Text-to-Speech', id: 'flux-speak-hd', real: 'TTS-1 HD', prov: 'OpenAI', tier: 'Pro', desc: 'Studio-grade high-definition audio synthesis for production voiceovers.' },
-                                            { mod: 'Embeddings', id: 'flux-embed', real: 'Titan Embeddings V2', prov: 'AWS Bedrock', tier: 'Free', desc: '1024-dimensional dense vector embeddings for semantic search and RAG.' },
+                                            { mod: 'Text / Chat', id: 'flux-pro', real: 'Flux Pro', prov: 'Flux Neural Cloud', tier: 'Free', desc: 'Frontier multimodal intelligence with deep reasoning, native vision, and fast document analysis. 300k context.' },
+                                            { mod: 'Text / Chat', id: 'flux-lite', real: 'Flux Lite', prov: 'Flux Neural Cloud', tier: 'Free', desc: 'Ultra-fast multimodal reasoning, high-throughput interactive processing, sub-200ms latency. 300k context.' },
+                                            { mod: 'Text / Chat', id: 'flux', real: 'Flux Standard', prov: 'Flux Neural Cloud', tier: 'Free', desc: 'Flagship default. High-accuracy general reasoning, precision SQL synthesis. 128k context.' },
+                                            { mod: 'Text / Chat', id: 'flux-micro', real: 'Flux Micro', prov: 'Flux Neural Cloud', tier: 'Free', desc: 'Lowest latency text intelligence engineered for extreme throughput and real-time agents. 128k context.' },
+                                            { mod: 'Text / Chat', id: 'flux-turbo', real: 'Flux Turbo', prov: 'Flux Neural Cloud', tier: 'Free', desc: 'Hyper-speed 300+ tokens/second inference. Ideal for real-time agents. 128k context.' },
+                                            { mod: 'Text / Chat', id: 'flux-omni', real: 'Flux Omni', prov: 'Flux Neural Cloud', tier: 'Free', desc: 'Massive context window, multimodal vision understanding, high velocity. 300k context.' },
+                                            { mod: 'Text / Chat', id: 'flux-max', real: 'Flux Max', prov: 'Flux Neural Cloud', tier: 'Free', desc: 'Flagship coding, instruction following, and vision benchmarks. 300k context.' },
+                                            { mod: 'Text / Chat', id: 'flux-flash', real: 'Flux Flash', prov: 'Flux Neural Cloud', tier: 'Free', desc: 'Sub-100ms token throughput. Ideal for autocompletion, real-time UX, streaming. 128k context.' },
+                                            { mod: 'Text / Chat', id: 'flux-5.2', real: 'Flux 5.2', prov: 'Flux Neural Cloud', tier: 'Free', desc: 'Frontier reasoning architecture engineered for multi-step agentic execution. 300k context.' },
+                                            { mod: 'Text / Chat', id: 'flux-ultra', real: 'Flux Ultra', prov: 'Flux Neural Cloud', tier: 'Free', desc: 'Maximum cognitive depth for database architectural blueprints and complex migrations. 300k context.' },
+                                            { mod: 'Text / Chat', id: 'flux-vision', real: 'Flux Vision', prov: 'Flux Neural Cloud', tier: 'Free', desc: 'Visual schema comprehension, diagram recognition, screenshot-to-code. 128k context.' },
+                                            { mod: 'Text / Chat', id: 'gpt-4o', real: 'Flux Drop-in', prov: 'Flux Neural Cloud', tier: 'Free', desc: 'OpenAI compatibility drop-in alias automatically mapped to flux-pro.' },
+                                            { mod: 'Text / Chat', id: 'gpt-3.5-turbo', real: 'Flux Drop-in Mini', prov: 'Flux Neural Cloud', tier: 'Free', desc: 'OpenAI compatibility drop-in alias automatically mapped to flux-lite.' },
+                                            { mod: 'Image Generation', id: 'flux-image-fast', real: 'Flux Image Fast', prov: 'Flux Neural Cloud', tier: 'Free', desc: 'Ultra-fast low-latency image generation for avatars and thumbnails.' },
+                                            { mod: 'Image Generation', id: 'flux-image-ultra', real: 'Flux Image Ultra', prov: 'Flux Neural Cloud', tier: 'Pro', desc: 'SOTA photorealism, typography rendering, and cinematic lighting with automatic S3 storage.' },
+                                            { mod: 'Image Generation', id: 'flux-image-hd', real: 'Flux Image HD', prov: 'Flux Neural Cloud', tier: 'Free', desc: 'High-definition image generation with superior detail and typography.' },
+                                            { mod: 'Image Generation', id: 'flux-image-pro', real: 'Flux Image Pro', prov: 'Flux Neural Cloud', tier: 'Pro', desc: 'Premium creative composition with prompt adherence and S3 storage.' },
+                                            { mod: 'Image Generation', id: 'flux-image', real: 'Flux Image', prov: 'Flux Neural Cloud', tier: 'Free', desc: 'High-quality photorealistic text-to-image synthesis with automatic S3 cloud hosting.' },
+                                            { mod: 'Video Generation', id: 'flux-video', real: 'Flux Video', prov: 'Flux Neural Cloud', tier: 'Free', desc: 'Text-to-video synthesis with dynamic motion and lighting (HTTP 202 async polling).' },
+                                            { mod: 'Video Generation', id: 'flux-video-ray', real: 'Flux Video Ray', prov: 'Flux Neural Cloud', tier: 'Pro', desc: 'Cinema-grade video generation with realistic physics and camera motion.' },
+                                            { mod: 'Video Generation', id: 'flux-video-pro', real: 'Flux Video Pro', prov: 'Flux Neural Cloud', tier: 'Max', desc: 'Cinematic high-fidelity video generation with rich motion dynamics.' },
+                                            { mod: 'Speech-to-Text', id: 'flux-listen', real: 'Flux Listen', prov: 'Flux Neural Cloud', tier: 'Free', desc: 'Real-time multilingual transcription with timestamps.' },
+                                            { mod: 'Speech-to-Text', id: 'flux-listen-pro', real: 'Flux Listen Pro', prov: 'Flux Neural Cloud', tier: 'Free', desc: 'Maximum precision transcription for noisy, technical audio.' },
+                                            { mod: 'Speech-to-Text', id: 'flux-listen-en', real: 'Flux Listen EN', prov: 'Flux Neural Cloud', tier: 'Free', desc: 'Lightweight, hyper-fast English-only speech recognition.' },
+                                            { mod: 'Text-to-Speech', id: 'flux-speak', real: 'Flux Speak', prov: 'Flux Neural Cloud', tier: 'Free', desc: 'Natural voice synthesis across multiple expressive voices.' },
+                                            { mod: 'Text-to-Speech', id: 'flux-speak-hd', real: 'Flux Speak HD', prov: 'Flux Neural Cloud', tier: 'Pro', desc: 'Studio-grade high-definition audio synthesis for production voiceovers.' },
+                                            { mod: 'Embeddings', id: 'flux-embed', real: 'Flux Embed', prov: 'Flux Neural Cloud', tier: 'Free', desc: '1024-dimensional dense vector embeddings for semantic search and RAG.' },
                                         ].map(m => (
                                             <tr key={m.id} className="hover:bg-secondary/70">
                                                 <td className="px-4 py-3 font-mono text-cyan-400 text-xs font-semibold whitespace-nowrap">{m.mod}</td>

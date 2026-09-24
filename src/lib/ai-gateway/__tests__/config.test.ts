@@ -41,32 +41,33 @@ describe('Flux AI Gateway - Model Registry & Resolution', () => {
   });
 
   it('should resolve OpenAI compatibility aliases properly', () => {
-    expect(resolveFluxModel('gpt-4o').id).toBe('flux-ultra');
-    expect(resolveFluxModel('gpt-4o-mini').id).toBe('flux-max');
-    expect(resolveFluxModel('gpt-3.5-turbo').id).toBe('flux-fast');
+    expect(resolveFluxModel('gpt-4o').id).toBe('flux-pro');
+    expect(resolveFluxModel('gpt-4o-mini').id).toBe('flux-lite');
+    expect(resolveFluxModel('gpt-3.5-turbo').id).toBe('flux-lite');
     expect(resolveFluxModel('dall-e-3', 'image').id).toBe('flux-image');
     expect(resolveFluxModel('whisper-1', 'audio-stt').id).toBe('flux-listen');
     expect(resolveFluxModel('tts-1', 'audio-tts').id).toBe('flux-speak');
     expect(resolveFluxModel('text-embedding-3-small', 'embedding').id).toBe('flux-embed');
   });
 
-  it('should resolve frontier AWS Bedrock models (flux-nova-pro, flux-image-ultra, flux-video-ray)', () => {
+  it('should resolve frontier models (flux-pro, flux-image-ultra, flux-video-ray)', () => {
     // 1. Frontier Reasoning
-    const novaPro = resolveFluxModel('flux-nova-pro', 'text');
-    expect(novaPro.id).toBe('flux-nova-pro');
-    expect(novaPro.provider).toBe('bedrock');
-    expect(resolveFluxModel('nova-pro', 'text').id).toBe('flux-nova-pro');
+    const proModel = resolveFluxModel('flux-pro', 'text');
+    expect(proModel.id).toBe('flux-pro');
+    expect(proModel.provider).toBe('bedrock');
+    expect(resolveFluxModel('nova-pro', 'text').id).toBe('flux-pro');
+    expect(resolveFluxModel('flux-nova-pro', 'text').id).toBe('flux-pro');
 
     // 2. State-of-the-Art Image
     const imgUltra = resolveFluxModel('flux-image-ultra', 'image');
     expect(imgUltra.id).toBe('flux-image-ultra');
-    expect(imgUltra.provider).toBe('bedrock');
+    expect(imgUltra.provider).toBe('glm');
     expect(resolveFluxModel('stable-image-ultra', 'image').id).toBe('flux-image-ultra');
 
     // 3. Cinema-Grade Video
     const vidRay = resolveFluxModel('flux-video-ray', 'video');
     expect(vidRay.id).toBe('flux-video-ray');
-    expect(vidRay.provider).toBe('bedrock');
+    expect(vidRay.provider).toBe('glm');
     expect(resolveFluxModel('luma-ray-v2', 'video').id).toBe('flux-video-ray');
   });
 

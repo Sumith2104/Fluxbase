@@ -399,26 +399,26 @@ addAlert('Gateway Base URL & Compatibility',
     'success'
 );
 
-addH2('Frontier Model Catalog & Real Upstream Architectures');
+addH2('Proprietary Model Catalog & Engine Architecture');
 addTable(
-    ['Gateway ID', 'Real Upstream Model', 'Provider / Tier', 'Specs & Best Use Case'],
+    ['Model ID', 'Engine Designation', 'Architecture', 'Specs & Best Use Case'],
     [
-        ['flux-nova-pro', 'Amazon Nova Pro', 'Bedrock (Free)', 'Flagship multimodal reasoning, vision & coding. 300k context'],
-        ['flux-nova-lite', 'Amazon Nova Lite', 'Bedrock (Free)', 'Fast multimodal reasoning, sub-200ms latency, high volume. 300k context'],
-        ['flux', 'GLM-4 Flash (Default)', 'Zhipu (Free)', 'High-accuracy general reasoning, precision SQL synthesis. 128k context'],
-        ['flux-nova-micro', 'Amazon Nova Micro', 'Bedrock (Free)', 'Lowest latency text model for extreme throughput agents. 128k context'],
-        ['flux-image-fast', 'CogView 3 Flash', 'Zhipu (Free)', 'Ultra-fast text-to-image synthesis in 2-8s with S3 cloud delivery'],
-        ['flux-embed', 'Titan Embeddings V2', 'Bedrock (Free)', '1024-dimensional dense vector embeddings for semantic search & RAG'],
-        ['flux-video', 'CogVideoX Flash', 'Zhipu (Free)', 'Text-to-video dynamic motion synthesis with async task polling'],
-        ['flux-turbo', 'LLaMA 3.3 70B Versatile', 'Groq (Free)', 'Hyper-speed 300+ tok/s inference on Groq LPUs. 128k context'],
-        ['flux-omni', 'Gemini 2.0 Flash', 'Google (Free)', 'Massive 1M token context window, multimodal vision understanding'],
-        ['flux-max', 'GPT-4o Mini', 'OpenAI (Free)', 'Lightweight flagship coding and prompt adherence. 128k context'],
-        ['flux-vision', 'GLM-4V Multimodal', 'Zhipu (Free)', 'Visual diagram comprehension, screenshot-to-code, OCR inspection'],
-        ['flux-listen', 'Whisper Large v3 Turbo', 'Groq (Free)', '10x real-time multilingual audio transcription with timestamps'],
-        ['flux-speak', 'TTS-1 (6 Voices)', 'OpenAI (Free)', 'Natural expressive speech synthesis (alloy, echo, fable, onyx, etc.)'],
-        ['gpt-4o', 'GPT-4o Alias', 'OpenAI (Free)', 'Drop-in compatibility alias automatically mapped to flagship tier'],
+        ['flux-pro', 'Flux Pro', 'Flux Neural Cloud', 'Flagship multimodal reasoning, vision & coding. 300k context'],
+        ['flux-lite', 'Flux Lite', 'Flux Neural Cloud', 'Fast multimodal reasoning, sub-200ms latency, high volume. 300k context'],
+        ['flux', 'Flux Standard', 'Flux Neural Cloud', 'High-accuracy general reasoning, precision SQL synthesis. 128k context'],
+        ['flux-micro', 'Flux Micro', 'Flux Neural Cloud', 'Lowest latency text model for extreme throughput agents. 128k context'],
+        ['flux-image-fast', 'Flux Image Fast', 'Flux Neural Cloud', 'Ultra-fast text-to-image synthesis in 2-8s with S3 cloud delivery'],
+        ['flux-embed', 'Flux Embed', 'Flux Neural Cloud', '1024-dimensional dense vector embeddings for semantic search & RAG'],
+        ['flux-video', 'Flux Video', 'Flux Neural Cloud', 'Text-to-video dynamic motion synthesis with async task polling'],
+        ['flux-turbo', 'Flux Turbo', 'Flux Neural Cloud', 'Hyper-speed 300+ tok/s inference for real-time interaction. 128k context'],
+        ['flux-omni', 'Flux Omni', 'Flux Neural Cloud', 'Massive context window, multimodal vision understanding. 300k context'],
+        ['flux-max', 'Flux Max', 'Flux Neural Cloud', 'Flagship coding, robust reasoning, and instruction following. 300k context'],
+        ['flux-vision', 'Flux Vision', 'Flux Neural Cloud', 'Visual diagram comprehension, screenshot-to-code, OCR inspection'],
+        ['flux-listen', 'Flux Listen', 'Flux Neural Cloud', 'Real-time multilingual audio transcription with timestamps'],
+        ['flux-speak', 'Flux Speak', 'Flux Neural Cloud', 'Natural expressive speech synthesis across multiple voices'],
+        ['gpt-4o', 'Flux Drop-in', 'Flux Neural Cloud', 'Drop-in compatibility alias automatically mapped to flux-pro'],
     ],
-    [85, 105, 80, 235]
+    [85, 105, 100, 215]
 );
 
 addH2('Tier Token Allocations & Rate Limits Matrix');

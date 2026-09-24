@@ -84,7 +84,7 @@ export async function POST(req: NextRequest) {
     if (!providerConfig.isAvailable) {
       if (!allowFallback && isLastInChain) {
         return aiError(
-          `Provider '${spec.provider}' for model '${spec.id}' is not configured or missing API credentials (${spec.provider.toUpperCase()}_API_KEY or AWS credentials).`,
+          `Model '${spec.id}' is currently unavailable. Please verify API configuration or try again shortly.`,
           'configuration_error',
           503,
           rl.headers
@@ -262,7 +262,7 @@ export async function POST(req: NextRequest) {
 
       if (isLastInChain || (!allowFallback && !isBalanceOrOutage)) {
         return aiError(
-          `[${spec.provider}] ${err?.message || err}`,
+          `[Flux Gateway] ${err?.message || 'Model request processing failed.'}`,
           'upstream_error',
           502,
           rl.headers

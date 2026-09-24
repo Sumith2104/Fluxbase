@@ -83,7 +83,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ task
 
       if (res.status === 'Failed') {
         taskData.status = 'failed';
-        taskData.error = res.failureMessage || 'Bedrock video generation failed upstream.';
+        taskData.error = res.failureMessage || 'Video generation task failed upstream.';
         await (redis as any).set(taskKey, taskData, { ex: 7200 });
         return aiSuccess({
           id: taskId,

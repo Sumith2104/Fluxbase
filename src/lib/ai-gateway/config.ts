@@ -98,7 +98,7 @@ export const FLUX_MODEL_REGISTRY: Record<string, FluxModelSpec> = {
     upstreamModel: 'glm-4-flash',
     upstreamEndpoint: PROVIDER_ENDPOINTS.glm.chat,
     label: 'Flux Flash',
-    description: 'Ultra-fast token throughput. Ideal for autocompletion, real-time UX, and lightweight tasks',
+    description: 'Ultra-fast token throughput for autocompletion, real-time UX, and lightweight tasks',
     contextWindow: 128000,
     maxOutputTokens: 4096,
     minTier: 'free',
@@ -111,7 +111,7 @@ export const FLUX_MODEL_REGISTRY: Record<string, FluxModelSpec> = {
     upstreamModel: 'amazon.nova-pro-v1:0',
     upstreamEndpoint: 'bedrock://converse',
     label: 'Flux 5.2',
-    description: 'Next-generation reasoning architecture specialized in multi-step agentic execution powered by Amazon Nova Pro',
+    description: 'Next-generation reasoning architecture specialized in multi-step agentic execution',
     contextWindow: 300000,
     maxOutputTokens: 8192,
     minTier: 'free',
@@ -124,7 +124,7 @@ export const FLUX_MODEL_REGISTRY: Record<string, FluxModelSpec> = {
     upstreamModel: 'glm-4-flash',
     upstreamEndpoint: PROVIDER_ENDPOINTS.glm.chat,
     label: 'Flux Fast',
-    description: 'Ultra-fast general reasoning and SQL generation powered by GLM-4 Flash',
+    description: 'Ultra-fast general reasoning and high-throughput SQL generation',
     contextWindow: 128000,
     maxOutputTokens: 4096,
     minTier: 'free',
@@ -137,7 +137,7 @@ export const FLUX_MODEL_REGISTRY: Record<string, FluxModelSpec> = {
     upstreamModel: 'amazon.nova-pro-v1:0',
     upstreamEndpoint: 'bedrock://converse',
     label: 'Flux Pro',
-    description: 'High-precision schema architecture and BI analysis powered by Amazon Nova Pro on AWS Bedrock',
+    description: 'High-precision schema architecture, data modeling, and BI analysis',
     contextWindow: 300000,
     maxOutputTokens: 8192,
     minTier: 'free',
@@ -150,11 +150,37 @@ export const FLUX_MODEL_REGISTRY: Record<string, FluxModelSpec> = {
     upstreamModel: 'amazon.nova-pro-v1:0',
     upstreamEndpoint: 'bedrock://converse',
     label: 'Flux Ultra',
-    description: 'Maximum intelligence for deep reasoning and complex migrations powered by Amazon Nova Pro on AWS Bedrock',
+    description: 'Maximum intelligence for deep reasoning, long chains of thought, and complex migrations',
     contextWindow: 300000,
     maxOutputTokens: 8192,
     minTier: 'free',
     capabilities: ['text-generation', 'chat', 'tool-calling', 'json-mode', 'coding'],
+  },
+  'flux-lite': {
+    id: 'flux-lite',
+    modality: 'text',
+    provider: 'bedrock',
+    upstreamModel: 'amazon.nova-lite-v1:0',
+    upstreamEndpoint: 'bedrock://converse',
+    label: 'Flux Lite',
+    description: 'High-velocity multimodal reasoning and sub-200ms interactive processing',
+    contextWindow: 300000,
+    maxOutputTokens: 8192,
+    minTier: 'free',
+    capabilities: ['text-generation', 'chat', 'fast', 'tool-calling', 'json-mode', 'vision'],
+  },
+  'flux-micro': {
+    id: 'flux-micro',
+    modality: 'text',
+    provider: 'bedrock',
+    upstreamModel: 'amazon.nova-micro-v1:0',
+    upstreamEndpoint: 'bedrock://converse',
+    label: 'Flux Micro',
+    description: 'Lightweight, ultra-low latency text intelligence engineered for extreme throughput',
+    contextWindow: 128000,
+    maxOutputTokens: 4096,
+    minTier: 'free',
+    capabilities: ['text-generation', 'chat', 'hyper-fast', 'tool-calling', 'json-mode'],
   },
   'flux-turbo': {
     id: 'flux-turbo',
@@ -163,7 +189,7 @@ export const FLUX_MODEL_REGISTRY: Record<string, FluxModelSpec> = {
     upstreamModel: 'amazon.nova-lite-v1:0',
     upstreamEndpoint: 'bedrock://converse',
     label: 'Flux Turbo',
-    description: 'Hyper-speed inference powered by Amazon Nova Lite on AWS Bedrock',
+    description: 'Hyper-speed inference engine for real-time applications and low latency agents',
     contextWindow: 300000,
     maxOutputTokens: 8192,
     minTier: 'free',
@@ -176,7 +202,7 @@ export const FLUX_MODEL_REGISTRY: Record<string, FluxModelSpec> = {
     upstreamModel: 'glm-4v-flash',
     upstreamEndpoint: PROVIDER_ENDPOINTS.glm.chat,
     label: 'Flux Vision',
-    description: 'High-speed multimodal vision and visual schema recognition',
+    description: 'High-speed multimodal vision, visual schema comprehension, and diagram recognition',
     contextWindow: 128000,
     maxOutputTokens: 4096,
     minTier: 'free',
@@ -189,7 +215,7 @@ export const FLUX_MODEL_REGISTRY: Record<string, FluxModelSpec> = {
     upstreamModel: 'amazon.nova-pro-v1:0',
     upstreamEndpoint: 'bedrock://converse',
     label: 'Flux Omni',
-    description: 'Multimodal vision, document comprehension, and fast reasoning powered by Amazon Nova Pro on AWS Bedrock',
+    description: 'Multimodal vision, document comprehension, and fast reasoning across diverse inputs',
     contextWindow: 300000,
     maxOutputTokens: 8192,
     minTier: 'free',
@@ -202,50 +228,11 @@ export const FLUX_MODEL_REGISTRY: Record<string, FluxModelSpec> = {
     upstreamModel: 'amazon.nova-pro-v1:0',
     upstreamEndpoint: 'bedrock://converse',
     label: 'Flux Max',
-    description: 'Flagship reasoning and robust coding benchmarks powered by Amazon Nova Pro on AWS Bedrock',
+    description: 'Flagship reasoning, robust coding benchmarks, and advanced instruction following',
     contextWindow: 300000,
     maxOutputTokens: 8192,
     minTier: 'free',
     capabilities: ['text-generation', 'vision', 'chat', 'tool-calling', 'json-mode'],
-  },
-  'flux-nova-micro': {
-    id: 'flux-nova-micro',
-    modality: 'text',
-    provider: 'bedrock',
-    upstreamModel: 'amazon.nova-micro-v1:0',
-    upstreamEndpoint: 'bedrock://converse',
-    label: 'Flux Nova Micro',
-    description: 'Lightweight, ultra-low latency text intelligence on AWS Bedrock',
-    contextWindow: 128000,
-    maxOutputTokens: 4096,
-    minTier: 'free',
-    capabilities: ['text-generation', 'chat', 'hyper-fast', 'tool-calling', 'json-mode'],
-  },
-  'flux-nova-pro': {
-    id: 'flux-nova-pro',
-    modality: 'text',
-    provider: 'bedrock',
-    upstreamModel: 'amazon.nova-pro-v1:0',
-    upstreamEndpoint: 'bedrock://converse',
-    label: 'Flux Nova Pro',
-    description: 'Amazon Bedrock flagship multimodal intelligence with high speed reasoning and native vision',
-    contextWindow: 300000,
-    maxOutputTokens: 8192,
-    minTier: 'free',
-    capabilities: ['text-generation', 'chat', 'reasoning', 'tool-calling', 'json-mode', 'vision'],
-  },
-  'flux-nova-lite': {
-    id: 'flux-nova-lite',
-    modality: 'text',
-    provider: 'bedrock',
-    upstreamModel: 'amazon.nova-lite-v1:0',
-    upstreamEndpoint: 'bedrock://converse',
-    label: 'Flux Nova Lite',
-    description: 'Ultra-fast multimodal reasoning and conversational intelligence on AWS Bedrock',
-    contextWindow: 300000,
-    maxOutputTokens: 8192,
-    minTier: 'free',
-    capabilities: ['text-generation', 'chat', 'fast', 'tool-calling', 'json-mode', 'vision'],
   },
 
   // --- IMAGE GENERATION ---
@@ -256,7 +243,7 @@ export const FLUX_MODEL_REGISTRY: Record<string, FluxModelSpec> = {
     upstreamModel: 'cogview-3-flash',
     upstreamEndpoint: PROVIDER_ENDPOINTS.glm.images,
     label: 'Flux Image',
-    description: 'High-quality photorealistic text-to-image synthesis powered by CogView 3 Flash',
+    description: 'High-quality photorealistic text-to-image synthesis with automatic cloud asset delivery',
     minTier: 'free',
     capabilities: ['text-to-image', 'high-resolution'],
     supportedFormats: ['url', 'b64_json'],
@@ -268,7 +255,7 @@ export const FLUX_MODEL_REGISTRY: Record<string, FluxModelSpec> = {
     upstreamModel: 'cogview-3-flash',
     upstreamEndpoint: PROVIDER_ENDPOINTS.glm.images,
     label: 'Flux Image Fast',
-    description: 'Ultra-fast low-latency image generation for web assets',
+    description: 'Ultra-fast low-latency image generation for web assets and rapid prototyping',
     minTier: 'free',
     capabilities: ['text-to-image', 'fast'],
     supportedFormats: ['url', 'b64_json'],
@@ -280,7 +267,7 @@ export const FLUX_MODEL_REGISTRY: Record<string, FluxModelSpec> = {
     upstreamModel: 'cogview-3-flash',
     upstreamEndpoint: PROVIDER_ENDPOINTS.glm.images,
     label: 'Flux Image HD',
-    description: 'High-definition photorealistic text-to-image synthesis powered by CogView',
+    description: 'High-definition photorealistic text-to-image synthesis',
     minTier: 'free',
     capabilities: ['text-to-image', 'photorealistic', 'typography'],
     supportedFormats: ['url', 'b64_json'],
@@ -292,7 +279,7 @@ export const FLUX_MODEL_REGISTRY: Record<string, FluxModelSpec> = {
     upstreamModel: 'cogview-3-flash',
     upstreamEndpoint: PROVIDER_ENDPOINTS.glm.images,
     label: 'Flux Image Pro',
-    description: 'Premium creative composition with prompt adherence powered by CogView',
+    description: 'Premium creative composition with advanced prompt adherence',
     minTier: 'free',
     capabilities: ['text-to-image', 'hd'],
     supportedFormats: ['url', 'b64_json'],
@@ -304,7 +291,7 @@ export const FLUX_MODEL_REGISTRY: Record<string, FluxModelSpec> = {
     upstreamModel: 'cogview-3-flash',
     upstreamEndpoint: PROVIDER_ENDPOINTS.glm.images,
     label: 'Flux Image Ultra',
-    description: 'State-of-the-art photorealistic image generation powered by CogView',
+    description: 'State-of-the-art photorealistic image generation and typography',
     minTier: 'free',
     capabilities: ['text-to-image', 'photorealistic', 'typography', 'high-resolution'],
     supportedFormats: ['url', 'b64_json'],
@@ -396,7 +383,7 @@ export const FLUX_MODEL_REGISTRY: Record<string, FluxModelSpec> = {
     upstreamModel: 'cogvideox-flash',
     upstreamEndpoint: PROVIDER_ENDPOINTS.glm.videos,
     label: 'Flux Video Pro',
-    description: 'Cinematic video generation with high fidelity powered by CogVideoX Flash',
+    description: 'Cinematic video generation with high fidelity and rich motion dynamics',
     minTier: 'free',
     capabilities: ['text-to-video', 'image-to-video', 'async-polling'],
     supportedFormats: ['mp4'],
@@ -408,7 +395,7 @@ export const FLUX_MODEL_REGISTRY: Record<string, FluxModelSpec> = {
     upstreamModel: 'cogvideox-flash',
     upstreamEndpoint: PROVIDER_ENDPOINTS.glm.videos,
     label: 'Flux Video Ray',
-    description: 'Cinema-grade dynamic video generation with realistic physics and camera motion powered by CogVideoX',
+    description: 'Cinema-grade dynamic video generation with realistic physics and camera motion',
     minTier: 'free',
     capabilities: ['text-to-video', 'cinematic', 'async-polling'],
     supportedFormats: ['mp4'],
@@ -422,7 +409,7 @@ export const FLUX_MODEL_REGISTRY: Record<string, FluxModelSpec> = {
     upstreamModel: 'amazon.titan-embed-text-v2:0',
     upstreamEndpoint: 'bedrock://invoke-model',
     label: 'Flux Embed',
-    description: 'High-performance 1024-dimensional text embeddings powered by Amazon Titan Embeddings V2 on AWS Bedrock',
+    description: 'High-performance 1024-dimensional dense text embeddings for semantic search and RAG retrieval',
     contextWindow: 8192,
     minTier: 'free',
     capabilities: ['embeddings', 'similarity-search', 'rag-retrieval', '1024-dim'],
@@ -433,48 +420,67 @@ export const FLUX_MODEL_REGISTRY: Record<string, FluxModelSpec> = {
  * Model Aliases mapping third-party and shorthand model names to Flux Models
  */
 export const MODEL_ALIASES: Record<string, string> = {
-  // Default Shorthands
+  // Default Shorthands & Canonical Flux IDs
   'flux': 'flux',
   'flux-flash': 'flux-flash',
   'flux-5.2': 'flux-5.2',
   'flux-fast': 'flux',
+  'flux-pro': 'flux-pro',
+  'flux-ultra': 'flux-ultra',
+  'flux-lite': 'flux-lite',
+  'flux-micro': 'flux-micro',
+  'flux-turbo': 'flux-turbo',
+  'flux-omni': 'flux-omni',
+  'flux-vision': 'flux-vision',
+  'flux-max': 'flux-max',
   'flux-image': 'flux-image',
+  'flux-image-fast': 'flux-image-fast',
+  'flux-image-hd': 'flux-image-hd',
+  'flux-image-pro': 'flux-image-pro',
+  'flux-image-ultra': 'flux-image-ultra',
   'flux-video': 'flux-video',
+  'flux-video-pro': 'flux-video-pro',
+  'flux-video-ray': 'flux-video-ray',
   'flux-listen': 'flux-listen',
+  'flux-listen-pro': 'flux-listen-pro',
+  'flux-listen-en': 'flux-listen-en',
   'flux-speak': 'flux-speak',
+  'flux-speak-hd': 'flux-speak-hd',
   'flux-embed': 'flux-embed',
 
-  // OpenAI Chat Aliases
-  'gpt-4o': 'flux-nova-pro',
-  'gpt-4o-mini': 'flux-nova-lite',
-  'gpt-4-turbo': 'flux-nova-pro',
-  'gpt-4': 'flux-nova-pro',
-  'gpt-3.5-turbo': 'flux-nova-lite',
-  // Nova & Amazon Bedrock Aliases
-  'flux-nova-pro': 'flux-nova-pro',
-  'nova-pro': 'flux-nova-pro',
-  'amazon-nova-pro': 'flux-nova-pro',
-  'amazon.nova-pro-v1:0': 'flux-nova-pro',
-  'flux-nova-lite': 'flux-nova-lite',
-  'nova-lite': 'flux-nova-lite',
-  'amazon-nova-lite': 'flux-nova-lite',
-  'amazon.nova-lite-v1:0': 'flux-nova-lite',
-  'flux-nova-micro': 'flux-nova-micro',
-  'nova-micro': 'flux-nova-micro',
-  'amazon-nova-micro': 'flux-nova-micro',
-  'amazon.nova-micro-v1:0': 'flux-nova-micro',
+  // Legacy & Provider Shorthands smoothly remapped to pure Flux IDs
+  'flux-nova-pro': 'flux-pro',
+  'nova-pro': 'flux-pro',
+  'amazon-nova-pro': 'flux-pro',
+  'amazon.nova-pro-v1:0': 'flux-pro',
+  'flux-nova-lite': 'flux-lite',
+  'nova-lite': 'flux-lite',
+  'amazon-nova-lite': 'flux-lite',
+  'amazon.nova-lite-v1:0': 'flux-lite',
+  'flux-nova-micro': 'flux-micro',
+  'nova-micro': 'flux-micro',
+  'amazon-nova-micro': 'flux-micro',
+  'amazon.nova-micro-v1:0': 'flux-micro',
   'titan-embed': 'flux-embed',
   'amazon.titan-embed-text-v2:0': 'flux-embed',
+  'flux-pro-max': 'flux-pro',
+  'flux-sonnet': 'flux-pro',
+
+  // OpenAI Chat Aliases
+  'gpt-4o': 'flux-pro',
+  'gpt-4o-mini': 'flux-lite',
+  'gpt-4-turbo': 'flux-pro',
+  'gpt-4': 'flux-pro',
+  'gpt-3.5-turbo': 'flux-lite',
 
   // OpenAI Image Aliases
-  'flux-image-ultra': 'flux-image-ultra',
   'stable-image-ultra': 'flux-image-ultra',
   'stable-diffusion-ultra': 'flux-image-ultra',
   'dall-e-3': 'flux-image',
   'dall-e-2': 'flux-image-fast',
   'dall-e': 'flux-image',
 
-  // OpenAI Audio Aliases
+  // Audio Aliases
   'whisper-1': 'flux-listen',
   'whisper': 'flux-listen',
   'tts-1': 'flux-speak',
@@ -496,14 +502,13 @@ export const MODEL_ALIASES: Record<string, string> = {
   'glm-3-turbo': 'flux-fast',
   'glm-4v-flash': 'flux-vision',
   'glm-4v': 'flux-vision',
-  'flux-vision': 'flux-vision',
   'llama-3.3-70b-versatile': 'flux-turbo',
   'gemini-2.0-flash': 'flux-omni',
+  'gemini-1.5-flash': 'flux-omni',
   'cogview-4': 'flux-image',
   'cogview-3-flash': 'flux-image-fast',
   'cogvideox-flash': 'flux-video',
   'cogvideox': 'flux-video-pro',
-  'flux-video-ray': 'flux-video-ray',
   'luma-ray-v2': 'flux-video-ray',
   'ray-v2': 'flux-video-ray',
 };
@@ -517,9 +522,9 @@ export const WHITELABEL_MAP: Record<string, string> = {
   'glm-4-plus': 'flux-ultra',
   'glm-4v-flash': 'flux-vision',
   'glm-4v': 'flux-vision',
-  'amazon.nova-pro-v1:0': 'flux-nova-pro',
-  'amazon.nova-lite-v1:0': 'flux-nova-lite',
-  'amazon.nova-micro-v1:0': 'flux-nova-micro',
+  'amazon.nova-pro-v1:0': 'flux-pro',
+  'amazon.nova-lite-v1:0': 'flux-lite',
+  'amazon.nova-micro-v1:0': 'flux-micro',
   'amazon.titan-embed-text-v2:0': 'flux-embed',
   'llama-3.3-70b-versatile': 'flux-turbo',
   'gemini-2.0-flash': 'flux-omni',
@@ -621,7 +626,7 @@ export function buildFallbackChain(primarySpec: FluxModelSpec, hasMultimodal = f
   // If allowFallback is disabled, include primarySpec plus a reliable Bedrock backstop if primary is external
   if (!allowFallback) {
     if (primarySpec.provider !== 'bedrock' && primarySpec.modality === 'text') {
-      const backup = FLUX_MODEL_REGISTRY['flux-nova-pro'];
+      const backup = FLUX_MODEL_REGISTRY['flux-pro'];
       if (backup && backup.id !== primarySpec.id) {
         return [primarySpec, backup];
       }
@@ -637,7 +642,7 @@ export function buildFallbackChain(primarySpec: FluxModelSpec, hasMultimodal = f
       const config = getProviderConfig(primarySpec.provider);
       if (config.isAvailable) chain.push(primarySpec);
     }
-    const visionPriority = ['flux-nova-pro', 'flux-vision', 'flux-omni', 'flux-max'];
+    const visionPriority = ['flux-pro', 'flux-vision', 'flux-omni', 'flux-max'];
     for (const vId of visionPriority) {
       const spec = FLUX_MODEL_REGISTRY[vId];
       if (spec && !chain.some(s => s.id === spec.id)) {
@@ -655,8 +660,8 @@ export function buildFallbackChain(primarySpec: FluxModelSpec, hasMultimodal = f
 
   if (primarySpec.modality === 'text') {
     const fallbacks = hasMultimodal
-      ? ['flux-nova-pro', 'flux-vision', 'flux-omni', 'flux-max']
-      : ['flux-nova-pro', 'flux-nova-lite', 'flux', 'flux-turbo', 'flux-omni', 'flux-fast', 'flux-max'];
+      ? ['flux-pro', 'flux-vision', 'flux-omni', 'flux-max']
+      : ['flux-pro', 'flux-lite', 'flux', 'flux-turbo', 'flux-omni', 'flux-fast', 'flux-max'];
     for (const fbId of fallbacks) {
       const fbSpec = FLUX_MODEL_REGISTRY[fbId];
       if (fbSpec && fbSpec.id !== primarySpec.id && !chain.some(s => s.id === fbSpec.id)) {
