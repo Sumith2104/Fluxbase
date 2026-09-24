@@ -579,76 +579,66 @@ export class SqlEngine {
                 const { schemaName } = getProjectDbAndSchema(this.projectObj!);
                 const safeTableName = tableName.replace(/[^a-zA-Z0-9_]/g, '');
 
-                // Option B: Automatically route bulk generation (>=10k rows) to multi-threaded chunk workers
-                if (count >= 10_000) {
-                    const { runParallelGenerateJob } = await import('@/lib/chunked-parallel-worker');
-                    const parallelResult = await runParallelGenerateJob({
-                        pool,
-                        schemaName,
-                        tableName: safeTableName,
-                        totalCount: count,
-                        columns,
-                    });
-
-                    return {
-                        rows: [],
-                        columns: [],
-                        message: `Successfully generated ${count.toLocaleString()} rows for ${tableName} across ${parallelResult.workersUsed} parallel workers in ${(parallelResult.durationMs / 1000).toFixed(2)}s (${parallelResult.rowsPerSecond.toLocaleString()} rows/s)`,
-                        explanation: [`Parallel Multi-Worker Streaming Engine (${parallelResult.workersUsed} workers)`]
-                    };
-                }
-
                 const insertableCols = columns.filter(col => col.column_name !== 'id' && col.column_name !== '_id');
                 if (insertableCols.length === 0) throw new Error("No insertable columns found in table");
 
                 const quotedCols = insertableCols.map(col => `"${col.column_name}"`).join(', ');
+                const selectExprs = insertableCols.map(col => {
+                    const colNameLower = col.column_name.toLowerCase();
+                    const type = col.data_type.toUpperCase();
+
+                    if (colNameLower.includes('email')) {
+                        return `'user' || i || '@example.com'`;
+                    } else if (colNameLower.includes('phone')) {
+                        return `'123-456-' || lpad((i % 10000)::text, 4, '0')`;
+                    } else if (colNameLower === 'state') {
+                        return `'CA'`;
+                    } else if (colNameLower === 'zip_code' || colNameLower.includes('zip')) {
+                        return `'90210'`;
+                    } else if (colNameLower.includes('country')) {
+                        return `'USA'`;
+                    } else if (colNameLower.includes('city')) {
+                        return `'Springfield'`;
+                    } else if (colNameLower.includes('address')) {
+                        return `'123 Main St'`;
+                    } else if (colNameLower.includes('name')) {
+                        return `'User ' || i`;
+                    } else if (type.includes('VARCHAR') || type.includes('TEXT') || type.includes('STRING')) {
+                        return `'Gen_' || i`;
+                    } else if (type.includes('INT') || type.includes('NUMBER') || type.includes('NUMERIC')) {
+                        return `(i % 1000)`;
+                    } else if (type.includes('DOUBLE') || type.includes('FLOAT') || type.includes('DECIMAL') || type.includes('REAL')) {
+                        return `round((random() * 1000)::numeric, 2)`;
+                    } else if (type.includes('BOOL')) {
+                        return `(i % 2 = 0)`;
+                    } else if (type.includes('DATE') || type.includes('TIME')) {
+                        return `NOW()`;
+                    } else if (type.includes('UUID')) {
+                        return `gen_random_uuid()`;
+                    } else if (type.includes('JSON')) {
+                        return `'{"id": ' || i || ', "status": "active"}'::jsonb`;
+                    } else {
+                        return `'val_' || i`;
+                    }
+                }).join(', ');
+
                 const client = await pool.connect();
-
                 try {
-                    await client.query("SELECT set_config('synchronous_commit', 'off', false)");
-                    
-                    const { from: copyFrom } = await import('pg-copy-streams');
-                    const { Readable } = await import('node:stream');
-                    const { pipeline } = await import('node:stream/promises');
-
-                    const copySql = `COPY "${schemaName}"."${safeTableName}" (${quotedCols}) FROM STDIN WITH (FORMAT csv, NULL '')`;
-                    const copyStream = client.query(copyFrom(copySql));
-
-                    let generated = 0;
-                    const dataStream = new Readable({
-                        read() {
-                            let chunk = '';
-                            while (generated < count && chunk.length < 65536) {
-                                generated++;
-                                const rowVals: string[] = [];
-                                for (const col of insertableCols) {
-                                    const type = col.data_type.toUpperCase();
-                                    if (type.includes('VARCHAR') || type.includes('TEXT') || type.includes('STRING')) {
-                                        rowVals.push(`Gen_${Math.random().toString(36).substring(7)}`);
-                                    } else if (type.includes('INT') || type.includes('NUMBER') || type.includes('NUMERIC') || type.includes('DOUBLE') || type.includes('FLOAT')) {
-                                        rowVals.push(String(Math.floor(Math.random() * 1000)));
-                                    } else if (type.includes('BOOL')) {
-                                        rowVals.push(Math.random() > 0.5 ? 'true' : 'false');
-                                    } else if (type.includes('DATE') || type.includes('TIME')) {
-                                        rowVals.push(new Date().toISOString());
-                                    } else {
-                                        rowVals.push('val');
-                                    }
-                                }
-                                chunk += rowVals.join(',') + '\n';
-                            }
-                            this.push(chunk.length > 0 ? chunk : null);
-                        }
-                    });
-
-                    await pipeline(dataStream, copyStream);
-                    generatedCount = count;
+                    await client.query("SELECT set_config('synchronous_commit', 'off', false), set_config('work_mem', '64MB', false)");
+                    const t0 = Date.now();
+                    await client.query(`
+                        INSERT INTO "${schemaName}"."${safeTableName}" (${quotedCols})
+                        SELECT ${selectExprs}
+                        FROM generate_series(1, ${count}) AS s(i);
+                    `);
+                    const durationMs = Date.now() - t0;
+                    const rps = Math.round((count * 1000) / Math.max(1, durationMs));
 
                     return {
                         rows: [],
                         columns: [],
-                        message: `Successfully generated ${generatedCount} rows for ${tableName}`,
-                        explanation: ['Native PostgreSQL High-Speed Streaming COPY']
+                        message: `Successfully generated ${count.toLocaleString()} rows for ${tableName} in ${(durationMs / 1000).toFixed(2)}s (${rps.toLocaleString()} rows/s)`,
+                        explanation: ['Native PostgreSQL High-Speed Set Generation Engine (generate_series)']
                     };
                 } finally {
                     client.release();
