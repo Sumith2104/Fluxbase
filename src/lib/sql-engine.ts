@@ -386,9 +386,9 @@ export class SqlEngine {
                                set_config('fluxbase.auth_uid', $2, true), 
                                set_config('timezone', $3, false),
                                set_config('request.jwt.claims', $4, true),
-                               set_config('fluxbase.skip_realtime_triggers', 'true', true),
+                               set_config('fluxbase.skip_realtime_triggers', 'true', false),
                                set_config('synchronous_commit', 'off', false),
-                               set_config('work_mem', '64MB', false);
+                               set_config('work_mem', '16MB', false);
                     `;
                     const claimsJson = JSON.stringify({ sub: this.userId || '', role: 'authenticated' });
                     const sessionParams = [
