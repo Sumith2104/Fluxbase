@@ -51,7 +51,7 @@ export async function POST(req: NextRequest) {
 
   if (!providerConfig.isAvailable) {
     return aiError(
-      `Video provider '${primarySpec.provider}' is not configured or missing API credentials.`,
+      `Video engine for model '${primarySpec.id}' is temporarily unavailable.`,
       'api_error',
       503,
       rl.headers

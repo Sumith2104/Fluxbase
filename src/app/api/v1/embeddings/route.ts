@@ -159,7 +159,7 @@ export async function POST(req: NextRequest) {
 
       if (!res.ok) {
         const errBody = await res.text();
-        throw new Error(`${provider} embeddings error (${res.status}): ${errBody}`);
+        throw new Error(`Upstream neural engine error (${res.status}): ${errBody}`);
       }
 
       const result = await res.json();
@@ -198,7 +198,7 @@ export async function POST(req: NextRequest) {
   });
 
   return aiError(
-    lastError?.message || 'Embeddings service temporarily unavailable.',
+    '[Flux Gateway] Embeddings service temporarily unavailable.',
     'api_error',
     502,
     rl.headers

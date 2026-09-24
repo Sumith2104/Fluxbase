@@ -83,7 +83,7 @@ export async function POST(req: NextRequest) {
 
       if (!res.ok) {
         const errBody = await res.text();
-        throw new Error(`Upstream ${spec.provider} transcription error (${res.status}): ${errBody}`);
+        throw new Error(`Upstream transcription engine error (${res.status}): ${errBody}`);
       }
 
       const latencyMs = Date.now() - startTime;
@@ -132,7 +132,7 @@ export async function POST(req: NextRequest) {
   });
 
   return aiError(
-    lastError?.message || 'Audio transcription service temporarily unavailable.',
+    '[Flux Gateway] Audio transcription service temporarily unavailable.',
     'api_error',
     502,
     rl.headers

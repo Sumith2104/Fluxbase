@@ -129,7 +129,7 @@ export async function POST(req: NextRequest) {
   });
 
   return aiError(
-    lastError?.message || 'Text-to-speech service temporarily unavailable.',
+    '[Flux Gateway] Text-to-speech service temporarily unavailable.',
     'api_error',
     502,
     rl.headers

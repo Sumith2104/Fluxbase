@@ -59,7 +59,7 @@ export async function POST(req: NextRequest) {
     if (!providerConfig.isAvailable) {
       if (!allowFallback) {
         return aiError(
-          `Provider '${spec.provider}' for model '${spec.id}' is not configured or missing API credentials (${spec.provider.toUpperCase()}_API_KEY or AWS credentials).`,
+          `Neural engine for model '${spec.id}' is temporarily unavailable.`,
           'configuration_error',
           503,
           rl.headers
@@ -131,7 +131,7 @@ export async function POST(req: NextRequest) {
       lastError = err;
       if (!allowFallback) {
         return aiError(
-          `[${spec.provider}] ${err?.message || err}`,
+          `[Flux Gateway] ${err?.message || 'Image generation failed.'}`,
           'upstream_error',
           502,
           rl.headers
@@ -152,7 +152,7 @@ export async function POST(req: NextRequest) {
   });
 
   return aiError(
-    lastError?.message || 'Image generation service temporarily unavailable across all upstream providers.',
+    '[Flux Gateway] Image generation service temporarily unavailable across all neural processing units.',
     'api_error',
     502,
     rl.headers
@@ -211,12 +211,12 @@ async function dispatchImageGeneration(
           }),
         });
       } else {
-        throw new Error(`Zhipu image API error (${res.status}): ${errText}`);
+        throw new Error(`Upstream image engine error (${res.status}): ${errText}`);
       }
 
       if (!res.ok) {
         const retryErr = await res.text();
-        throw new Error(`Zhipu image API error (${res.status}): ${retryErr}`);
+        throw new Error(`Upstream image engine error (${res.status}): ${retryErr}`);
       }
     }
 
@@ -258,7 +258,7 @@ async function dispatchImageGeneration(
 
     if (!res.ok) {
       const errText = await res.text();
-      throw new Error(`OpenAI image API error (${res.status}): ${errText}`);
+      throw new Error(`Upstream image engine error (${res.status}): ${errText}`);
     }
 
     const data = await res.json();
@@ -292,7 +292,7 @@ async function dispatchImageGeneration(
 
     if (!res.ok) {
       const errText = await res.text();
-      throw new Error(`Gemini image API error (${res.status}): ${errText}`);
+      throw new Error(`Upstream image engine error (${res.status}): ${errText}`);
     }
 
     const data = await res.json();

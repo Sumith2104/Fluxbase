@@ -1217,7 +1217,7 @@ main();`;
                         </h1>
                         <p className="text-muted-foreground max-w-2xl text-sm sm:text-base leading-relaxed">
                             Access top-tier frontier intelligence across 6 modalities with unified OpenAI SDK compatibility. 
-                            Direct Bedrock, Groq, Gemini, and OpenAI routing with zero middleware latency.
+                            Direct high-performance neural engine routing with zero middleware latency.
                         </p>
                     </div>
 

@@ -221,7 +221,7 @@ export async function executeBedrockConverse(opts: BedrockChatOptions) {
   const completionTokens = response.usage?.outputTokens || 0;
 
   return {
-    id: `chatcmpl-bedrock-${Date.now()}`,
+    id: `chatcmpl-flux-${Date.now()}`,
     object: 'chat.completion',
     created: Math.floor(Date.now() / 1000),
     model: outboundModel,
@@ -287,7 +287,7 @@ export async function executeBedrockConverseStream(opts: BedrockChatOptions): Pr
   });
 
   const response = await client.send(command);
-  const streamId = `chatcmpl-bedrock-${Date.now()}`;
+  const streamId = `chatcmpl-flux-${Date.now()}`;
   const encoder = new TextEncoder();
 
   let inputTokens = 0;
