@@ -527,38 +527,43 @@ export class SqlEngine {
                 const mysqlPool = await getTenantMysqlPool(this.projectObj!);
                 const { dbName } = getProjectDbAndSchema(this.projectObj!);
                 const safeTableName = tableName.replace(/[^a-zA-Z0-9_]/g, '');
+                const insertableCols = columns.filter(col => col.column_name !== 'id' && col.column_name !== '_id');
+                if (insertableCols.length === 0) throw new Error("No insertable columns found in table");
 
-                for (let i = 0; i < count; i++) {
-                    const ObjectCols: string[] = [];
-                    const ObjectVals: string[] = [];
-                    const ObjectParams: any[] = [];
+                const quotedCols = insertableCols.map(col => `\`${col.column_name}\``).join(', ');
+                const BATCH_SIZE = 500;
 
-                    for (const col of columns) {
-                        if (col.column_name === 'id' || col.column_name === '_id') continue;
+                for (let b = 0; b < count; b += BATCH_SIZE) {
+                    const currentBatchSize = Math.min(BATCH_SIZE, count - b);
+                    const placeholders: string[] = [];
+                    const batchParams: any[] = [];
 
-                        let val: any = null;
-                        const type = col.data_type.toUpperCase();
-                        if (type.includes('VARCHAR') || type.includes('TEXT') || type.includes('STRING')) {
-                            val = 'Gen_' + Math.random().toString(36).substring(7);
-                        } else if (type.includes('INT') || type.includes('NUMBER') || type.includes('DOUBLE') || type.includes('FLOAT')) {
-                            val = Math.floor(Math.random() * 1000);
-                        } else if (type.includes('BOOL') || type.includes('TINYINT')) {
-                            val = Math.random() > 0.5 ? 1 : 0;
-                        } else if (type.includes('DATE') || type.includes('TIME')) {
-                            val = new Date().toISOString().slice(0, 19).replace('T', ' '); 
+                    for (let i = 0; i < currentBatchSize; i++) {
+                        const rowVals: string[] = [];
+                        for (const col of insertableCols) {
+                            let val: any = null;
+                            const type = col.data_type.toUpperCase();
+                            if (type.includes('VARCHAR') || type.includes('TEXT') || type.includes('STRING')) {
+                                val = 'Gen_' + Math.random().toString(36).substring(7);
+                            } else if (type.includes('INT') || type.includes('NUMBER') || type.includes('DOUBLE') || type.includes('FLOAT')) {
+                                val = Math.floor(Math.random() * 1000);
+                            } else if (type.includes('BOOL') || type.includes('TINYINT')) {
+                                val = Math.random() > 0.5 ? 1 : 0;
+                            } else if (type.includes('DATE') || type.includes('TIME')) {
+                                val = new Date().toISOString().slice(0, 19).replace('T', ' '); 
+                            } else {
+                                val = 'val';
+                            }
+                            rowVals.push('?');
+                            batchParams.push(val);
                         }
-
-                        if (val !== null || col.is_nullable) {
-                            ObjectCols.push(`\`${col.column_name}\``);
-                            ObjectVals.push(`?`);
-                            ObjectParams.push(val);
-                        }
+                        placeholders.push(`(${rowVals.join(', ')})`);
                     }
 
-                    if (ObjectCols.length > 0) {
-                        const ddl = `INSERT INTO \`${dbName}\`.\`${safeTableName}\` (${ObjectCols.join(', ')}) VALUES (${ObjectVals.join(', ')})`;
-                        await mysqlPool.query(ddl as any, ObjectParams);
-                        generatedCount++;
+                    if (placeholders.length > 0) {
+                        const ddl = `INSERT INTO \`${dbName}\`.\`${safeTableName}\` (${quotedCols}) VALUES ${placeholders.join(', ')}`;
+                        await mysqlPool.query(ddl as any, batchParams);
+                        generatedCount += currentBatchSize;
                     }
                 }
 
@@ -566,55 +571,68 @@ export class SqlEngine {
                     rows: [],
                     columns: [],
                     message: `Successfully generated ${generatedCount} rows for ${tableName}`,
-                    explanation: ['Native MySQL Bulk Insertion']
+                    explanation: ['Native MySQL Multi-Row Bulk Insertion']
                 };
 
             } else {
                 const pool = await getTenantPgPool(this.projectObj!);
                 const { schemaName } = getProjectDbAndSchema(this.projectObj!);
                 const safeTableName = tableName.replace(/[^a-zA-Z0-9_]/g, '');
+                const insertableCols = columns.filter(col => col.column_name !== 'id' && col.column_name !== '_id');
+                if (insertableCols.length === 0) throw new Error("No insertable columns found in table");
 
-                for (let i = 0; i < count; i++) {
-                    const ObjectCols: string[] = [];
-                    const ObjectVals: string[] = [];
-                    const ObjectParams: any[] = [];
-                    let pIdx = 1;
+                const quotedCols = insertableCols.map(col => `"${col.column_name}"`).join(', ');
+                const client = await pool.connect();
 
-                    for (const col of columns) {
-                        if (col.column_name === 'id' || col.column_name === '_id') continue;
+                try {
+                    await client.query("SELECT set_config('synchronous_commit', 'off', false)");
+                    
+                    const { from: copyFrom } = await import('pg-copy-streams');
+                    const { Readable } = await import('node:stream');
+                    const { pipeline } = await import('node:stream/promises');
 
-                        let val: any = null;
-                        const type = col.data_type.toUpperCase();
-                        if (type === 'VARCHAR' || type === 'TEXT' || type === 'STRING') {
-                            val = 'Gen_' + Math.random().toString(36).substring(7);
-                        } else if (type === 'INT' || type === 'NUMBER' || type === 'NUMERIC') {
-                            val = Math.floor(Math.random() * 1000);
-                        } else if (type === 'BOOLEAN' || type.includes('BOOL')) {
-                            val = Math.random() > 0.5;
-                        } else if (type === 'DATE' || type === 'DATETIME' || type === 'TIMESTAMP' || type.includes('TIME')) {
-                            val = new Date().toISOString();
+                    const copySql = `COPY "${schemaName}"."${safeTableName}" (${quotedCols}) FROM STDIN WITH (FORMAT csv, NULL '')`;
+                    const copyStream = client.query(copyFrom(copySql));
+
+                    let generated = 0;
+                    const dataStream = new Readable({
+                        read() {
+                            let chunk = '';
+                            while (generated < count && chunk.length < 65536) {
+                                generated++;
+                                const rowVals: string[] = [];
+                                for (const col of insertableCols) {
+                                    const type = col.data_type.toUpperCase();
+                                    if (type.includes('VARCHAR') || type.includes('TEXT') || type.includes('STRING')) {
+                                        rowVals.push(`Gen_${Math.random().toString(36).substring(7)}`);
+                                    } else if (type.includes('INT') || type.includes('NUMBER') || type.includes('NUMERIC') || type.includes('DOUBLE') || type.includes('FLOAT')) {
+                                        rowVals.push(String(Math.floor(Math.random() * 1000)));
+                                    } else if (type.includes('BOOL')) {
+                                        rowVals.push(Math.random() > 0.5 ? 'true' : 'false');
+                                    } else if (type.includes('DATE') || type.includes('TIME')) {
+                                        rowVals.push(new Date().toISOString());
+                                    } else {
+                                        rowVals.push('val');
+                                    }
+                                }
+                                chunk += rowVals.join(',') + '\n';
+                            }
+                            this.push(chunk.length > 0 ? chunk : null);
                         }
+                    });
 
-                        if (val !== null || col.is_nullable) {
-                            ObjectCols.push(`"${col.column_name}"`);
-                            ObjectVals.push(`$${pIdx++}`);
-                            ObjectParams.push(val);
-                        }
-                    }
+                    await pipeline(dataStream, copyStream);
+                    generatedCount = count;
 
-                    if (ObjectCols.length > 0) {
-                        const ddl = `INSERT INTO "${schemaName}"."${safeTableName}" (${ObjectCols.join(', ')}) VALUES (${ObjectVals.join(', ')})`;
-                        await pool.query(ddl as any, ObjectParams);
-                        generatedCount++;
-                    }
+                    return {
+                        rows: [],
+                        columns: [],
+                        message: `Successfully generated ${generatedCount} rows for ${tableName}`,
+                        explanation: ['Native PostgreSQL High-Speed Streaming COPY']
+                    };
+                } finally {
+                    client.release();
                 }
-
-                return {
-                    rows: [],
-                    columns: [],
-                    message: `Successfully generated ${generatedCount} rows for ${tableName}`,
-                    explanation: ['Native Postgres Bulk Insertion']
-                };
             }
         } catch (e: any) {
             logger.error('Generate Data Error:', e);

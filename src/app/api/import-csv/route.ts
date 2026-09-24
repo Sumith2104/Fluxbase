@@ -4,6 +4,8 @@ import { getProjectById } from '@/lib/data';
 import { getTenantPgPool, getTenantMysqlPool, getProjectDbAndSchema } from '@/lib/tenant-pools';
 import Busboy from 'busboy';
 import { Readable } from 'node:stream';
+import { pipeline } from 'node:stream/promises';
+import { from as copyFrom } from 'pg-copy-streams';
 
 export const runtime = 'nodejs';
 export const maxDuration = 300;
@@ -108,6 +110,14 @@ function parseCSV(csvText: string): { headers: string[]; rows: string[][] } {
     const rows = lines.slice(1).map(parseLine);
 
     return { headers, rows };
+}
+
+function formatCsvValue(val: string | null): string {
+    if (val === null || val === undefined) return '';
+    if (val.includes('"') || val.includes(',') || val.includes('\n') || val.includes('\r')) {
+        return `"${val.replace(/"/g, '""')}"`;
+    }
+    return val;
 }
 
 /**
@@ -354,55 +364,89 @@ export async function POST(req: NextRequest) {
                 for (const [, groupRows] of groups) {
                     const quotedCols = groupRows[0].cols.join(', ');
                     const colCount = groupRows[0].cols.length;
-                    for (let batchStart = 0; batchStart < groupRows.length; batchStart += BATCH_SIZE) {
-                        const batch = groupRows.slice(batchStart, batchStart + BATCH_SIZE);
-                        const flatParams: (string | null)[] = [];
-                        const valueClauses: string[] = [];
 
-                        for (let r = 0; r < batch.length; r++) {
-                            const vals = batch[r].vals;
-                            const placeholders = vals.map((_, c) => `$${r * colCount + c + 1}`).join(', ');
-                            valueClauses.push(`(${placeholders})`);
-                            flatParams.push(...vals);
-                        }
+                    // Ultra-fast streaming COPY protocol fast-path
+                    let copySuccess = false;
+                    const copySp = `sp_copy_${savepointIdx++}`;
+                    await client.query(`SAVEPOINT ${copySp}`);
 
-                        const batchSp = `sp_batch_${savepointIdx++}`;
-                        await client.query(`SAVEPOINT ${batchSp}`);
+                    try {
+                        const copySql = `COPY "${schemaName}"."${safeTableName}" (${quotedCols}) FROM STDIN WITH (FORMAT csv, NULL '')`;
+                        const copyStream = client.query(copyFrom(copySql));
 
-                        const sql = `INSERT INTO "${schemaName}"."${safeTableName}" (${quotedCols}) VALUES ${valueClauses.join(', ')}`;
+                        let rowIdx = 0;
+                        const dataStream = new Readable({
+                            read() {
+                                let chunk = '';
+                                while (rowIdx < groupRows.length && chunk.length < 65536) {
+                                    const r = groupRows[rowIdx++];
+                                    chunk += r.vals.map(formatCsvValue).join(',') + '\n';
+                                }
+                                this.push(chunk.length > 0 ? chunk : null);
+                            }
+                        });
 
-                        try {
-                            await client.query(sql, flatParams);
-                            await client.query(`RELEASE SAVEPOINT ${batchSp}`);
-                            importedCount += batch.length;
-                        } catch {
-                            await client.query(`ROLLBACK TO SAVEPOINT ${batchSp}`);
-                            await client.query(`RELEASE SAVEPOINT ${batchSp}`);
+                        await pipeline(dataStream, copyStream);
+                        await client.query(`RELEASE SAVEPOINT ${copySp}`);
+                        importedCount += groupRows.length;
+                        copySuccess = true;
+                    } catch {
+                        // Rollback savepoint if COPY fails and fall back to row-by-row / batching for error diagnosis
+                        await client.query(`ROLLBACK TO SAVEPOINT ${copySp}`);
+                        await client.query(`RELEASE SAVEPOINT ${copySp}`);
+                    }
+
+                    if (!copySuccess) {
+                        for (let batchStart = 0; batchStart < groupRows.length; batchStart += BATCH_SIZE) {
+                            const batch = groupRows.slice(batchStart, batchStart + BATCH_SIZE);
+                            const flatParams: (string | null)[] = [];
+                            const valueClauses: string[] = [];
 
                             for (let r = 0; r < batch.length; r++) {
                                 const vals = batch[r].vals;
-                                const rowCols = batch[r].cols.join(', ');
-                                const placeholders = vals.map((_, c) => `$${c + 1}`).join(', ');
-                                const rowSql = `INSERT INTO "${schemaName}"."${safeTableName}" (${rowCols}) VALUES (${placeholders})`;
-                                const rowSp = `sp_row_${savepointIdx++}`;
+                                const placeholders = vals.map((_, c) => `$${r * colCount + c + 1}`).join(', ');
+                                valueClauses.push(`(${placeholders})`);
+                                flatParams.push(...vals);
+                            }
 
-                                await client.query(`SAVEPOINT ${rowSp}`);
-                                try {
-                                    await client.query(rowSql, vals);
-                                    await client.query(`RELEASE SAVEPOINT ${rowSp}`);
-                                    importedCount++;
-                                } catch (rowErr: any) {
-                                    await client.query(`ROLLBACK TO SAVEPOINT ${rowSp}`);
-                                    await client.query(`RELEASE SAVEPOINT ${rowSp}`);
-                                    const absoluteRowNum = batchStart + r + 2;
-                                    errors.push(`Row ${absoluteRowNum}: ${rowErr.message.split('\n')[0]}`);
+                            const batchSp = `sp_batch_${savepointIdx++}`;
+                            await client.query(`SAVEPOINT ${batchSp}`);
+
+                            const sql = `INSERT INTO "${schemaName}"."${safeTableName}" (${quotedCols}) VALUES ${valueClauses.join(', ')}`;
+
+                            try {
+                                await client.query(sql, flatParams);
+                                await client.query(`RELEASE SAVEPOINT ${batchSp}`);
+                                importedCount += batch.length;
+                            } catch {
+                                await client.query(`ROLLBACK TO SAVEPOINT ${batchSp}`);
+                                await client.query(`RELEASE SAVEPOINT ${batchSp}`);
+
+                                for (let r = 0; r < batch.length; r++) {
+                                    const vals = batch[r].vals;
+                                    const rowCols = batch[r].cols.join(', ');
+                                    const placeholders = vals.map((_, c) => `$${c + 1}`).join(', ');
+                                    const rowSql = `INSERT INTO "${schemaName}"."${safeTableName}" (${rowCols}) VALUES (${placeholders})`;
+                                    const rowSp = `sp_row_${savepointIdx++}`;
+
+                                    await client.query(`SAVEPOINT ${rowSp}`);
+                                    try {
+                                        await client.query(rowSql, vals);
+                                        await client.query(`RELEASE SAVEPOINT ${rowSp}`);
+                                        importedCount++;
+                                    } catch (rowErr: any) {
+                                        await client.query(`ROLLBACK TO SAVEPOINT ${rowSp}`);
+                                        await client.query(`RELEASE SAVEPOINT ${rowSp}`);
+                                        const absoluteRowNum = batchStart + r + 2;
+                                        errors.push(`Row ${absoluteRowNum}: ${rowErr.message.split('\n')[0]}`);
+                                        if (errors.length >= 50) break;
+                                    }
                                     if (errors.length >= 50) break;
                                 }
-                                if (errors.length >= 50) break;
                             }
-                        }
 
-                        if (errors.length >= 50) break;
+                            if (errors.length >= 50) break;
+                        }
                     }
                     if (errors.length >= 50) break;
                 }

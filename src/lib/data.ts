@@ -1167,74 +1167,8 @@ export async function createTable(projectId: string, tableName: string, descript
         const ddl = safeSql`CREATE TABLE ${safeSchema}.${safeTable} (${joinedDefs})`;
         await pool.query(ddl);
 
-        // --- Phase 2: PostgreSQL Realtime Event Trigger ---
-        try {
-            const safeTriggerName = quotePgIdentifierSafe(`${safeTableName}_ws_trigger`);
-            const triggerFunctionSql = safeSql`
-                CREATE OR REPLACE FUNCTION ${safeSchema}.notify_table_change()
-                RETURNS trigger AS $$
-                DECLARE
-                  payload JSON;
-                  row_data RECORD;
-                  v_count INT;
-                BEGIN
-                  -- Fast-path exit if bulk skip is enabled for session or query
-                  IF current_setting('fluxbase.skip_realtime_triggers', true) = 'true' THEN
-                    RETURN COALESCE(NEW, OLD);
-                  END IF;
-
-                  -- Statement/batch safeguard: prevent SLRU queue exhaustion and client freeze.
-                  -- In bulk operations (> 100 rows in a single statement/tx), suppress per-row notify.
-                  v_count := COALESCE(NULLIF(current_setting('fluxbase.rt_count', true), '')::int, 0) + 1;
-                  IF v_count > 100 THEN
-                    RETURN COALESCE(NEW, OLD);
-                  END IF;
-                  PERFORM set_config('fluxbase.rt_count', v_count::text, true);
-
-                  IF TG_OP = 'DELETE' THEN
-                    row_data := OLD;
-                  ELSE
-                    row_data := NEW;
-                  END IF;
-
-                  payload := json_build_object(
-                    'table', TG_TABLE_NAME,
-                    'project_id', '${toSafeSql(projectId.replace(/'/g, "''"))}',
-                    'operation', TG_OP,
-                    'data', row_to_json(row_data)
-                  );
-
-                  -- PostgreSQL NOTIFY has a hard limit of 8000 bytes.
-                  -- If exceeded (e.g. large base64 strings, long JSON, binary data), send truncated payload so transaction never fails:
-                  IF octet_length(payload::text) > 7500 THEN
-                    payload := json_build_object(
-                      'table', TG_TABLE_NAME,
-                      'project_id', '${toSafeSql(projectId.replace(/'/g, "''"))}',
-                      'operation', TG_OP,
-                      'data', json_build_object('id', row_to_json(row_data)->'id'),
-                      'truncated', true
-                    );
-                  END IF;
-
-                  PERFORM pg_notify('flux_realtime', payload::text);
-                  RETURN row_data;
-                END;
-                $$ LANGUAGE plpgsql;
-            `;
-            await pool.query(triggerFunctionSql);
-
-            const attachTriggerSql = safeSql`
-                DROP TRIGGER IF EXISTS ${safeTriggerName} ON ${safeSchema}.${safeTable};
-                CREATE TRIGGER ${safeTriggerName}
-                AFTER INSERT OR UPDATE OR DELETE
-                ON ${safeSchema}.${safeTable}
-                FOR EACH ROW
-                EXECUTE FUNCTION ${safeSchema}.notify_table_change();
-            `;
-            await pool.query(attachTriggerSql);
-        } catch (triggerError) {
-            console.warn(`[Realtime Trigger Warning] Failed to provision triggers on external database for project ${projectId}:`, triggerError);
-        }
+        // Realtime notifications are decoupled via API-level event publishing and Logical Replication
+        // This ensures zero-trigger overhead and maximal write throughput (identical to Supabase).
     }
 
     const { invalidateTableCache } = await import('@/lib/cache');
