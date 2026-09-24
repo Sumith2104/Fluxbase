@@ -48,7 +48,7 @@ fluxbasedb.me, www.fluxbasedb.me {
 
     # High-speed streaming routes (AI chat & realtime SSE)
     @streaming {
-        path /api/ai-chat* /api/ai/* /api/v1/chat/* /api/realtime/subscribe*
+        path /api/ai-chat* /api/ai/* /api/v1/chat/* /api/realtime/subscribe* /api/chat/*
     }
     handle @streaming {
         reverse_proxy app:3000 {
