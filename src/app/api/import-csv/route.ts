@@ -340,6 +340,8 @@ export async function POST(req: NextRequest) {
                 }
 
                 await client.query('BEGIN');
+                await client.query("SET LOCAL fluxbase.skip_realtime_triggers = 'true'");
+                await client.query("SET LOCAL synchronous_commit = 'off'");
                 let savepointIdx = 0;
 
                 const groups = new Map<string, ImportRow[]>();

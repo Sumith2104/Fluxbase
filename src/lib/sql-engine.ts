@@ -385,7 +385,10 @@ export class SqlEngine {
                         SELECT set_config('search_path', $1, false), 
                                set_config('fluxbase.auth_uid', $2, true), 
                                set_config('timezone', $3, false),
-                               set_config('request.jwt.claims', $4, true);
+                               set_config('request.jwt.claims', $4, true),
+                               set_config('fluxbase.skip_realtime_triggers', 'true', true),
+                               set_config('synchronous_commit', 'off', false),
+                               set_config('work_mem', '64MB', false);
                     `;
                     const claimsJson = JSON.stringify({ sub: this.userId || '', role: 'authenticated' });
                     const sessionParams = [
@@ -405,8 +408,8 @@ export class SqlEngine {
                         // Ignore if role does not exist — expected on non-Supabase databases
                     }
 
-                    // Set query timeout for this session
-                    const queryTimeoutMs = parseInt(process.env.FLUX_QUERY_TIMEOUT_MS || '30000', 10);
+                    // Set query timeout for this session (default 60s for SQL Editor/API queries)
+                    const queryTimeoutMs = parseInt(process.env.FLUX_QUERY_TIMEOUT_MS || '60000', 10);
                     await client.query(`SET statement_timeout = '${queryTimeoutMs}'`);
 
                     const result = await client.query(finalQuery, params || []);

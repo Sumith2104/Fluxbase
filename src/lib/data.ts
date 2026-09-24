@@ -1176,7 +1176,21 @@ export async function createTable(projectId: string, tableName: string, descript
                 DECLARE
                   payload JSON;
                   row_data RECORD;
+                  v_count INT;
                 BEGIN
+                  -- Fast-path exit if bulk skip is enabled for session or query
+                  IF current_setting('fluxbase.skip_realtime_triggers', true) = 'true' THEN
+                    RETURN COALESCE(NEW, OLD);
+                  END IF;
+
+                  -- Statement/batch safeguard: prevent SLRU queue exhaustion and client freeze.
+                  -- In bulk operations (> 100 rows in a single statement/tx), suppress per-row notify.
+                  v_count := COALESCE(NULLIF(current_setting('fluxbase.rt_count', true), '')::int, 0) + 1;
+                  IF v_count > 100 THEN
+                    RETURN COALESCE(NEW, OLD);
+                  END IF;
+                  PERFORM set_config('fluxbase.rt_count', v_count::text, true);
+
                   IF TG_OP = 'DELETE' THEN
                     row_data := OLD;
                   ELSE
@@ -1203,7 +1217,6 @@ export async function createTable(projectId: string, tableName: string, descript
                   END IF;
 
                   PERFORM pg_notify('flux_realtime', payload::text);
-                  PERFORM pg_notify('fluxbase_changes', payload::text);
                   RETURN row_data;
                 END;
                 $$ LANGUAGE plpgsql;

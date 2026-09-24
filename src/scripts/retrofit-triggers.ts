@@ -37,16 +37,24 @@ async function retrofitTriggers() {
                 DECLARE
                   payload JSON;
                   row_data RECORD;
+                  v_count INT;
                 BEGIN
+                  -- Support skipping triggers for bulk operations
+                  IF current_setting('fluxbase.skip_realtime_triggers', true) = 'true' THEN
+                    RETURN COALESCE(NEW, OLD);
+                  END IF;
+
+                  -- Statement/batch safeguard: suppress per-row notify on bulk operations (> 100 rows)
+                  v_count := COALESCE(NULLIF(current_setting('fluxbase.rt_count', true), '')::int, 0) + 1;
+                  IF v_count > 100 THEN
+                    RETURN COALESCE(NEW, OLD);
+                  END IF;
+                  PERFORM set_config('fluxbase.rt_count', v_count::text, true);
+
                   IF TG_OP = 'DELETE' THEN
                     row_data := OLD;
                   ELSE
                     row_data := NEW;
-                  END IF;
-
-                  -- Support skipping triggers for bulk operations
-                  IF current_setting('fluxbase.skip_realtime_triggers', true) = 'true' THEN
-                    RETURN row_data;
                   END IF;
 
                   payload := json_build_object(
@@ -58,7 +66,7 @@ async function retrofitTriggers() {
 
                   -- Postgres NOTIFY has a hard limit of 8000 bytes.
                   -- If exceeded, we send a truncated payload to avoid failing the transaction.
-                  IF octet_length(payload::text) > 8000 THEN
+                  IF octet_length(payload::text) > 7500 THEN
                     payload := json_build_object(
                       'table', TG_TABLE_NAME,
                       'project_id', '${projectId}',
