@@ -60,6 +60,23 @@ export async function middleware(request: NextRequest) {
         return NextResponse.next();
     }
 
+    // 0.1 Vercel Domain Handling:
+    // If a request hits a Vercel deployment domain (*.vercel.app):
+    const host = request.headers.get('host') || request.nextUrl.host || '';
+    if (host.includes('.vercel.app')) {
+        // A. Transparently proxy (rewrite) /execute-sql and /api/* to AWS EC2 (fluxbasedb.me)
+        // so external scripts, curl, and SDKs calling the Vercel URL do NOT fail or lose POST bodies.
+        if (pathname === '/execute-sql' || pathname.startsWith('/api/')) {
+            const targetPath = pathname === '/execute-sql' ? '/api/execute-sql' : pathname;
+            const targetUrl = new URL(targetPath + (request.nextUrl.search || ''), 'https://fluxbasedb.me');
+            return NextResponse.rewrite(targetUrl);
+        }
+
+        // B. For all human/browser clicks and navigations, issue a 308 Permanent Redirect to https://fluxbasedb.me
+        const canonicalUrl = new URL(pathname + (request.nextUrl.search || ''), 'https://fluxbasedb.me');
+        return NextResponse.redirect(canonicalUrl, 308);
+    }
+
     const isAuthPage = ['/login', '/signup', '/reset-password'].includes(pathname);
 
     let userId: any = null;

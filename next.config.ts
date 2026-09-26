@@ -47,9 +47,13 @@ const nextConfig: NextConfig = {
     // When deployed on Vercel, forward ALL API routes to the dedicated AWS EC2 production backend (fluxbasedb.me).
     // Using beforeFiles ensures Vercel Edge proxies the requests BEFORE local serverless route handlers are evaluated,
     // guaranteeing sub-second execution without cold starts or connection pool starvation.
-    if (process.env.VERCEL === '1') {
+    if (process.env.VERCEL === '1' || process.env.VERCEL_ENV || process.env.NEXT_PUBLIC_VERCEL_ENV) {
       return {
         beforeFiles: [
+          {
+            source: '/execute-sql',
+            destination: 'https://fluxbasedb.me/api/execute-sql',
+          },
           {
             source: '/api/:path*',
             destination: 'https://fluxbasedb.me/api/:path*',
