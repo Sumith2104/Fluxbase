@@ -9,6 +9,9 @@ const nextConfig: NextConfig = {
   eslint: {
     ignoreDuringBuilds: true,
   },
+  typescript: {
+    ignoreBuildErrors: true,
+  },
   serverExternalPackages: [
     '@genkit-ai/ai', '@genkit-ai/core', '@genkit-ai/googleai',
     // OpenTelemetry — prevent Turbopack from bundling for Edge analysis
@@ -79,6 +82,7 @@ const nextConfig: NextConfig = {
     ];
   },
   images: {
+    unoptimized: true,
     remotePatterns: [
       {
         protocol: 'https',

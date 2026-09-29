@@ -408,7 +408,7 @@ export async function executeProjectBuild(params: {
         }
         // Always prefer npm install --legacy-peer-deps to avoid lockfile peer dependency deadlocks
         if (!effectiveInstallCmd || effectiveInstallCmd.includes('npm ci') || effectiveInstallCmd === 'npm install') {
-            effectiveInstallCmd = 'npm install --legacy-peer-deps --no-audit --no-fund';
+            effectiveInstallCmd = 'npm install --legacy-peer-deps --include=dev --no-audit --no-fund';
         }
     }
 
@@ -437,6 +437,7 @@ export async function executeProjectBuild(params: {
         CI: 'true',
         NEXT_TELEMETRY_DISABLED: '1'
     };
+    delete installEnv.npm_config_production;
     delete installEnv.TURBOPACK;
     delete installEnv.__NEXT_TURBOPACK;
     delete installEnv.NEXT_TURBOPACK;
@@ -541,7 +542,7 @@ export default nextConfig;
         if (effectiveInstallCmd) {
             // Automatically ensure --legacy-peer-deps is passed for npm install to prevent peer dependency deadlocks
             if (effectiveInstallCmd.startsWith('npm install') && !effectiveInstallCmd.includes('--legacy-peer-deps')) {
-                effectiveInstallCmd = effectiveInstallCmd.replace('npm install', 'npm install --legacy-peer-deps --no-audit --no-fund');
+                effectiveInstallCmd = effectiveInstallCmd.replace('npm install', 'npm install --legacy-peer-deps --include=dev --no-audit --no-fund');
             }
             log(`Running install: ${effectiveInstallCmd}`);
             await flushLogsToDb('building');
