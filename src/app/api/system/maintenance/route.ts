@@ -50,16 +50,25 @@ export async function GET() {
             logger.warn('[Maintenance API] Redis cache get failed, querying DB directly', e);
         }
 
-        // 2. Query PostgreSQL RDS
+        // 2. Query PostgreSQL RDS (support both maintenance_announcements and maintenance_updates)
         const query = `
-            SELECT id, content, badge_text, bg_color, text_color, badge_color,
-                   start_time, end_time, is_active, dismissible, link_url, link_text,
-                   priority, created_at, updated_at
-            FROM fluxbase_global.maintenance_announcements
+            WITH combined AS (
+                SELECT id, content, badge_text, bg_color, text_color, badge_color,
+                       start_time, end_time, is_active, dismissible, link_url, link_text,
+                       priority, created_at, updated_at
+                FROM fluxbase_global.maintenance_announcements
+                UNION ALL
+                SELECT id, content, badge_text, bg_color, text_color, badge_color,
+                       start_time, end_time, is_active, dismissible, link_url, link_text,
+                       priority, created_at, updated_at
+                FROM fluxbase_global.maintenance_updates
+            )
+            SELECT *
+            FROM combined
             WHERE is_active = TRUE
               AND (start_time IS NULL OR start_time <= NOW())
               AND (end_time IS NULL OR end_time > NOW())
-            ORDER BY priority DESC, created_at DESC
+            ORDER BY priority DESC, updated_at DESC, created_at DESC
             LIMIT 1;
         `;
 
@@ -93,6 +102,102 @@ export async function GET() {
             { success: false, error: 'Failed to fetch maintenance status', banner: null },
             { status: 500 }
         );
+    }
+}
+
+// Update or publish maintenance announcement
+export async function POST(req: Request) {
+    try {
+        const body = await req.json();
+        const {
+            content,
+            badge_text = 'Maintenance',
+            bg_color = '#FFFFFF',
+            text_color = '#000000',
+            badge_color = '#696969',
+            start_time = null,
+            end_time = null,
+            is_active = true,
+            dismissible = false,
+            link_url = null,
+            link_text = null,
+            priority = 10
+        } = body;
+
+        if (!content || typeof content !== 'string') {
+            return NextResponse.json({ success: false, error: 'Content is required' }, { status: 400 });
+        }
+
+        // Upsert into both maintenance_announcements and maintenance_updates for full compatibility
+        const upsertQuery = `
+            INSERT INTO fluxbase_global.maintenance_announcements (
+                id, content, badge_text, bg_color, text_color, badge_color,
+                start_time, end_time, is_active, dismissible, link_url, link_text,
+                priority, updated_at
+            ) VALUES (
+                '6d5a17c1-398f-4c2b-b4eb-f2668adef227', $1, $2, $3, $4, $5,
+                $6, $7, $8, $9, $10, $11, $12, NOW()
+            )
+            ON CONFLICT (id) DO UPDATE SET
+                content = EXCLUDED.content,
+                badge_text = EXCLUDED.badge_text,
+                bg_color = EXCLUDED.bg_color,
+                text_color = EXCLUDED.text_color,
+                badge_color = EXCLUDED.badge_color,
+                start_time = EXCLUDED.start_time,
+                end_time = EXCLUDED.end_time,
+                is_active = EXCLUDED.is_active,
+                dismissible = EXCLUDED.dismissible,
+                link_url = EXCLUDED.link_url,
+                link_text = EXCLUDED.link_text,
+                priority = EXCLUDED.priority,
+                updated_at = NOW()
+            RETURNING *;
+        `;
+
+        const res = await pool.query(upsertQuery, [
+            content, badge_text, bg_color, text_color, badge_color,
+            start_time, end_time, is_active, dismissible, link_url, link_text, priority
+        ]);
+
+        // Keep maintenance_updates in sync
+        try {
+            await pool.query(
+                `INSERT INTO fluxbase_global.maintenance_updates (
+                    id, content, badge_text, bg_color, text_color, badge_color,
+                    start_time, end_time, is_active, dismissible, link_url, link_text,
+                    priority, updated_at
+                ) VALUES (
+                    '6d5a17c1-398f-4c2b-b4eb-f2668adef227', $1, $2, $3, $4, $5,
+                    $6, $7, $8, $9, $10, $11, $12, NOW()
+                )
+                ON CONFLICT (id) DO UPDATE SET
+                    content = EXCLUDED.content,
+                    badge_text = EXCLUDED.badge_text,
+                    bg_color = EXCLUDED.bg_color,
+                    text_color = EXCLUDED.text_color,
+                    badge_color = EXCLUDED.badge_color,
+                    start_time = EXCLUDED.start_time,
+                    end_time = EXCLUDED.end_time,
+                    is_active = EXCLUDED.is_active,
+                    dismissible = EXCLUDED.dismissible,
+                    link_url = EXCLUDED.link_url,
+                    link_text = EXCLUDED.link_text,
+                    priority = EXCLUDED.priority,
+                    updated_at = NOW();`,
+                [content, badge_text, bg_color, text_color, badge_color, start_time, end_time, is_active, dismissible, link_url, link_text, priority]
+            );
+        } catch (_) {}
+
+        // Instant Redis cache invalidation
+        try {
+            await redis.del(REDIS_KEY);
+        } catch (_) {}
+
+        return NextResponse.json({ success: true, banner: res.rows[0] });
+    } catch (err: any) {
+        logger.error('[Maintenance API] POST error:', err);
+        return NextResponse.json({ success: false, error: err.message }, { status: 500 });
     }
 }
 
