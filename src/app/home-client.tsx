@@ -40,6 +40,14 @@ export default function Home() {
 
     useEffect(() => {
         checkDatabaseHealthAction().then(isHealthy => setIsOffline(!isHealthy));
+        fetch('/api/auth/session')
+            .then(res => res.json())
+            .then(data => {
+                if (data?.authenticated || data?.user?.id) {
+                    window.location.href = '/dashboard/projects';
+                }
+            })
+            .catch(() => {});
     }, []);
 
     const openSignup = () => {

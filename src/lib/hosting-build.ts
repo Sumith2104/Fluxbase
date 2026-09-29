@@ -664,7 +664,7 @@ export default nextConfig;
                                     size: buf.length,
                                     mimeType: 'text/html'
                                 });
-                            } else if (entry.name === 'index.html' && dir === appServerDir) {
+                            } else if ((entry.name === 'index.html' || entry.name === 'page.html') && dir === appServerDir) {
                                 builtFiles.push({
                                     path: 'index.html',
                                     buffer: buf,
@@ -724,15 +724,28 @@ export default nextConfig;
             // 5. Ensure root index.html exists
             const hasIndex = builtFiles.some(f => f.path === 'index.html');
             if (!hasIndex) {
-                const fallback404 = builtFiles.find(f => f.path === '404.html');
-                if (fallback404) {
+                // Look for actual content pages before falling back to 404
+                const contentCandidate = builtFiles.find(f => f.path === 'home.html' || f.path === 'dashboard.html' || f.path === 'projects.html') ||
+                    builtFiles.find(f => f.path.endsWith('.html') && f.path !== '404.html' && f.path !== '500.html');
+                if (contentCandidate) {
                     builtFiles.push({
                         path: 'index.html',
-                        buffer: fallback404.buffer,
-                        size: fallback404.size,
+                        buffer: contentCandidate.buffer,
+                        size: contentCandidate.size,
                         mimeType: 'text/html'
                     });
-                    log('Configured fallback 404 as root index.html for SPA routing');
+                    log(`Configured ${contentCandidate.path} as root index.html`);
+                } else {
+                    const fallback404 = builtFiles.find(f => f.path === '404.html');
+                    if (fallback404) {
+                        builtFiles.push({
+                            path: 'index.html',
+                            buffer: fallback404.buffer,
+                            size: fallback404.size,
+                            mimeType: 'text/html'
+                        });
+                        log('Configured fallback 404 as root index.html for SPA routing');
+                    }
                 }
             }
         } else {
