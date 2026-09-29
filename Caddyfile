@@ -4,8 +4,6 @@
     admin off
     on_demand_tls {
         ask http://app:3000/api/hosting/verify-domain
-        interval 5m
-        burst 5
     }
 }
 
