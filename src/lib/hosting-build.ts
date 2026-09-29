@@ -37,9 +37,7 @@ export function detectFramework(files: ExtractedFile[]): DetectedFramework {
         const hasPnpmLock = files.some(f => f.path === 'pnpm-lock.yaml');
 
         let defaultInstall = 'npm install --legacy-peer-deps --no-audit --no-fund';
-        if (hasLockfile) {
-            defaultInstall = 'npm ci --include=dev';
-        } else if (hasYarnLock) {
+        if (hasYarnLock) {
             defaultInstall = 'yarn install --frozen-lockfile';
         } else if (hasPnpmLock) {
             defaultInstall = 'pnpm install --frozen-lockfile';
@@ -408,10 +406,9 @@ export async function executeProjectBuild(params: {
         if (!effectiveBuildCmd) {
             effectiveBuildCmd = 'npm run build';
         }
-        // If the install command was defaulted to 'npm install --legacy-peer-deps' but package-lock exists, upgrade to npm ci
-        const hasLockfile = files.some(f => f.path === 'package-lock.json' || f.path.endsWith('/package-lock.json'));
-        if (hasLockfile && (!effectiveInstallCmd || effectiveInstallCmd.includes('--legacy-peer-deps') || effectiveInstallCmd === 'npm ci')) {
-            effectiveInstallCmd = 'npm ci --include=dev';
+        // Always prefer npm install --legacy-peer-deps to avoid lockfile peer dependency deadlocks
+        if (!effectiveInstallCmd || effectiveInstallCmd.includes('npm ci') || effectiveInstallCmd === 'npm install') {
+            effectiveInstallCmd = 'npm install --legacy-peer-deps --no-audit --no-fund';
         }
     }
 
