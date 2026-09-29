@@ -189,7 +189,13 @@ function runStreamingCommand(
 
         const timer = setTimeout(() => {
             timedOut = true;
-            child.kill('SIGTERM');
+            if (process.platform === 'win32' && child.pid) {
+                try {
+                    spawn('taskkill', ['/pid', child.pid.toString(), '/T', '/F']);
+                } catch (_) {}
+            } else {
+                child.kill('SIGTERM');
+            }
             reject(new Error(`Command timed out after ${timeoutMs / 1000}s: ${command}`));
         }, timeoutMs);
 
@@ -479,6 +485,10 @@ export default nextConfig;
 
         // Execute install command with full devDependencies available
         if (effectiveInstallCmd) {
+            // Automatically ensure --legacy-peer-deps is passed for npm install to prevent peer dependency deadlocks
+            if (effectiveInstallCmd.startsWith('npm install') && !effectiveInstallCmd.includes('--legacy-peer-deps')) {
+                effectiveInstallCmd = effectiveInstallCmd.replace('npm install', 'npm install --legacy-peer-deps --no-audit --no-fund');
+            }
             log(`Running install: ${effectiveInstallCmd}`);
             await flushLogsToDb('building');
             try {
@@ -493,9 +503,9 @@ export default nextConfig;
             } catch (instErr: any) {
                 log(`Install notice: ${instErr.message}`);
                 if (effectiveInstallCmd.includes('npm ci')) {
-                    log('Falling back to npm install --legacy-peer-deps --include=dev...');
+                    log('Falling back to npm install --legacy-peer-deps --include=dev --no-audit --no-fund...');
                     try {
-                        await runStreamingCommand('npm install --legacy-peer-deps --include=dev', {
+                        await runStreamingCommand('npm install --legacy-peer-deps --include=dev --no-audit --no-fund', {
                             cwd: buildDir,
                             env: installEnv,
                             timeoutMs: 240000,
@@ -504,8 +514,10 @@ export default nextConfig;
                         log('Dependencies resolved with fallback install.');
                         await flushLogsToDb();
                     } catch (fallbackErr: any) {
-                        log(`Fallback install notice: ${fallbackErr.message}`);
+                        throw new Error(`Failed to install dependencies: ${fallbackErr.message}`);
                     }
+                } else {
+                    throw new Error(`Failed to install dependencies: ${instErr.message}`);
                 }
             }
         }
