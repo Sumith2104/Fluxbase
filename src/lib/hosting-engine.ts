@@ -43,11 +43,6 @@ export const MIME_TYPES: Record<string, string> = {
     '.wav': 'audio/wav',
 };
 
-const DANGEROUS_EXTENSIONS = new Set([
-    '.exe', '.sh', '.bat', '.cmd', '.com', '.msi', '.bin', '.pif',
-    '.scr', '.vbs', '.vbe', '.wsf', '.wsh', '.php', '.py', '.rb',
-    '.cgi', '.pl', '.jar'
-]);
 
 export function detectMimeType(filePath: string): string {
     const lastDot = filePath.lastIndexOf('.');
@@ -135,14 +130,6 @@ export async function extractZipArchive(zipBuffer: Buffer): Promise<ExtractedFil
         cleanPath = sanitizePath(cleanPath);
         if (!cleanPath) continue;
 
-        // Security: reject dangerous executables
-        const lastDot = cleanPath.lastIndexOf('.');
-        if (lastDot !== -1) {
-            const ext = cleanPath.slice(lastDot).toLowerCase();
-            if (DANGEROUS_EXTENSIONS.has(ext)) {
-                throw new Error(`Executable file type '${ext}' is not permitted for web hosting (${cleanPath})`);
-            }
-        }
 
         const buffer = await file.async('nodebuffer');
         extracted.push({
