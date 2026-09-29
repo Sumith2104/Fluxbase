@@ -404,6 +404,24 @@ export async function createDeployment(params: {
                     );
                 }
             } catch (bErr: any) {
+                const isCanceled = bErr?.message?.includes('canceled by user') || bErr?.message?.includes('Deployment canceled');
+                if (isCanceled) {
+                    await pool.query(
+                        `UPDATE fluxbase_global.hosting_deployments 
+                         SET status = 'canceled', error_message = 'Deployment canceled by user' 
+                         WHERE deploy_id = $1`,
+                        [deployId]
+                    );
+                    return {
+                        deployId,
+                        version: nextVersion,
+                        subdomain: site.subdomain,
+                        previewUrl,
+                        status: 'canceled',
+                        fileCount: 0,
+                        totalBytes: 0,
+                    };
+                }
                 buildLogs = bErr.message || 'Build execution failed';
                 await pool.query(
                     `UPDATE fluxbase_global.hosting_deployments 
@@ -412,6 +430,20 @@ export async function createDeployment(params: {
                     [buildLogs, deployId]
                 );
                 throw new Error(`Build failed: ${bErr.message}`);
+            }
+
+            // Check if deployment was canceled before upload
+            const depCheck = await pool.query('SELECT status FROM fluxbase_global.hosting_deployments WHERE deploy_id = $1', [deployId]);
+            if (depCheck.rows[0]?.status === 'canceled') {
+                return {
+                    deployId,
+                    version: nextVersion,
+                    subdomain: site.subdomain,
+                    previewUrl,
+                    status: 'canceled',
+                    fileCount: 0,
+                    totalBytes: 0,
+                };
             }
 
             // Upload files to S3

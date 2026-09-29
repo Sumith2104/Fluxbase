@@ -67,7 +67,8 @@ import {
     Unlock,
     Zap,
     GitCommit,
-    CheckCheck
+    CheckCheck,
+    StopCircle
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
@@ -183,6 +184,10 @@ export default function HostingPage() {
     const [isTogglingAutoDeploy, setIsTogglingAutoDeploy] = useState(false);
     const [isTriggeringAutoDeploy, setIsTriggeringAutoDeploy] = useState(false);
     const [elapsedSeconds, setElapsedSeconds] = useState(0);
+
+    // Cancel Deployment State
+    const [isCancellingDeploy, setIsCancellingDeploy] = useState(false);
+    const [cancellingDeployId, setCancellingDeployId] = useState<string | null>(null);
 
     // Env Var States
     const [envFilter, setEnvFilter] = useState<'all' | 'production' | 'preview'>('all');
@@ -697,6 +702,39 @@ export default function HostingPage() {
         }
     };
 
+    // Cancel In-Flight Deployment
+    const handleCancelDeployment = async (deployId: string) => {
+        if (!site?.site_id || !deployId) return;
+        setIsCancellingDeploy(true);
+        setCancellingDeployId(deployId);
+        try {
+            const res = await fetch('/api/hosting/cancel', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ siteId: site.site_id, deployId }),
+            });
+            const data = await res.json();
+            if (!res.ok || !data.success) throw new Error(data.error || 'Failed to cancel deployment');
+
+            toast({
+                title: 'Deployment Canceled',
+                description: 'The build process was terminated and the deployment marked as canceled.'
+            });
+            refetchLog();
+            refetchDeploys();
+            refetchSite();
+        } catch (err: any) {
+            toast({
+                title: 'Cancellation Failed',
+                description: err.message,
+                variant: 'destructive'
+            });
+        } finally {
+            setIsCancellingDeploy(false);
+            setCancellingDeployId(null);
+        }
+    };
+
     // Add Env Var
     const handleSaveEnv = async () => {
         if (!site?.site_id) return;
@@ -1188,14 +1226,30 @@ export default function HostingPage() {
                                 </p>
                             </div>
                         </div>
-                        <Button
-                            size="sm"
-                            onClick={() => openBuildLogsModal(activeDeployment.deploy_id)}
-                            className="gap-2 text-xs self-start sm:self-auto"
-                        >
-                            <Terminal className="h-3.5 w-3.5" />
-                            View Live Logs
-                        </Button>
+                        <div className="flex items-center gap-2 self-start sm:self-auto">
+                            <Button
+                                size="sm"
+                                onClick={() => openBuildLogsModal(activeDeployment.deploy_id)}
+                                className="gap-2 text-xs"
+                            >
+                                <Terminal className="h-3.5 w-3.5" />
+                                View Live Logs
+                            </Button>
+                            <Button
+                                size="sm"
+                                variant="destructive"
+                                onClick={() => handleCancelDeployment(activeDeployment.deploy_id)}
+                                disabled={isCancellingDeploy}
+                                className="gap-1.5 text-xs bg-destructive/90 hover:bg-destructive text-destructive-foreground font-medium"
+                            >
+                                {isCancellingDeploy ? (
+                                    <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+                                ) : (
+                                    <StopCircle className="h-3.5 w-3.5" />
+                                )}
+                                Cancel Deployment
+                            </Button>
+                        </div>
                     </div>
                 )}
 
@@ -2175,6 +2229,7 @@ export default function HostingPage() {
                                                                     dep.status === 'live' && "bg-emerald-500/20 text-emerald-400",
                                                                     dep.status === 'ready' && "bg-teal-500/20 text-teal-400",
                                                                     dep.status === 'failed' && "bg-destructive/20 text-destructive border-destructive/30",
+                                                                    dep.status === 'canceled' && "bg-amber-500/20 text-amber-400 border-amber-500/30",
                                                                     dep.status === 'uploading' && "bg-blue-500/20 text-blue-400 animate-pulse",
                                                                     dep.status === 'building' && "bg-amber-500/20 text-amber-400 animate-pulse"
                                                                 )}
@@ -2215,7 +2270,7 @@ export default function HostingPage() {
                                                                 <div className="min-w-0 flex-1">
                                                                     <div className="flex items-center justify-between gap-2 mb-0.5">
                                                                         <span className="font-semibold text-[10px] uppercase tracking-wider text-destructive/80">
-                                                                            Build Error
+                                                                            {dep.status === 'canceled' ? 'Notice' : 'Build Error'}
                                                                         </span>
                                                                         <span className="text-[10px] font-sans font-medium underline opacity-75 group-hover:opacity-100 flex items-center gap-1 shrink-0">
                                                                             View Logs
@@ -2232,6 +2287,22 @@ export default function HostingPage() {
                                                 </div>
 
                                                 <div className="flex items-center gap-2 self-start md:self-center shrink-0">
+                                                    {(dep.status === 'building' || dep.status === 'uploading' || dep.status === 'queued') && (
+                                                        <Button
+                                                            variant="destructive"
+                                                            size="sm"
+                                                            className="h-8 text-xs gap-1.5 shrink-0 bg-destructive/90 hover:bg-destructive text-destructive-foreground font-medium"
+                                                            onClick={() => handleCancelDeployment(dep.deploy_id)}
+                                                            disabled={isCancellingDeploy && cancellingDeployId === dep.deploy_id}
+                                                        >
+                                                            {isCancellingDeploy && cancellingDeployId === dep.deploy_id ? (
+                                                                <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+                                                            ) : (
+                                                                <StopCircle className="h-3.5 w-3.5" />
+                                                            )}
+                                                            Cancel
+                                                        </Button>
+                                                    )}
                                                     <Button
                                                         variant="outline"
                                                         size="sm"
@@ -2252,7 +2323,7 @@ export default function HostingPage() {
                                                             Preview
                                                         </Button>
                                                     )}
-                                                    {!isLive && dep.status !== 'failed' && (
+                                                    {dep.status === 'ready' && !isLive && (
                                                         <Button
                                                             variant="default"
                                                             size="sm"
@@ -2767,6 +2838,7 @@ export default function HostingPage() {
                                             logData.deployment.status === 'live' && "bg-emerald-500/20 text-emerald-400",
                                             logData.deployment.status === 'ready' && "bg-teal-500/20 text-teal-400",
                                             logData.deployment.status === 'failed' && "bg-destructive/20 text-destructive",
+                                            logData.deployment.status === 'canceled' && "bg-amber-500/20 text-amber-400",
                                             logData.deployment.status === 'uploading' && "bg-blue-500/20 text-blue-400 animate-pulse",
                                             logData.deployment.status === 'building' && "bg-amber-500/20 text-amber-400 animate-pulse"
                                         )}
@@ -2783,6 +2855,22 @@ export default function HostingPage() {
                             )}
                         </div>
                         <div className="flex items-center gap-2">
+                            {(logData?.deployment?.status === 'building' || logData?.deployment?.status === 'uploading' || logData?.deployment?.status === 'queued') && (
+                                <Button
+                                    variant="destructive"
+                                    size="sm"
+                                    className="h-7 text-xs gap-1.5 font-medium shadow-sm bg-destructive/90 hover:bg-destructive text-destructive-foreground"
+                                    onClick={() => handleCancelDeployment(logData.deployment.deploy_id)}
+                                    disabled={isCancellingDeploy}
+                                >
+                                    {isCancellingDeploy ? (
+                                        <RefreshCw className="h-3 w-3 animate-spin" />
+                                    ) : (
+                                        <StopCircle className="h-3.5 w-3.5" />
+                                    )}
+                                    Cancel Deployment
+                                </Button>
+                            )}
                             <Button
                                 variant="ghost"
                                 size="sm"
@@ -2863,6 +2951,13 @@ export default function HostingPage() {
                         {logData?.deployment?.error_message && (
                             <div className="mt-4 p-3 rounded bg-destructive/10 border border-destructive/20 text-destructive font-semibold">
                                 Error: {logData.deployment.error_message}
+                            </div>
+                        )}
+
+                        {logData?.deployment?.status === 'canceled' && (
+                            <div className="mt-4 p-3 rounded-lg bg-amber-500/10 border border-amber-500/30 flex items-center gap-2 text-amber-300 text-xs">
+                                <StopCircle className="h-4 w-4 shrink-0 text-amber-400" />
+                                <span>Deployment was canceled by user. Build process was stopped.</span>
                             </div>
                         )}
 

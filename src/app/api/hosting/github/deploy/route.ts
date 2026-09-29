@@ -122,6 +122,13 @@ async function runGitHubDeploymentPipeline(params: PipelineParams) {
             );
         }
 
+        // Check if deployment was canceled by user during build
+        const depCheck = await pool.query('SELECT status FROM fluxbase_global.hosting_deployments WHERE deploy_id = $1', [deployId]);
+        if (depCheck.rows[0]?.status === 'canceled') {
+            await appendDeployLog('Deployment canceled before asset publication.');
+            return;
+        }
+
         // Upload compiled static assets to S3 edge storage
         await appendDeployLog(`Uploading ${buildRes.files.length} compiled assets to global CDN...`);
         const uploadStats = await uploadDeploymentAssetsToS3(projectId, deployId, buildRes.files);
@@ -188,6 +195,17 @@ async function runGitHubDeploymentPipeline(params: PipelineParams) {
 
     } catch (err: any) {
         logger.error(`[GitHub Deploy Pipeline Failed] [${deployId}]:`, err);
+        const isCanceled = err?.message?.includes('canceled by user') || err?.message?.includes('Deployment was canceled');
+        if (isCanceled) {
+            await appendDeployLog(`DEPLOYMENT CANCELED: Deployment was canceled by user.`, 'canceled');
+            await pool.query(
+                `UPDATE fluxbase_global.hosting_deployments
+                 SET status = 'canceled', error_message = 'Deployment canceled by user'
+                 WHERE deploy_id = $1`,
+                [deployId]
+            );
+            return;
+        }
         const errMsg = err.message || 'Deployment pipeline failed';
         await appendDeployLog(`DEPLOYMENT FAILED: ${errMsg}`, 'failed');
         await pool.query(

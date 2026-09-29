@@ -16,7 +16,8 @@ export interface DetectedFramework {
 }
 
 export function detectFramework(files: ExtractedFile[]): DetectedFramework {
-    const pkgFile = files.find(f => f.path === 'package.json' || f.path.endsWith('/package.json'));
+    // Prioritize root package.json before any nested packages in monorepos or subdirectories
+    const pkgFile = files.find(f => f.path === 'package.json') || files.find(f => f.path.endsWith('/package.json'));
     if (!pkgFile) {
         return {
             name: 'Static Web Application',
@@ -31,11 +32,11 @@ export function detectFramework(files: ExtractedFile[]): DetectedFramework {
         const pkg = JSON.parse(pkgFile.buffer.toString('utf8'));
         const deps = { ...(pkg.dependencies || {}), ...(pkg.devDependencies || {}) };
 
-        const hasLockfile = files.some(f => f.path === 'package-lock.json' || f.path.endsWith('/package-lock.json'));
-        const hasYarnLock = files.some(f => f.path === 'yarn.lock' || f.path.endsWith('/yarn.lock'));
-        const hasPnpmLock = files.some(f => f.path === 'pnpm-lock.yaml' || f.path.endsWith('/pnpm-lock.yaml'));
+        const hasLockfile = files.some(f => f.path === 'package-lock.json');
+        const hasYarnLock = files.some(f => f.path === 'yarn.lock');
+        const hasPnpmLock = files.some(f => f.path === 'pnpm-lock.yaml');
 
-        let defaultInstall = 'npm install --legacy-peer-deps';
+        let defaultInstall = 'npm install --legacy-peer-deps --no-audit --no-fund';
         if (hasLockfile) {
             defaultInstall = 'npm ci --include=dev';
         } else if (hasYarnLock) {
@@ -162,11 +163,54 @@ export function findBuiltAssets(files: ExtractedFile[], targetOutputDir?: string
     return null;
 }
 
+interface ActiveBuildJob {
+    deployId: string;
+    child?: import('child_process').ChildProcess;
+    isCanceled?: boolean;
+}
+
+const activeBuildJobs = new Map<string, ActiveBuildJob>();
+
+export async function cancelDeploymentBuild(
+    deployId: string,
+    reason: string = 'Deployment canceled by user'
+): Promise<{ success: boolean; message: string }> {
+    const pool = getPgPool();
+    const job = activeBuildJobs.get(deployId);
+    if (job) {
+        job.isCanceled = true;
+        if (job.child) {
+            try {
+                if (process.platform === 'win32' && job.child.pid) {
+                    spawn('taskkill', ['/pid', job.child.pid.toString(), '/T', '/F']);
+                } else if (job.child.pid) {
+                    job.child.kill('SIGTERM');
+                }
+            } catch (err) {
+                logger.warn(`Failed to kill process for deploy ${deployId}:`, err);
+            }
+        }
+    }
+
+    const timestamp = new Date().toISOString().replace('T', ' ').slice(0, 19);
+    await pool.query(
+        `UPDATE fluxbase_global.hosting_deployments 
+         SET status = 'canceled', 
+             error_message = $1, 
+             build_logs = COALESCE(build_logs, '') || E'\\n' || $2
+         WHERE deploy_id = $3 AND status IN ('uploading', 'building', 'queued')`,
+        [reason, `[${timestamp}] [System] Deployment was canceled by user.`, deployId]
+    );
+
+    return { success: true, message: 'Deployment canceled successfully' };
+}
+
 interface RunCommandOptions {
     cwd: string;
     env: NodeJS.ProcessEnv;
     timeoutMs?: number;
     onLog: (line: string) => void;
+    deployId?: string;
 }
 
 /**
@@ -180,12 +224,23 @@ function runStreamingCommand(
         const timeoutMs = options.timeoutMs || 300000;
         let timedOut = false;
 
+        if (options.deployId && activeBuildJobs.get(options.deployId)?.isCanceled) {
+            return reject(new Error('Deployment canceled by user'));
+        }
+
         const child = spawn(command, {
             shell: true,
             cwd: options.cwd,
             env: options.env,
             windowsHide: true,
         });
+
+        if (options.deployId) {
+            const job = activeBuildJobs.get(options.deployId);
+            if (job) {
+                job.child = child;
+            }
+        }
 
         const timer = setTimeout(() => {
             timedOut = true;
@@ -319,6 +374,8 @@ export async function executeProjectBuild(params: {
         logs.push(line);
         scheduleFlush();
     };
+
+    activeBuildJobs.set(deployId, { deployId });
 
     log(`Starting deployment compilation for ${deployId}`);
 
@@ -496,11 +553,15 @@ export default nextConfig;
                     cwd: buildDir,
                     env: installEnv,
                     timeoutMs: 240000, // 4 mins
-                    onLog: logStream
+                    onLog: logStream,
+                    deployId
                 });
                 log('Dependencies resolved successfully.');
                 await flushLogsToDb();
             } catch (instErr: any) {
+                if (activeBuildJobs.get(deployId)?.isCanceled) {
+                    throw new Error('Deployment canceled by user');
+                }
                 log(`Install notice: ${instErr.message}`);
                 if (effectiveInstallCmd.includes('npm ci')) {
                     log('Falling back to npm install --legacy-peer-deps --include=dev --no-audit --no-fund...');
@@ -509,7 +570,8 @@ export default nextConfig;
                             cwd: buildDir,
                             env: installEnv,
                             timeoutMs: 240000,
-                            onLog: logStream
+                            onLog: logStream,
+                            deployId
                         });
                         log('Dependencies resolved with fallback install.');
                         await flushLogsToDb();
@@ -520,6 +582,10 @@ export default nextConfig;
                     throw new Error(`Failed to install dependencies: ${instErr.message}`);
                 }
             }
+        }
+
+        if (activeBuildJobs.get(deployId)?.isCanceled) {
+            throw new Error('Deployment canceled by user');
         }
 
         // Execute build command with NODE_ENV=production
@@ -534,7 +600,8 @@ export default nextConfig;
                 cwd: buildDir,
                 env: buildEnv,
                 timeoutMs: 300000, // 5 mins
-                onLog: logStream
+                onLog: logStream,
+                deployId
             });
             log('Build process completed successfully.');
             await flushLogsToDb();
@@ -704,6 +771,17 @@ export default nextConfig;
         };
 
     } catch (err: any) {
+        const isCanceled = activeBuildJobs.get(deployId)?.isCanceled || 
+            err?.message?.includes('canceled by user') ||
+            err?.message?.includes('Deployment was canceled');
+        if (isCanceled) {
+            log('[System] Deployment was canceled by user.');
+            await flushLogsToDb('canceled');
+            const cancelErr = new Error('Deployment canceled by user');
+            (cancelErr as any).buildLogs = logs.join('\n');
+            throw cancelErr;
+        }
+
         let errorSummary = err?.message || 'Build compilation failed';
         if (errorSummary.includes('Command failed with exit code') || errorSummary.includes('Command failed:')) {
             const descriptiveLine = [...logs].reverse().find(l => 
@@ -721,6 +799,7 @@ export default nextConfig;
         (customErr as any).buildLogs = logs.join('\n');
         throw customErr;
     } finally {
+        activeBuildJobs.delete(deployId);
         if (flushTimeout) clearTimeout(flushTimeout);
         // Clean up scratch build directory
         try {
