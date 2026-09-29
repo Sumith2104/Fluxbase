@@ -8,6 +8,7 @@ import {
     getOrCreateHostingSite,
     extractZipArchive,
     uploadDeploymentAssetsToS3,
+    deployToTenantsEdge,
     checkHostingDeploySize
 } from '@/lib/hosting-engine';
 import { getPgPool } from '@/lib/pg';
@@ -124,6 +125,15 @@ async function runGitHubDeploymentPipeline(params: PipelineParams) {
         // Upload compiled static assets to S3 edge storage
         await appendDeployLog(`Uploading ${buildRes.files.length} compiled assets to global CDN...`);
         const uploadStats = await uploadDeploymentAssetsToS3(projectId, deployId, buildRes.files);
+
+        // Deploy directly to the dedicated top-tier edge server (/var/www/tenants/<subdomain>)
+        await appendDeployLog(`Deploying to top-tier edge cluster (/var/www/tenants)...`);
+        const siteRow = await pool.query('SELECT subdomain, custom_domain FROM fluxbase_global.hosting_sites WHERE site_id = $1', [siteId]);
+        const sub = siteRow.rows[0]?.subdomain;
+        const customDomains = siteRow.rows[0]?.custom_domain ? [siteRow.rows[0].custom_domain] : [];
+        if (sub) {
+            await deployToTenantsEdge(sub, buildRes.files, customDomains);
+        }
 
         // Mark deployment live / ready
         const isProd = environment === 'production' || autoPromote;

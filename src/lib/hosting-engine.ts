@@ -203,6 +203,52 @@ export async function uploadDeploymentAssetsToS3(
 }
 
 /**
+ * Deploys files directly to the dedicated top-tier hosting edge server (/var/www/tenants/<domain>)
+ */
+export async function deployToTenantsEdge(
+    subdomain: string,
+    files: ExtractedFile[],
+    customDomains: string[] = []
+): Promise<{ success: boolean; error?: string }> {
+    const edgeUrl = process.env.HOSTING_EDGE_URL || 'http://13.207.235.61:9000';
+    const edgeSecret = process.env.HOSTING_EDGE_SECRET || '9e1e726a895a56318a934c340329d11362adf922fd3afd86';
+
+    const fullDomain = subdomain.includes('.') ? subdomain : `${subdomain}.fluxbasedb.me`;
+
+    try {
+        const payload = JSON.stringify({
+            domain: fullDomain,
+            customDomains,
+            files: files.map(f => ({
+                path: f.path,
+                content: f.buffer.toString('base64')
+            }))
+        });
+
+        const res = await fetch(`${edgeUrl}/api/deploy-tenant`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'x-fluxbase-secret': edgeSecret
+            },
+            body: payload
+        });
+
+        if (!res.ok) {
+            const errText = await res.text();
+            logger.warn(`Failed to deploy to tenants edge (${res.status}): ${errText}`);
+            return { success: false, error: errText };
+        }
+
+        logger.info(`Successfully deployed ${files.length} files to tenants edge for ${fullDomain}`);
+        return { success: true };
+    } catch (err: any) {
+        logger.warn(`Error deploying to tenants edge: ${err?.message}`);
+        return { success: false, error: err?.message };
+    }
+}
+
+/**
  * Creates or gets the hosting site record for a project
  */
 export async function getOrCreateHostingSite(
@@ -370,6 +416,13 @@ export async function createDeployment(params: {
 
             // Upload files to S3
             const uploadStats = await uploadDeploymentAssetsToS3(projectId, deployId, filesToUpload);
+
+            // Deploy files directly to the dedicated top-tier edge server (/var/www/tenants/<domain>)
+            const customDomains = site.custom_domain ? [site.custom_domain] : [];
+            await deployToTenantsEdge(site.subdomain, filesToUpload, customDomains);
+            if (environment === 'preview') {
+                await deployToTenantsEdge(`${deployId}.preview.fluxbasedb.me`, filesToUpload);
+            }
 
             // Update deploy status to ready
             const isProd = environment === 'production' || autoPromote;
