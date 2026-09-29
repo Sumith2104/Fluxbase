@@ -98,10 +98,54 @@ export class GitHubClient {
         }));
     }
 
+    async listAllRepos(maxRepos: number = 300): Promise<GitHubRepo[]> {
+        const all: GitHubRepo[] = [];
+        let page = 1;
+        const perPage = 100;
+
+        while (all.length < maxRepos) {
+            const batch = await this.listRepos(page, perPage);
+            if (!batch || batch.length === 0) break;
+            all.push(...batch);
+            if (batch.length < perPage) break;
+            page++;
+        }
+
+        return all;
+    }
+
     async searchUserRepos(query: string): Promise<GitHubRepo[]> {
-        // Fetch user repos and filter locally for responsiveness and rate-limit conservation
-        const all = await this.listRepos(1, 100);
-        const q = query.toLowerCase().trim();
+        const q = query.trim().toLowerCase();
+        if (!q) return this.listAllRepos(100);
+
+        try {
+            // Check via GitHub Search API for instant matching across all repos
+            const user = await this.getUser();
+            const searchUrl = `https://api.github.com/search/repositories?q=user:${encodeURIComponent(user.login)}+${encodeURIComponent(query)}+in:name&per_page=50`;
+            const res = await fetch(searchUrl, { headers: this.headers });
+            if (res.ok) {
+                const data = await res.json();
+                if (Array.isArray(data.items) && data.items.length > 0) {
+                    return data.items.map((r: any) => ({
+                        id: r.id,
+                        full_name: r.full_name,
+                        name: r.name,
+                        private: Boolean(r.private),
+                        description: r.description || null,
+                        default_branch: r.default_branch || 'main',
+                        language: r.language || null,
+                        updated_at: r.updated_at,
+                        html_url: r.html_url,
+                        stargazers_count: r.stargazers_count || 0,
+                    }));
+                }
+            }
+        } catch {
+            // Fallback to local filter
+        }
+
+        // Fallback: fetch up to 300 repos and filter locally
+        const all = await this.listAllRepos(300);
         return all.filter(r => 
             r.name.toLowerCase().includes(q) || 
             r.full_name.toLowerCase().includes(q) ||
@@ -281,4 +325,106 @@ export class GitHubClient {
             modulePath: cleanModulePath,
         };
     }
+
+    async getTree(
+        owner: string,
+        repo: string,
+        branch: string = 'main',
+        recursive: boolean = true
+    ): Promise<{ tree: Array<{ path: string; mode: string; type: string; sha: string; size?: number; url: string }> }> {
+        const url = `https://api.github.com/repos/${owner}/${repo}/git/trees/${encodeURIComponent(branch)}${recursive ? '?recursive=1' : ''}`;
+        const res = await fetch(url, { headers: this.headers });
+        if (!res.ok) {
+            throw new Error(`GitHub API error fetching tree for ${owner}/${repo}@${branch} (${res.status}): ${await res.text()}`);
+        }
+        return res.json();
+    }
+
+    async getBlobContent(owner: string, repo: string, sha: string): Promise<Buffer> {
+        const url = `https://api.github.com/repos/${owner}/${repo}/git/blobs/${sha}`;
+        const res = await fetch(url, { headers: this.headers });
+        if (!res.ok) {
+            throw new Error(`GitHub API error fetching blob ${sha} (${res.status}): ${await res.text()}`);
+        }
+        const data = await res.json();
+        return Buffer.from(data.content, data.encoding || 'base64');
+    }
+
+    async getRepoZipball(owner: string, repo: string, ref: string = 'main'): Promise<Buffer> {
+        const url = `https://api.github.com/repos/${owner}/${repo}/zipball/${encodeURIComponent(ref)}`;
+        const res = await fetch(url, { headers: this.headers, redirect: 'follow' });
+        if (!res.ok) {
+            throw new Error(`GitHub API error downloading repository zip (${res.status}): ${await res.text()}`);
+        }
+        const arrayBuf = await res.arrayBuffer();
+        return Buffer.from(arrayBuf);
+    }
+
+    async getLatestCommit(owner: string, repo: string, branch: string = 'main'): Promise<{ sha: string; message: string; author: string }> {
+        const url = `https://api.github.com/repos/${owner}/${repo}/commits/${encodeURIComponent(branch)}`;
+        const res = await fetch(url, { headers: this.headers });
+        if (!res.ok) {
+            throw new Error(`GitHub API error fetching commit (${res.status}): ${await res.text()}`);
+        }
+        const data = await res.json();
+        return {
+            sha: data.sha,
+            message: data.commit?.message || 'New commit',
+            author: data.commit?.author?.name || data.author?.login || 'committer'
+        };
+    }
+
+    async createWebhook(owner: string, repo: string, webhookUrl: string, secret?: string): Promise<{ id: number }> {
+        try {
+            const listRes = await fetch(`https://api.github.com/repos/${owner}/${repo}/hooks`, { headers: this.headers });
+            if (listRes.ok) {
+                const hooks = await listRes.json();
+                if (Array.isArray(hooks)) {
+                    const existing = hooks.find((h: any) => h.config?.url === webhookUrl);
+                    if (existing) {
+                        return { id: existing.id };
+                    }
+                }
+            }
+        } catch (e) {
+            logger.warn('Failed to query existing GitHub webhooks:', e);
+        }
+
+        const res = await fetch(`https://api.github.com/repos/${owner}/${repo}/hooks`, {
+            method: 'POST',
+            headers: this.headers,
+            body: JSON.stringify({
+                name: 'web',
+                active: true,
+                events: ['push'],
+                config: {
+                    url: webhookUrl,
+                    content_type: 'json',
+                    insecure_ssl: '0',
+                    secret: secret || ''
+                }
+            })
+        });
+
+        if (!res.ok) {
+            const errText = await res.text();
+            throw new Error(`Failed to create repository webhook (${res.status}): ${errText}`);
+        }
+
+        return res.json();
+    }
+
+    async deleteWebhook(owner: string, repo: string, hookId: number | string): Promise<boolean> {
+        try {
+            const res = await fetch(`https://api.github.com/repos/${owner}/${repo}/hooks/${hookId}`, {
+                method: 'DELETE',
+                headers: this.headers
+            });
+            return res.ok || res.status === 404;
+        } catch {
+            return false;
+        }
+    }
 }
+
+

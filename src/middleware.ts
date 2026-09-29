@@ -44,6 +44,24 @@ export async function middleware(request: NextRequest) {
     const sessionCookie = request.cookies.get('session')?.value;
     const { pathname } = request.nextUrl;
     
+    // Flux Hosting Wildcard Subdomain & Custom Domain Routing
+    const rawHost = request.headers.get('x-forwarded-host') || request.headers.get('host') || request.nextUrl.host || '';
+    const cleanHost = rawHost.split(':')[0].toLowerCase();
+    const isHostingHeader = request.headers.get('x-flux-hosting') === 'true';
+    const isFluxBaseMain = cleanHost === 'fluxbasedb.me' || cleanHost === 'www.fluxbasedb.me' || cleanHost === 'payments.fluxbasedb.me' || cleanHost === 'superfarmer.fluxbasedb.me' || cleanHost === 'localhost' || cleanHost === '127.0.0.1';
+    const isHostedSubdomain = (!isFluxBaseMain && (cleanHost.endsWith('.fluxbasedb.me') || isHostingHeader));
+
+    if (isHostedSubdomain) {
+        if (pathname === '/api/hosting/verify-domain' || pathname.startsWith('/api/v1/hosting/ai-proxy')) {
+            return NextResponse.next();
+        }
+        const url = request.nextUrl.clone();
+        url.pathname = '/api/hosting/serve';
+        url.searchParams.set('path', pathname);
+        url.searchParams.set('host', cleanHost);
+        return NextResponse.rewrite(url);
+    }
+
     // 0. Path normalization and exclusion
     // Skip static files, images, favicon, robots.txt, sitemap.xml etc. to avoid infinite loops or blocking SEO crawlers
     if (

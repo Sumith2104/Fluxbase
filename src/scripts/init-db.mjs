@@ -177,6 +177,133 @@ async function initDb() {
             )
         `);
 
+        // Phase 4: Flux Hosting Infrastructure Tables
+        console.log("🔨 Creating Table: fluxbase_global.hosting_sites");
+        await client.query(`
+            CREATE TABLE IF NOT EXISTS fluxbase_global.hosting_sites (
+                site_id         VARCHAR(128) PRIMARY KEY DEFAULT gen_random_uuid()::text,
+                project_id      VARCHAR(128) NOT NULL REFERENCES fluxbase_global.projects(project_id) ON DELETE CASCADE,
+                user_id         VARCHAR(128) NOT NULL REFERENCES fluxbase_global.users(id) ON DELETE CASCADE,
+
+                subdomain       VARCHAR(63) UNIQUE NOT NULL,
+                custom_domain   VARCHAR(255) UNIQUE,
+                custom_domain_verified BOOLEAN DEFAULT false,
+
+                production_deploy_id VARCHAR(128),
+                preview_deploy_id    VARCHAR(128),
+
+                is_spa          BOOLEAN DEFAULT true,
+                framework       VARCHAR(50) DEFAULT 'static',
+                root_directory  VARCHAR(255) DEFAULT '/',
+                not_found_page  VARCHAR(255) DEFAULT '/404.html',
+
+                github_repo     VARCHAR(255),
+                github_branch   VARCHAR(100) DEFAULT 'main',
+                github_build_dir VARCHAR(255) DEFAULT 'dist',
+                auto_deploy     BOOLEAN DEFAULT true,
+                github_webhook_id BIGINT,
+
+                ai_models_enabled BOOLEAN DEFAULT false,
+                ai_models_quota   INTEGER DEFAULT 1000,
+
+                status          VARCHAR(20) DEFAULT 'active',
+                created_at      TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+                updated_at      TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+
+                UNIQUE (project_id)
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_hosting_sites_subdomain ON fluxbase_global.hosting_sites(subdomain);
+            CREATE INDEX IF NOT EXISTS idx_hosting_sites_custom_domain ON fluxbase_global.hosting_sites(custom_domain) WHERE custom_domain IS NOT NULL;
+            CREATE INDEX IF NOT EXISTS idx_hosting_sites_user ON fluxbase_global.hosting_sites(user_id);
+        `);
+
+        console.log("🔨 Creating Table: fluxbase_global.hosting_deployments");
+        await client.query(`
+            CREATE TABLE IF NOT EXISTS fluxbase_global.hosting_deployments (
+                deploy_id       VARCHAR(128) PRIMARY KEY DEFAULT gen_random_uuid()::text,
+                site_id         VARCHAR(128) NOT NULL REFERENCES fluxbase_global.hosting_sites(site_id) ON DELETE CASCADE,
+                project_id      VARCHAR(128) NOT NULL,
+                user_id         VARCHAR(128) NOT NULL,
+
+                environment     VARCHAR(20) NOT NULL DEFAULT 'preview',
+                version         INTEGER NOT NULL DEFAULT 1,
+                commit_sha      VARCHAR(40),
+                commit_message  TEXT,
+                branch          VARCHAR(100),
+                source          VARCHAR(20) NOT NULL DEFAULT 'upload',
+
+                s3_prefix       TEXT NOT NULL,
+                file_count      INTEGER DEFAULT 0,
+                total_size_bytes BIGINT DEFAULT 0,
+                entry_file      VARCHAR(255) DEFAULT 'index.html',
+
+                status          VARCHAR(20) DEFAULT 'uploading',
+                error_message   TEXT,
+
+                build_log_key   TEXT,
+
+                created_at      TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+                deployed_at     TIMESTAMPTZ,
+                superseded_at   TIMESTAMPTZ,
+
+                preview_url     TEXT
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_hosting_deploys_site ON fluxbase_global.hosting_deployments(site_id, created_at DESC);
+            CREATE INDEX IF NOT EXISTS idx_hosting_deploys_status ON fluxbase_global.hosting_deployments(status);
+        `);
+
+        console.log("🔨 Creating Table: fluxbase_global.hosting_env_vars");
+        await client.query(`
+            CREATE TABLE IF NOT EXISTS fluxbase_global.hosting_env_vars (
+                id              VARCHAR(128) PRIMARY KEY DEFAULT gen_random_uuid()::text,
+                site_id         VARCHAR(128) NOT NULL REFERENCES fluxbase_global.hosting_sites(site_id) ON DELETE CASCADE,
+                environment     VARCHAR(20) NOT NULL DEFAULT 'production',
+                key             VARCHAR(255) NOT NULL,
+                value           TEXT NOT NULL,
+                is_secret       BOOLEAN DEFAULT false,
+                created_at      TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+                updated_at      TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+
+                UNIQUE (site_id, environment, key)
+            );
+        `);
+
+        console.log("🔨 Creating Table: fluxbase_global.hosting_access_logs");
+        await client.query(`
+            CREATE TABLE IF NOT EXISTS fluxbase_global.hosting_access_logs (
+                id              BIGSERIAL PRIMARY KEY,
+                site_id         VARCHAR(128) NOT NULL,
+                deploy_id       VARCHAR(128),
+                path            VARCHAR(2048),
+                status_code     SMALLINT,
+                bytes_served    BIGINT DEFAULT 0,
+                ip              VARCHAR(45),
+                user_agent      TEXT,
+                referer         TEXT,
+                country         VARCHAR(2),
+                created_at      TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_hosting_access_site ON fluxbase_global.hosting_access_logs(site_id, created_at DESC);
+        `);
+
+        console.log("🔨 Creating Table: fluxbase_global.hosting_domain_verifications");
+        await client.query(`
+            CREATE TABLE IF NOT EXISTS fluxbase_global.hosting_domain_verifications (
+                id              VARCHAR(128) PRIMARY KEY DEFAULT gen_random_uuid()::text,
+                site_id         VARCHAR(128) NOT NULL REFERENCES fluxbase_global.hosting_sites(site_id) ON DELETE CASCADE,
+                domain          VARCHAR(255) NOT NULL,
+                verification_type VARCHAR(20) DEFAULT 'CNAME',
+                verification_key  VARCHAR(255) NOT NULL,
+                verification_value VARCHAR(255) NOT NULL,
+                verified        BOOLEAN DEFAULT false,
+                last_check_at   TIMESTAMPTZ,
+                created_at      TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+            );
+        `);
+
         await client.query('COMMIT');
         console.log("✅ SUCCESS: Global Schemas and Metadata Tables Provisioned.");
     } catch (e) {

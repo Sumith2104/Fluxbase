@@ -82,6 +82,7 @@ const navItems = [
     { href: "/ai-models", label: "AI Models", icon: <InfinityIcon /> },
     { href: "/analytics", label: "Analytics", icon: <BarChart3 /> },
     { href: "/storage", label: "Storage", icon: <Folder /> },
+    { href: "/hosting", label: "Hosting", icon: <Globe /> },
     { href: "/settings", label: "Settings", icon: <SettingsIcon /> },
 ];
 
@@ -304,6 +305,7 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
             router.prefetch(`/query?projectId=${pid}`);
             router.prefetch(`/settings?projectId=${pid}`);
             router.prefetch(`/analytics?projectId=${pid}`);
+            router.prefetch(`/hosting?projectId=${pid}`);
         }
     }, [selectedProject?.project_id, router]);
 
@@ -311,7 +313,7 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
     const isLoading = userLoading || projectContextLoading;
 
     const toolItems = navItems.slice(0, -1).map(item => {
-        const isProjectSpecific = ["/editor", "/storage", "/query", "/database", "/analytics"].includes(item.href);
+        const isProjectSpecific = ["/editor", "/storage", "/query", "/database", "/analytics", "/hosting"].includes(item.href);
         const isDisabled = isProjectSpecific && !selectedProject?.project_id;
         let finalHref = item.href;
 
@@ -401,6 +403,11 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
             combination: 'g m',
             handler: () => router.push('/ai-models'),
             description: 'Go to AI Models'
+        },
+        {
+            combination: 'g h',
+            handler: () => selectedProject?.project_id ? router.push(`/hosting?projectId=${selectedProject.project_id}`) : router.push('/dashboard/projects'),
+            description: 'Go to Hosting'
         },
     ], !!userId);
 

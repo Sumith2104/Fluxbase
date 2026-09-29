@@ -394,3 +394,131 @@ export async function checkInstanceSizeLimit(userId: string, requestedSize: stri
         throw new LimitExceededError(`Infrastructure Profile limit reached. Your ${plan.toUpperCase()} plan is not authorized to provision a '${requestedSize}' instance. Please upgrade your subscription to access larger database hardware.`);
     }
 }
+
+export const PLAN_HOSTING_LIMITS = {
+    free: {
+        sitesPerProject: 1,
+        deploySizeBytes: 50 * 1024 * 1024,             // 50 MB
+        totalStorageBytes: 500 * 1024 * 1024,           // 500 MB
+        bandwidthBytesMonthly: 10 * 1024 * 1024 * 1024,  // 10 GB
+        deploymentsMonthly: 50,
+        customDomains: 0,
+        previewDeploys: 3,
+        aiCallsMonthly: 1000,
+        envVarsPerSite: 20,
+        buildLogRetentionDays: 7,
+    },
+    pro: {
+        sitesPerProject: 3,
+        deploySizeBytes: 500 * 1024 * 1024,             // 500 MB
+        totalStorageBytes: 5 * 1024 * 1024 * 1024,      // 5 GB
+        bandwidthBytesMonthly: 100 * 1024 * 1024 * 1024, // 100 GB
+        deploymentsMonthly: 500,
+        customDomains: 3,
+        previewDeploys: 10,
+        aiCallsMonthly: 50000,
+        envVarsPerSite: 100,
+        buildLogRetentionDays: 30,
+    },
+    max: {
+        sitesPerProject: 10,
+        deploySizeBytes: 2 * 1024 * 1024 * 1024,        // 2 GB
+        totalStorageBytes: 50 * 1024 * 1024 * 1024,     // 50 GB
+        bandwidthBytesMonthly: 1024 * 1024 * 1024 * 1024, // 1 TB
+        deploymentsMonthly: 999999,
+        customDomains: 10,
+        previewDeploys: 999999,
+        aiCallsMonthly: 250000,
+        envVarsPerSite: 500,
+        buildLogRetentionDays: 90,
+    },
+    employee: {
+        sitesPerProject: 999999,
+        deploySizeBytes: 5 * 1024 * 1024 * 1024,        // 5 GB
+        totalStorageBytes: 500 * 1024 * 1024 * 1024,    // 500 GB
+        bandwidthBytesMonthly: 5 * 1024 * 1024 * 1024 * 1024, // 5 TB
+        deploymentsMonthly: 999999,
+        customDomains: 999999,
+        previewDeploys: 999999,
+        aiCallsMonthly: 999999,
+        envVarsPerSite: 999999,
+        buildLogRetentionDays: 180,
+    },
+    org_owner: {
+        sitesPerProject: 999999,
+        deploySizeBytes: 5 * 1024 * 1024 * 1024,        // 5 GB
+        totalStorageBytes: 500 * 1024 * 1024 * 1024,    // 500 GB
+        bandwidthBytesMonthly: 5 * 1024 * 1024 * 1024 * 1024, // 5 TB
+        deploymentsMonthly: 999999,
+        customDomains: 999999,
+        previewDeploys: 999999,
+        aiCallsMonthly: 999999,
+        envVarsPerSite: 999999,
+        buildLogRetentionDays: 180,
+    },
+    pay_as_you_go: {
+        sitesPerProject: 999999,
+        deploySizeBytes: 5 * 1024 * 1024 * 1024,        // 5 GB
+        totalStorageBytes: 500 * 1024 * 1024 * 1024,    // 500 GB
+        bandwidthBytesMonthly: 999999 * 1024 * 1024 * 1024, // Unlimited (metered)
+        deploymentsMonthly: 999999,
+        customDomains: 999999,
+        previewDeploys: 999999,
+        aiCallsMonthly: 999999,
+        envVarsPerSite: 999999,
+        buildLogRetentionDays: 180,
+    },
+} as const;
+
+export async function checkHostingSiteLimit(projectId: string): Promise<void> {
+    const plan = await getProjectOwnerPlan(projectId);
+    const limit = PLAN_HOSTING_LIMITS[plan]?.sitesPerProject ?? 1;
+
+    const pool = getPgPool();
+    const res = await pool.query(
+        'SELECT COUNT(*) as count FROM fluxbase_global.hosting_sites WHERE project_id = $1',
+        [projectId]
+    );
+    const count = parseInt(res.rows[0].count, 10);
+
+    if (count >= limit) {
+        throw new LimitExceededError(`Hosting site limit reached. Your ${plan.toUpperCase()} plan allows a maximum of ${limit} site(s) per project.`);
+    }
+}
+
+export async function checkHostingDeploySize(projectId: string, sizeBytes: number): Promise<void> {
+    const plan = await getProjectOwnerPlan(projectId);
+    const maxBytes = Number(PLAN_HOSTING_LIMITS[plan]?.deploySizeBytes ?? (50 * 1024 * 1024));
+
+    if (sizeBytes > maxBytes) {
+        const mbLimit = Math.round(maxBytes / (1024 * 1024));
+        const mbActual = (sizeBytes / (1024 * 1024)).toFixed(1);
+        throw new LimitExceededError(`Deploy size limit exceeded. Your ${plan.toUpperCase()} plan allows up to ${mbLimit} MB per deployment, but upload was ${mbActual} MB.`);
+    }
+}
+
+export async function checkHostingCustomDomainLimit(projectId: string): Promise<void> {
+    const plan = await getProjectOwnerPlan(projectId);
+    const limit = PLAN_HOSTING_LIMITS[plan]?.customDomains ?? 0;
+
+    if (limit === 0) {
+        throw new LimitExceededError(`Custom domains are available on PRO, MAX, and ORG OWNER plans. Please upgrade this project's subscription.`);
+    }
+}
+
+export async function checkHostingEnvVarLimit(projectId: string, siteId: string, additionalCount: number = 1): Promise<void> {
+    const plan = await getProjectOwnerPlan(projectId);
+    const limit = PLAN_HOSTING_LIMITS[plan]?.envVarsPerSite ?? 20;
+
+    const pool = getPgPool();
+    const res = await pool.query(
+        'SELECT COUNT(*) as count FROM fluxbase_global.hosting_env_vars WHERE site_id = $1',
+        [siteId]
+    );
+    const count = parseInt(res.rows[0].count, 10);
+
+    if (count + additionalCount > limit) {
+        throw new LimitExceededError(`Environment variable limit reached. Your ${plan.toUpperCase()} plan allows up to ${limit} variables per site.`);
+    }
+}
+

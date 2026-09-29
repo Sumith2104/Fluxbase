@@ -8,7 +8,7 @@ export async function GET(request: NextRequest) {
         return NextResponse.json({ error: "GitHub Client ID is not configured for this environment" }, { status: 500 });
     }
 
-    const scope = 'read:user user:email';
+    const scope = 'repo read:user user:email';
     const origin = getBaseOrigin(request);
     const returnTo = request.nextUrl.searchParams.get('returnTo') || '/dashboard/projects';
     const state = encodeOAuthState(origin, returnTo);

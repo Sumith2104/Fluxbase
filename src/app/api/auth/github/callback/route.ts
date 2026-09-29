@@ -152,6 +152,15 @@ export async function GET(request: NextRequest) {
             sendWelcomeEmail(email, name).catch((e) => { logger.error(e); });
         }
 
+        // Store GitHub access token so repositories are instantly available for hosting deployments
+        try {
+            const githubUsername = userData.login || '';
+            await storeGitHubToken(userId, accessToken, tokenData.scope || 'repo read:user user:email', githubUsername);
+            logger.info(`[GitHub Login Callback] Stored GitHub token for user ${userId} (@${githubUsername})`);
+        } catch (tokenErr) {
+            logger.warn('[GitHub Login Callback] Could not store token:', tokenErr);
+        }
+
         // 5. Check for 2FA
         const { rows: userSettings } = await pool.query(
             'SELECT two_factor_enabled FROM fluxbase_global.users WHERE id = $1',

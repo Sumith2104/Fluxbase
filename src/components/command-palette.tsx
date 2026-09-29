@@ -41,6 +41,7 @@ const getStaticItems = (projectId?: string): CommandItem[] => {
         { id: 'ai-models', label: 'AI Models', description: 'AI Gateway & frontier models hub', icon: <InfinityIcon className="h-4 w-4" />, href: '/ai-models', category: 'Navigation', keywords: ['ai', 'models', 'claude', 'bedrock', 'chat', 'llm', 'infinity'] },
         { id: 'api', label: 'API', description: 'REST API explorer', icon: <Code className="h-4 w-4" />, href: projectHref('/api'), category: 'Navigation', keywords: ['rest', 'endpoint'] },
         { id: 'storage', label: 'Storage', description: 'File & object storage', icon: <Folder className="h-4 w-4" />, href: projectHref('/storage'), category: 'Navigation', keywords: ['files', 's3', 'upload'] },
+        { id: 'hosting', label: 'Hosting', description: 'Deploy & manage web apps', icon: <Globe className="h-4 w-4" />, href: projectHref('/hosting'), category: 'Navigation', keywords: ['deploy', 'hosting', 'website', 'subdomain', 'preview', 'production'] },
         // Settings
         { id: 'settings', label: 'Settings', description: 'Project settings', icon: <Settings className="h-4 w-4" />, href: projectHref('/settings'), category: 'Settings', keywords: ['config', 'preferences'] },
         { id: 'billing', label: 'Billing & Usage', description: 'Plans, usage meters & invoices', icon: <CreditCard className="h-4 w-4" />, href: projectHref('/settings/billing'), category: 'Settings', keywords: ['billing', 'subscription', 'plan', 'invoices', 'payg'] },
