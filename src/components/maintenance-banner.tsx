@@ -151,17 +151,17 @@ export function MaintenanceBanner() {
   return (
     <aside
       aria-label="System Announcement"
-      className="relative z-[100] w-full px-3 py-2 text-center text-xs font-medium shadow-md backdrop-blur-md transition-all duration-300 sm:text-sm"
+      className="relative z-[100] w-full px-3 py-1 text-center text-xs font-medium shadow-sm backdrop-blur-md transition-all duration-200"
       style={{
         backgroundColor: bgColor,
         color: textColor,
         borderBottom: '1px solid rgba(255, 255, 255, 0.15)'
       }}
     >
-      <div className="mx-auto flex max-w-7xl items-center justify-center gap-2 sm:gap-3 flex-wrap pr-6">
+      <div className="mx-auto flex max-w-7xl items-center justify-center gap-2 flex-wrap pr-5">
         {/* Dynamic Badge */}
         <span
-          className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wider shadow-sm shrink-0 border border-white/20"
+          className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider shadow-sm shrink-0 border border-white/20 leading-none"
           style={{ backgroundColor: badgeColor, color: textColor }}
         >
           <span className="h-1.5 w-1.5 rounded-full bg-current animate-pulse" />
@@ -169,7 +169,7 @@ export function MaintenanceBanner() {
         </span>
 
         {/* Message Content */}
-        <span className="font-medium tracking-wide">
+        <span className="text-[11px] sm:text-xs font-medium tracking-normal leading-tight">
           {banner.content}
         </span>
 
@@ -179,11 +179,11 @@ export function MaintenanceBanner() {
             href={banner.link_url}
             target={banner.link_url.startsWith('http') ? '_blank' : '_self'}
             rel="noopener noreferrer"
-            className="inline-flex items-center gap-1 text-[11px] font-semibold underline underline-offset-2 hover:opacity-80 transition-opacity ml-1"
+            className="inline-flex items-center gap-0.5 text-[11px] font-semibold underline underline-offset-2 hover:opacity-80 transition-opacity ml-1"
             style={{ color: textColor }}
           >
             {banner.link_text || 'Learn more'}
-            <ExternalLink className="h-3 w-3" />
+            <ExternalLink className="h-2.5 w-2.5" />
           </a>
         )}
       </div>
@@ -194,10 +194,10 @@ export function MaintenanceBanner() {
           type="button"
           onClick={handleDismiss}
           aria-label="Dismiss notification"
-          className="absolute right-2.5 top-1/2 -translate-y-1/2 rounded-md p-1 opacity-75 hover:opacity-100 hover:bg-black/10 focus:outline-none focus:ring-1 focus:ring-white/40 transition-all"
+          className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-0.5 opacity-75 hover:opacity-100 hover:bg-black/10 focus:outline-none focus:ring-1 focus:ring-white/40 transition-all"
           style={{ color: textColor }}
         >
-          <X className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+          <X className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
         </button>
       )}
     </aside>
