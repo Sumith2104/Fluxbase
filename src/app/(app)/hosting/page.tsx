@@ -72,7 +72,7 @@ import {
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 
-export const FRAMEWORK_PRESETS = [
+const FRAMEWORK_PRESETS = [
     {
         id: 'auto',
         name: 'Auto-Detect',
