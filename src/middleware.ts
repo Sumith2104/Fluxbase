@@ -197,6 +197,6 @@ export async function middleware(request: NextRequest) {
 // Config matcher is still useful but simpler to avoid issues with standard assets
 export const config = {
   matcher: [
-    '/((?!_next/static|_next/image|favicon.ico|robots.txt|sitemap.xml|manifest.webmanifest|google.*).*)',
+    '/((?!_next/image|favicon.ico|robots.txt|sitemap.xml|manifest.webmanifest|google.*).*)',
   ],
 };
