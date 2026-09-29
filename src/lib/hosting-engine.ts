@@ -130,6 +130,18 @@ export async function extractZipArchive(zipBuffer: Buffer): Promise<ExtractedFil
         cleanPath = sanitizePath(cleanPath);
         if (!cleanPath) continue;
 
+        // Skip committed dependency, build cache, and VCS directories
+        // These bloat memory and are cleanly created/installed during the build pipeline.
+        if (
+            cleanPath.startsWith('node_modules/') ||
+            cleanPath.includes('/node_modules/') ||
+            cleanPath.startsWith('.git/') ||
+            cleanPath.includes('/.git/') ||
+            cleanPath.startsWith('.next/') ||
+            cleanPath.includes('/.next/')
+        ) {
+            continue;
+        }
 
         const buffer = await file.async('nodebuffer');
         extracted.push({
