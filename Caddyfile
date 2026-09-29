@@ -179,8 +179,8 @@ superfarmer.fluxbasedb.me {
     }
 }
 
-# Flux Hosting - Wildcard Subdomain Handler
-*.fluxbasedb.me {
+# Flux Hosting - Dynamic On-Demand Subdomains & Custom Domains Handler
+https:// {
     tls {
         on_demand
     }
