@@ -117,7 +117,15 @@ Analyze the failure and provide the diagnosis and resolution JSON:`;
             const isTimeout = relevantLogTail.includes('Command timed out') || relevantLogTail.includes('timed out');
             const isPeerDeps = relevantLogTail.includes('ERESOLVE') || relevantLogTail.includes('peer dependency');
 
-            let fallbackDiagnosis = {
+            let fallbackDiagnosis: {
+                summary: string;
+                category: string;
+                rootCause: string;
+                affectedFile: string | null;
+                suggestedFix: string;
+                codeSnippet: string | null;
+                canAutoRetry: boolean;
+            } = {
                 summary: 'Deployment build failure',
                 category: 'other',
                 rootCause: errorMsg || 'Build exited with a non-zero code.',

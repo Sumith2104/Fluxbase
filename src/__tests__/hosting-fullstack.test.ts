@@ -4,6 +4,18 @@ import * as path from 'path';
 import * as os from 'os';
 import { createStandaloneArchive, extractStandaloneArchive } from '@/lib/hosting-archive';
 import { locateBackendEntryScript } from '@/lib/hosting-runner';
+import { findBuiltAssets } from '@/lib/hosting-build';
+
+vi.mock('@/lib/pg', () => ({
+    getPgPool: () => ({
+        query: vi.fn().mockResolvedValue({ rows: [] })
+    })
+}));
+
+vi.mock('@/lib/storage', () => ({
+    getS3Client: () => ({}),
+    getS3Bucket: () => 'test-bucket'
+}));
 
 describe('Fullstack Hosting Engine', () => {
     describe('Standalone Archive (Tar/Gzip compression and extraction)', () => {
@@ -122,6 +134,34 @@ INVALID-LINE-NO-EQUAL
             const decrypted = decryptEnvValue(encrypted);
             expect(decrypted).toBe(secret);
         });
+
+        it('correctly decrypts public URL variables stored as ciphertext', async () => {
+            const { encryptEnvValue, decryptEnvValue } = await import('@/lib/hosting-env');
+            const originalUrl = 'https://www.fluxbasedb.me';
+            const encryptedCipher = encryptEnvValue(originalUrl);
+
+            // Verify that calling decryptEnvValue yields a valid URL parsable by new URL()
+            const decryptedUrl = decryptEnvValue(encryptedCipher);
+            expect(decryptedUrl).toBe(originalUrl);
+            expect(() => new URL(decryptedUrl)).not.toThrow();
+        });
+    });
+
+    describe('Universal Static Project Asset Detection', () => {
+        it('detects pure static site with root index.html even when targetOutputDir is "out"', () => {
+            const staticFiles = [
+                { path: 'index.html', buffer: Buffer.from('<h1>Hello World</h1>'), size: 20, mimeType: 'text/html' },
+                { path: 'style.css', buffer: Buffer.from('body { color: red; }'), size: 23, mimeType: 'text/css' },
+                { path: 'script.js', buffer: Buffer.from('console.log("hi");'), size: 18, mimeType: 'text/javascript' }
+            ];
+
+            // Even when targetOutputDir is "out" (from database defaults), it must recognize root index.html
+            const detected = findBuiltAssets(staticFiles, 'out');
+            expect(detected).not.toBeNull();
+            expect(detected?.some(f => f.path === 'index.html')).toBe(true);
+            expect(detected?.length).toBe(3);
+        });
     });
 });
+
 

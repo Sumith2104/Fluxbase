@@ -508,7 +508,7 @@ export async function createDeployment(params: {
                     [siteId, environment]
                 );
                 for (const row of envRows.rows) {
-                    mergedEnvVars[row.key] = row.is_secret ? decryptEnvValue(row.value) : row.value;
+                    mergedEnvVars[row.key] = decryptEnvValue(row.value);
                 }
             } catch {}
             if (envVars) {
@@ -1012,7 +1012,7 @@ export async function executeGitHubDeployment(params: ExecuteGitHubDeploymentPar
                     [site.site_id, targetEnv]
                 );
                 for (const row of envRows.rows) {
-                    envVars[row.key] = row.is_secret ? decryptEnvValue(row.value) : row.value;
+                    envVars[row.key] = decryptEnvValue(row.value);
                 }
             } catch {}
 

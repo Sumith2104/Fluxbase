@@ -169,10 +169,10 @@ export function findBuiltAssets(files: ExtractedFile[], targetOutputDir?: string
         } catch {}
     }
 
-    // 1. Direct index.html at root (only pre-built if there is NO build script to run)
+    // 1. Direct index.html at root (if there is NO build script to run, this is a pure static site ready to serve)
     if (!hasBuildScript) {
         const rootIndex = files.find(f => f.path === 'index.html');
-        if (rootIndex && (!targetOutputDir || targetOutputDir === '.' || targetOutputDir === '/')) {
+        if (rootIndex) {
             return files;
         }
     }
@@ -369,6 +369,7 @@ export async function executeProjectBuild(params: {
 }> {
     const {
         deployId,
+        subdomain,
         files: rawFiles,
         buildCommand,
         outputDirectory,
@@ -516,8 +517,12 @@ export async function executeProjectBuild(params: {
         if (!effectiveBuildCmd) {
             effectiveBuildCmd = 'npm run build';
         }
-        // Always prefer npm install --legacy-peer-deps to avoid lockfile peer dependency deadlocks
-        if (!effectiveInstallCmd || effectiveInstallCmd.includes('npm ci') || effectiveInstallCmd === 'npm install') {
+    }
+
+    // For any npm-based installation across all frameworks (Next, Vite, CRA, Astro, etc.):
+    // Ensure devDependencies are included and legacy-peer-deps prevents lockfile deadlocks
+    if (effectiveInstallCmd && (effectiveInstallCmd.includes('npm install') || effectiveInstallCmd.includes('npm ci'))) {
+        if (!effectiveInstallCmd.includes('--legacy-peer-deps')) {
             effectiveInstallCmd = 'npm install --legacy-peer-deps --include=dev --no-audit --no-fund --prefer-offline';
         }
     }
@@ -579,8 +584,44 @@ export async function executeProjectBuild(params: {
     delete installEnv.__NEXT_PRIVATE_PREBUNDLED_REACT;
     delete installEnv.__NEXT_STRICT_NEXT_HEAD;
 
-    // Apply explicit site user-configured environment variables
-    Object.assign(installEnv, envVars);
+    // Decrypt and defensively validate all environment variables (especially URLs)
+    const { decryptEnvValue } = await import('@/lib/hosting-env');
+    const sanitizedEnvVars: Record<string, string> = {};
+    const fallbackHost = subdomain ? `${subdomain}.fluxbasedb.me` : 'fluxbasedb.me';
+
+    for (const [key, rawVal] of Object.entries(envVars)) {
+        if (rawVal === undefined || rawVal === null) continue;
+        let val = typeof rawVal === 'string' ? decryptEnvValue(rawVal) : String(rawVal);
+
+        // Defensively sanitize any URL-like variables
+        const isUrlVar = /(_URL|_ORIGIN|_DOMAIN|_HOST)$/i.test(key) || key === 'APP_URL' || key === 'NEXTAUTH_URL';
+        if (isUrlVar && val) {
+            let candidate = val.trim();
+            if (!candidate.includes('://')) {
+                candidate = `https://${candidate}`;
+            }
+            try {
+                new URL(candidate);
+                val = candidate;
+            } catch {
+                log(`[Env Sanitizer] Detected invalid URL in ${key} ("${val}"). Normalizing to safe fallback URL.`);
+                val = `https://${fallbackHost}`;
+            }
+        }
+        sanitizedEnvVars[key] = val;
+    }
+
+    // Guarantee that NEXT_PUBLIC_APP_URL is ALWAYS present and a valid URL
+    if (!sanitizedEnvVars['NEXT_PUBLIC_APP_URL'] || !sanitizedEnvVars['NEXT_PUBLIC_APP_URL'].startsWith('http')) {
+        sanitizedEnvVars['NEXT_PUBLIC_APP_URL'] = `https://${fallbackHost}`;
+    }
+    // Guarantee that NEXTAUTH_URL is also set
+    if (!sanitizedEnvVars['NEXTAUTH_URL'] || !sanitizedEnvVars['NEXTAUTH_URL'].startsWith('http')) {
+        sanitizedEnvVars['NEXTAUTH_URL'] = sanitizedEnvVars['NEXT_PUBLIC_APP_URL'];
+    }
+
+    // Apply sanitized environment variables to install and build process
+    Object.assign(installEnv, sanitizedEnvVars);
 
     // Prepend sandbox node_modules/.bin to PATH so local framework binaries are prioritized
     const localBin = path.join(buildDir, 'node_modules', '.bin');
@@ -634,15 +675,18 @@ export async function executeProjectBuild(params: {
             }
         }
 
-        // For Next.js projects: Ensure static optimizations and production env
+        // Ensure production environment variables file is written for all frameworks
+        const envContent = Object.entries(sanitizedEnvVars)
+            .map(([k, v]) => `${k}=${v}`)
+            .join('\n');
+        if (envContent) {
+            await fs.writeFile(path.join(buildDir, '.env.production'), envContent);
+            await fs.writeFile(path.join(buildDir, '.env'), envContent);
+        }
+
+        // For Next.js projects: Ensure static optimizations and server detection
         if (detected.framework === 'next' || detected.framework === 'nextjs') {
             log('Configuring Next.js build optimizations...');
-            const envContent = Object.entries(envVars)
-                .map(([k, v]) => `${k}=${v}`)
-                .join('\n');
-            if (envContent) {
-                await fs.writeFile(path.join(buildDir, '.env.production'), envContent);
-            }
 
             // Detect whether this project uses server-side features that are incompatible with `output: 'export'`
             const hasApiRoutes = files.some(f =>

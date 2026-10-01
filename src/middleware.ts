@@ -49,21 +49,14 @@ export async function middleware(request: NextRequest) {
     const cleanHost = rawHost.split(':')[0].toLowerCase();
     const isHostingHeader = request.headers.get('x-flux-hosting') === 'true';
     const isFluxBaseMain = cleanHost === 'fluxbasedb.me' || cleanHost === 'www.fluxbasedb.me' || cleanHost === 'payments.fluxbasedb.me' || cleanHost === 'superfarmer.fluxbasedb.me' || cleanHost === 'localhost' || cleanHost === '127.0.0.1';
-    const isHostedSubdomain = (!isFluxBaseMain && (cleanHost.endsWith('.fluxbasedb.me') || isHostingHeader));
+    const isHostedDomain = !isFluxBaseMain && (
+        cleanHost.endsWith('.fluxbasedb.me') || 
+        isHostingHeader ||
+        (!cleanHost.includes('vercel.app') && cleanHost.includes('.'))
+    );
 
-    if (isHostedSubdomain) {
+    if (isHostedDomain) {
         if (pathname === '/api/hosting/verify-domain' || pathname.startsWith('/api/v1/hosting/ai-proxy')) {
-            return NextResponse.next();
-        }
-
-        // When the hosted site is "fluxbase" (the main full-stack app deployed on fluxbase.fluxbasedb.me),
-        // pass API routes and Next.js Server Actions directly to the running server so auth, database,
-        // and full-stack features work seamlessly!
-        const isFluxbaseSelfSite = cleanHost.startsWith('fluxbase.') || cleanHost.includes('fluxbase-git-');
-        const isServerAction = request.headers.has('next-action');
-        const isApiCall = pathname.startsWith('/api/');
-
-        if (isFluxbaseSelfSite && (isApiCall || isServerAction)) {
             return NextResponse.next();
         }
 

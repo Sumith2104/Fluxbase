@@ -16,8 +16,22 @@ export const viewport: Viewport = {
   maximumScale: 5,
 };
 
+function getSafeMetadataBase(): URL {
+  const raw = process.env.NEXT_PUBLIC_APP_URL;
+  if (raw && typeof raw === 'string') {
+    try {
+      const candidate = raw.trim();
+      const withProto = candidate.includes('://') ? candidate : `https://${candidate}`;
+      return new URL(withProto);
+    } catch {
+      // Ignore and fallback below
+    }
+  }
+  return new URL('https://fluxbasedb.me');
+}
+
 export const metadata: Metadata = {
-  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || 'https://fluxbasedb.me'),
+  metadataBase: getSafeMetadataBase(),
   title: {
     default: 'Fluxbase — AI-Powered SQL Database Platform',
     template: '%s | Fluxbase',

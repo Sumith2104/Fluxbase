@@ -373,7 +373,7 @@ export async function recoverBackendProcess(siteId: string): Promise<{ success: 
         );
         const envVars: Record<string, string> = {};
         for (const r of envRes.rows) {
-            envVars[r.key] = r.is_secret ? decryptEnvValue(r.value) : r.value;
+            envVars[r.key] = decryptEnvValue(r.value);
         }
 
         // 3. Determine standalone bundle location
