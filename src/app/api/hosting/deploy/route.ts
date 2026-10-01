@@ -30,6 +30,8 @@ export async function POST(req: NextRequest) {
         let buildCommand: string | undefined;
         let outputDirectory: string | undefined;
         let installCommand: string | undefined;
+        let rawEnvText: string | undefined;
+        let envVars: any = undefined;
 
         if (contentType.includes('multipart/form-data')) {
             const formData = await req.formData();
@@ -42,6 +44,11 @@ export async function POST(req: NextRequest) {
             buildCommand = (formData.get('buildCommand') as string) || undefined;
             outputDirectory = (formData.get('outputDirectory') as string) || undefined;
             installCommand = (formData.get('installCommand') as string) || undefined;
+            rawEnvText = (formData.get('rawEnvText') as string) || (formData.get('env') as string) || undefined;
+            const envVarsRaw = formData.get('envVars');
+            if (typeof envVarsRaw === 'string') {
+                try { envVars = JSON.parse(envVarsRaw); } catch {}
+            }
 
             const fileField = formData.get('file');
             if (!fileField) {
@@ -85,6 +92,8 @@ export async function POST(req: NextRequest) {
             buildCommand = body.buildCommand || undefined;
             outputDirectory = body.outputDirectory || undefined;
             installCommand = body.installCommand || undefined;
+            rawEnvText = body.rawEnvText || undefined;
+            envVars = body.envVars || undefined;
 
             if (body.zipBase64) {
                 const zipBuf = Buffer.from(body.zipBase64, 'base64');
@@ -121,6 +130,18 @@ export async function POST(req: NextRequest) {
         // Get or create site
         const site = await getOrCreateHostingSite(projectId, auth.userId);
 
+        // Save environment variables if provided
+        if (envVars || rawEnvText) {
+            const { saveSiteEnvVars } = await import('@/lib/hosting-env');
+            await saveSiteEnvVars({
+                siteId: site.site_id,
+                projectId,
+                envVars,
+                rawEnvText,
+                environment
+            });
+        }
+
         // Deploy
         const result = await createDeployment({
             siteId: site.site_id,
@@ -132,6 +153,7 @@ export async function POST(req: NextRequest) {
             buildCommand,
             outputDirectory,
             installCommand,
+            envVars: typeof envVars === 'object' && !Array.isArray(envVars) ? envVars : undefined,
             autoPromote: environment === 'production',
             asyncBuild: true
         });

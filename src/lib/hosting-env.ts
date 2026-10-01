@@ -131,3 +131,96 @@ export function injectEnvIntoHtml(
         return `${clientScript}\n${html}`;
     }
 }
+
+export interface EnvVarItem {
+    key: string;
+    value: string;
+    isSecret?: boolean;
+    environment?: 'production' | 'preview' | 'all';
+}
+
+/**
+ * Saves and encrypts environment variables for a site (supports raw text, key-value records, or item arrays).
+ * Automatically validates variable names, sets secret status, and enforces project tier limits.
+ */
+export async function saveSiteEnvVars(params: {
+    siteId: string;
+    projectId: string;
+    envVars?: Record<string, string> | EnvVarItem[];
+    rawEnvText?: string;
+    environment?: 'production' | 'preview' | 'all';
+}): Promise<{ savedCount: number; items: any[] }> {
+    const { getPgPool } = await import('@/lib/pg');
+    const { checkHostingEnvVarLimit } = await import('@/lib/limits');
+
+    const pool = getPgPool();
+    const defaultEnv = params.environment || 'production';
+    const itemsToSave: EnvVarItem[] = [];
+
+    if (params.rawEnvText && typeof params.rawEnvText === 'string') {
+        const parsed = parseEnvFile(params.rawEnvText);
+        for (const p of parsed) {
+            itemsToSave.push({
+                key: p.key,
+                value: p.value,
+                isSecret: p.isSecret,
+                environment: defaultEnv
+            });
+        }
+    }
+
+    if (params.envVars) {
+        if (Array.isArray(params.envVars)) {
+            for (const item of params.envVars) {
+                if (!item || !item.key) continue;
+                const cleanKey = item.key.trim();
+                if (!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(cleanKey)) continue;
+                const isSec = item.isSecret !== undefined
+                    ? Boolean(item.isSecret)
+                    : !(cleanKey.startsWith('NEXT_PUBLIC_') || cleanKey.startsWith('VITE_') || cleanKey.startsWith('PUBLIC_'));
+                itemsToSave.push({
+                    key: cleanKey,
+                    value: String(item.value ?? ''),
+                    isSecret: isSec,
+                    environment: item.environment || defaultEnv
+                });
+            }
+        } else if (typeof params.envVars === 'object') {
+            for (const [k, v] of Object.entries(params.envVars)) {
+                const cleanKey = k.trim();
+                if (!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(cleanKey)) continue;
+                const isSec = !(cleanKey.startsWith('NEXT_PUBLIC_') || cleanKey.startsWith('VITE_') || cleanKey.startsWith('PUBLIC_'));
+                itemsToSave.push({
+                    key: cleanKey,
+                    value: String(v ?? ''),
+                    isSecret: isSec,
+                    environment: defaultEnv
+                });
+            }
+        }
+    }
+
+    if (itemsToSave.length === 0) {
+        return { savedCount: 0, items: [] };
+    }
+
+    await checkHostingEnvVarLimit(params.projectId, params.siteId, itemsToSave.length);
+
+    const saved: any[] = [];
+    for (const item of itemsToSave) {
+        const encrypted = encryptEnvValue(item.value);
+        const res = await pool.query(
+            `INSERT INTO fluxbase_global.hosting_env_vars (
+                site_id, environment, key, value, is_secret
+            ) VALUES ($1, $2, $3, $4, $5)
+            ON CONFLICT (site_id, environment, key)
+            DO UPDATE SET value = $4, is_secret = $5, updated_at = CURRENT_TIMESTAMP
+            RETURNING id, environment, key, is_secret`,
+            [params.siteId, item.environment || defaultEnv, item.key, encrypted, item.isSecret]
+        );
+        saved.push(res.rows[0]);
+    }
+
+    return { savedCount: saved.length, items: saved };
+}
+

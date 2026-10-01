@@ -68,7 +68,11 @@ import {
     Zap,
     GitCommit,
     CheckCheck,
-    StopCircle
+    StopCircle,
+    Folder,
+    FileCode,
+    Bot,
+    Wand2
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
@@ -85,7 +89,7 @@ const FRAMEWORK_PRESETS = [
     {
         id: 'next',
         name: 'Next.js',
-        description: 'Static HTML export (out/)',
+        description: 'Full-stack (SSR, API Routes) or Static Export',
         buildCommand: 'npx next build',
         outputDirectory: 'out',
         installCommand: 'npm install --legacy-peer-deps'
@@ -156,6 +160,11 @@ export default function HostingPage() {
     const [deploySourceTab, setDeploySourceTab] = useState<'github' | 'upload'>('github');
     const [uploadFramework, setUploadFramework] = useState('auto');
 
+    // Environment Variables during Deploy
+    const [deployEnvText, setDeployEnvText] = useState('');
+    const [showDeployEnv, setShowDeployEnv] = useState(false);
+    const [isSavingDeployEnv, setIsSavingDeployEnv] = useState(false);
+
     // Build Settings Overrides (for Quick Deploy)
     const [showBuildSettings, setShowBuildSettings] = useState(false);
     const [customBuildCommand, setCustomBuildCommand] = useState('');
@@ -189,6 +198,11 @@ export default function HostingPage() {
     const [isCancellingDeploy, setIsCancellingDeploy] = useState(false);
     const [cancellingDeployId, setCancellingDeployId] = useState<string | null>(null);
 
+    // AI Deployment Diagnostics State
+    const [aiDiagnosis, setAiDiagnosis] = useState<any>(null);
+    const [isDiagnosing, setIsDiagnosing] = useState(false);
+    const [diagnoseError, setDiagnoseError] = useState<string | null>(null);
+
     // Env Var States
     const [envFilter, setEnvFilter] = useState<'all' | 'production' | 'preview'>('all');
     const [isAddEnvOpen, setIsAddEnvOpen] = useState(false);
@@ -208,10 +222,24 @@ export default function HostingPage() {
     const [isVerifyingDomain, setIsVerifyingDomain] = useState(false);
     const [isDeleteSiteOpen, setIsDeleteSiteOpen] = useState(false);
     const [isDeletingSite, setIsDeletingSite] = useState(false);
+    const [isRestartingBackend, setIsRestartingBackend] = useState(false);
 
     // Initial Setup Wizard State
+    const [wizardMode, setWizardMode] = useState<'ai' | 'manual'>('ai');
     const [wizardSubdomain, setWizardSubdomain] = useState('');
     const [wizardFramework, setWizardFramework] = useState('static');
+    const [wizardRepoInput, setWizardRepoInput] = useState('');
+    const [wizardRepoBranch, setWizardRepoBranch] = useState('main');
+    const [isAnalyzingRepo, setIsAnalyzingRepo] = useState(false);
+    const [aiAnalysisResult, setAiAnalysisResult] = useState<any | null>(null);
+    const [wizardBuildCommand, setWizardBuildCommand] = useState('');
+    const [wizardOutputDir, setWizardOutputDir] = useState('');
+    const [wizardInstallCommand, setWizardInstallCommand] = useState('');
+    const [wizardRootDir, setWizardRootDir] = useState('.');
+    const [wizardEnvVars, setWizardEnvVars] = useState<Array<{ key: string; value: string; isSecret?: boolean; description?: string }>>([]);
+    const [wizardRawEnvText, setWizardRawEnvText] = useState('');
+    const [wizardEnvMode, setWizardEnvMode] = useState<'keyvalue' | 'raw'>('keyvalue');
+    const [wizardEnvTarget, setWizardEnvTarget] = useState<'production' | 'preview' | 'all'>('production');
     const [isCreatingSite, setIsCreatingSite] = useState(false);
 
     const projectId = project?.project_id;
@@ -284,6 +312,8 @@ export default function HostingPage() {
             }, 1000);
         } else if (!isLogsModalOpen) {
             setElapsedSeconds(0);
+            setAiDiagnosis(null);
+            setDiagnoseError(null);
         }
         return () => {
             if (interval) clearInterval(interval);
@@ -446,14 +476,48 @@ export default function HostingPage() {
         setIsLogsModalOpen(true);
     };
 
+    // Save deploy env vars before deployment
+    const saveDeployEnvVars = async (siteId: string) => {
+        if (!deployEnvText.trim()) return;
+        setIsSavingDeployEnv(true);
+        try {
+            const res = await fetch('/api/hosting/env', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    siteId,
+                    rawEnvText: deployEnvText.trim(),
+                    environment: deployEnvironment,
+                }),
+            });
+            const data = await res.json();
+            if (!res.ok || !data.success) {
+                throw new Error(data.error || 'Failed to save environment variables');
+            }
+            toast({
+                title: 'Environment variables saved',
+                description: `${data.count || 0} variable(s) configured for this deployment.`,
+            });
+        } finally {
+            setIsSavingDeployEnv(false);
+        }
+    };
+
     // Deploy action (Zip Upload)
     const handleDeploy = async () => {
         if (!uploadFile || !projectId) return;
 
         setIsDeploying(true);
-        setDeployProgressText('Uploading bundle and building...');
+        setDeployProgressText('Saving environment variables...');
 
         try {
+            // Save env vars first if the site exists
+            if (deployEnvText.trim() && siteData?.site?.site_id) {
+                await saveDeployEnvVars(siteData.site.site_id);
+            }
+
+            setDeployProgressText('Uploading bundle and building...');
+
             const formData = new FormData();
             formData.append('projectId', projectId);
             formData.append('environment', deployEnvironment);
@@ -472,6 +536,11 @@ export default function HostingPage() {
                 throw new Error(data.error || 'Deployment failed');
             }
 
+            // Save env vars with the newly created site if we didn't have it before
+            if (deployEnvText.trim() && data.deployment?.site_id && !siteData?.site?.site_id) {
+                await saveDeployEnvVars(data.deployment.site_id);
+            }
+
             toast({
                 title: 'Deployment initiated',
                 description: `Building and deploying ${deployEnvironment === 'production' ? 'to production' : 'to preview'}.`,
@@ -482,6 +551,8 @@ export default function HostingPage() {
             }
 
             setUploadFile(null);
+            setDeployEnvText('');
+            setShowDeployEnv(false);
             if (fileInputRef.current) fileInputRef.current.value = '';
             refetchSite();
             refetchDeploys();
@@ -503,6 +574,11 @@ export default function HostingPage() {
 
         setIsDeployingGithub(true);
         try {
+            // Save env vars first if we have them and a site exists
+            if (deployEnvText.trim() && siteData?.site?.site_id) {
+                await saveDeployEnvVars(siteData.site.site_id);
+            }
+
             const res = await fetch('/api/hosting/github/deploy', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -523,6 +599,11 @@ export default function HostingPage() {
                 throw new Error(data.error || 'Failed to deploy from GitHub');
             }
 
+            // Save env vars with newly created site if needed
+            if (deployEnvText.trim() && data.deployment?.site_id && !siteData?.site?.site_id) {
+                await saveDeployEnvVars(data.deployment.site_id);
+            }
+
             toast({
                 title: 'Deployment started',
                 description: `Importing and building repository ${selectedRepoForDeploy.full_name}...`,
@@ -533,6 +614,8 @@ export default function HostingPage() {
             }
 
             setSelectedRepoForDeploy(null);
+            setDeployEnvText('');
+            setShowDeployEnv(false);
             refetchSite();
             refetchDeploys();
         } catch (err: any) {
@@ -735,6 +818,34 @@ export default function HostingPage() {
         }
     };
 
+    // AI Deployment Diagnostics Handler
+    const handleRunAiDiagnosis = async (deployId: string) => {
+        if (!deployId) return;
+        setIsDiagnosing(true);
+        setDiagnoseError(null);
+        try {
+            const res = await fetch('/api/hosting/ai-diagnose', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ deployId })
+            });
+            const data = await res.json();
+            if (data.success && data.diagnosis) {
+                setAiDiagnosis(data.diagnosis);
+                toast({
+                    title: 'AI Diagnosis Ready',
+                    description: 'Flux AI identified the root cause of this build failure.'
+                });
+            } else {
+                setDiagnoseError(data.error || 'Failed to complete AI diagnosis');
+            }
+        } catch (err: any) {
+            setDiagnoseError(err.message || 'Error connecting to AI diagnostic service');
+        } finally {
+            setIsDiagnosing(false);
+        }
+    };
+
     // Add Env Var
     const handleSaveEnv = async () => {
         if (!site?.site_id) return;
@@ -920,11 +1031,97 @@ export default function HostingPage() {
         }
     };
 
+    // Restart Full-Stack Backend Process
+    const handleRestartBackend = async () => {
+        if (!site?.site_id || !projectId) return;
+        setIsRestartingBackend(true);
+        try {
+            const res = await fetch('/api/hosting/sites', {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ projectId, action: 'restart-backend' })
+            });
+            const data = await res.json();
+            if (!res.ok || !data.success) throw new Error(data.error || 'Failed to restart backend process');
+            toast({
+                title: 'Backend restarted',
+                description: data.message || 'Full-stack server process has been re-spawned.'
+            });
+            refetchSite();
+        } catch (err: any) {
+            toast({
+                title: 'Restart failed',
+                description: err.message,
+                variant: 'destructive'
+            });
+        } finally {
+            setIsRestartingBackend(false);
+        }
+    };
+
+    const handleAnalyzeRepo = async (targetRepo?: string) => {
+        const repoToAnalyze = (targetRepo || wizardRepoInput).trim();
+        if (!repoToAnalyze) {
+            toast({ title: 'Enter a repository', description: 'Please provide a GitHub repo or select one from the list', variant: 'destructive' });
+            return;
+        }
+
+        setIsAnalyzingRepo(true);
+        try {
+            const res = await fetch('/api/hosting/ai-analyze', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    repoUrl: repoToAnalyze,
+                    branch: wizardRepoBranch || 'main'
+                })
+            });
+            const data = await res.json();
+            if (!res.ok || !data.success) {
+                throw new Error(data.error || 'Failed to inspect repository');
+            }
+
+            setAiAnalysisResult(data);
+            if (data.config) {
+                if (data.config.suggestedSubdomain) {
+                    setWizardSubdomain(data.config.suggestedSubdomain);
+                }
+                setWizardFramework(data.config.framework || 'static');
+                setWizardBuildCommand(data.config.buildCommand || '');
+                setWizardOutputDir(data.config.outputDirectory || '');
+                setWizardInstallCommand(data.config.installCommand || '');
+                setWizardRootDir(data.config.rootDir || '.');
+            }
+            if (data.envVars && data.envVars.length > 0) {
+                setWizardEnvVars(data.envVars.map((v: any) => ({
+                    key: v.key,
+                    value: v.value || '',
+                    isSecret: !(v.key.startsWith('NEXT_PUBLIC_') || v.key.startsWith('VITE_') || v.key.startsWith('PUBLIC_')),
+                    description: v.description
+                })));
+            }
+
+            toast({
+                title: 'AI Analysis Complete',
+                description: `Identified ${data.config?.frameworkName || 'framework'} architecture with ${data.treeSummary?.totalFiles || 0} files inspected.`
+            });
+        } catch (err: any) {
+            toast({
+                title: 'Analysis Notice',
+                description: err.message,
+                variant: 'destructive'
+            });
+        } finally {
+            setIsAnalyzingRepo(false);
+        }
+    };
+
     // First-time site initialization
     const handleCreateSite = async () => {
         if (!projectId) return;
         setIsCreatingSite(true);
         try {
+            const validVars = wizardEnvVars.filter(v => v.key.trim());
             const res = await fetch('/api/hosting/sites', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -932,7 +1129,16 @@ export default function HostingPage() {
                     projectId,
                     subdomain: wizardSubdomain.trim().toLowerCase(),
                     framework: wizardFramework,
+                    buildCommand: wizardBuildCommand || undefined,
+                    outputDirectory: wizardOutputDir || undefined,
+                    installCommand: wizardInstallCommand || undefined,
+                    rootDirectory: wizardRootDir || undefined,
+                    githubRepo: aiAnalysisResult?.repo?.fullName || (wizardRepoInput.includes('/') ? wizardRepoInput.trim() : undefined),
+                    branch: wizardRepoBranch || 'main',
                     isSpa: true,
+                    envVars: wizardEnvMode === 'keyvalue' && validVars.length > 0 ? validVars : undefined,
+                    rawEnvText: wizardEnvMode === 'raw' && wizardRawEnvText.trim() ? wizardRawEnvText.trim() : undefined,
+                    environment: wizardEnvTarget || 'production',
                 }),
             });
             const data = await res.json();
@@ -940,6 +1146,40 @@ export default function HostingPage() {
 
             toast({ title: 'Hosting provisioned', description: `Site created at ${data.site.subdomain}.fluxbasedb.me` });
             refetchSite();
+
+            // Auto-trigger initial build if a repository is attached
+            const repoToDeploy = aiAnalysisResult?.repo?.fullName || (wizardRepoInput.includes('/') ? wizardRepoInput.trim() : null);
+            if (repoToDeploy) {
+                try {
+                    const deployRes = await fetch('/api/hosting/github/deploy', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            projectId,
+                            githubRepo: repoToDeploy,
+                            branch: wizardRepoBranch || 'main',
+                            buildCommand: wizardBuildCommand || '',
+                            outputDirectory: wizardOutputDir || '',
+                            installCommand: wizardInstallCommand || '',
+                            environment: wizardEnvTarget || 'production',
+                            autoDeploy: true,
+                            envVars: wizardEnvMode === 'keyvalue' && validVars.length > 0 ? validVars : undefined,
+                            rawEnvText: wizardEnvMode === 'raw' && wizardRawEnvText.trim() ? wizardRawEnvText.trim() : undefined,
+                        }),
+                    });
+                    const deployData = await deployRes.json();
+                    if (deployData.success && deployData.deployment?.deploy_id) {
+                        toast({
+                            title: 'Deployment initiated',
+                            description: `Compiling ${repoToDeploy} on Fluxbase Edge CDN...`,
+                        });
+                        openBuildLogsModal(deployData.deployment.deploy_id);
+                        refetchDeploys();
+                    }
+                } catch (deployErr: any) {
+                    console.error('Initial auto-deploy trigger failed:', deployErr);
+                }
+            }
         } catch (err: any) {
             toast({ title: 'Creation failed', description: err.message, variant: 'destructive' });
         } finally {
@@ -976,85 +1216,574 @@ export default function HostingPage() {
         );
     }
 
+    const renderWizardEnvSection = () => (
+        <div className="space-y-4 pt-4 border-t border-border/40">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                <div>
+                    <div className="flex items-center gap-2">
+                        <KeyRound className="h-4 w-4 text-primary" />
+                        <span className="text-xs font-semibold uppercase tracking-wider text-foreground">
+                            Environment Variables (.env)
+                        </span>
+                        <Badge variant="outline" className="text-[10px] font-mono py-0 h-4 uppercase">
+                            {wizardEnvTarget}
+                        </Badge>
+                    </div>
+                    <p className="text-[11px] text-muted-foreground mt-0.5">
+                        Define environment variables before provisioning. Values are encrypted at rest with AES-256-GCM and injected into your build &amp; runtime.
+                    </p>
+                </div>
+
+                <div className="flex items-center gap-1 bg-muted/60 p-1 rounded-md border border-border/40 self-start sm:self-auto text-xs">
+                    <button
+                        type="button"
+                        onClick={() => setWizardEnvMode('keyvalue')}
+                        className={cn(
+                            "px-2.5 py-1 rounded text-xs font-medium transition-colors",
+                            wizardEnvMode === 'keyvalue'
+                                ? "bg-background text-foreground shadow-sm"
+                                : "text-muted-foreground hover:text-foreground"
+                        )}
+                    >
+                        Key-Value ({wizardEnvVars.length})
+                    </button>
+                    <button
+                        type="button"
+                        onClick={() => setWizardEnvMode('raw')}
+                        className={cn(
+                            "px-2.5 py-1 rounded text-xs font-medium transition-colors",
+                            wizardEnvMode === 'raw'
+                                ? "bg-background text-foreground shadow-sm"
+                                : "text-muted-foreground hover:text-foreground"
+                        )}
+                    >
+                        Paste .env
+                    </button>
+                </div>
+            </div>
+
+            {wizardEnvMode === 'keyvalue' ? (
+                <div className="space-y-2.5">
+                    {wizardEnvVars.length === 0 ? (
+                        <div className="rounded-lg border border-dashed border-border/70 p-4 text-center bg-muted/10">
+                            <p className="text-xs text-muted-foreground mb-2.5">
+                                No environment variables configured yet.
+                            </p>
+                            <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                onClick={() => setWizardEnvVars(prev => [...prev, { key: '', value: '', isSecret: true }])}
+                                className="h-7 text-xs gap-1.5"
+                            >
+                                <Plus className="h-3.5 w-3.5" />
+                                Add Environment Variable
+                            </Button>
+                        </div>
+                    ) : (
+                        <div className="space-y-2">
+                            {wizardEnvVars.map((env, idx) => (
+                                <div key={idx} className="flex flex-col sm:flex-row sm:items-center gap-2 bg-card/60 p-2.5 rounded-lg border border-border/50">
+                                    <div className="w-full sm:w-5/12">
+                                        <Input
+                                            value={env.key}
+                                            onChange={(e) => {
+                                                const updated = [...wizardEnvVars];
+                                                const clean = e.target.value.trim().toUpperCase().replace(/[^A-Z0-9_]/g, '_');
+                                                updated[idx].key = clean;
+                                                if (clean.startsWith('NEXT_PUBLIC_') || clean.startsWith('VITE_') || clean.startsWith('PUBLIC_')) {
+                                                    updated[idx].isSecret = false;
+                                                }
+                                                setWizardEnvVars(updated);
+                                            }}
+                                            placeholder="KEY (e.g. DATABASE_URL)"
+                                            className="font-mono text-xs h-8"
+                                        />
+                                        {env.description && (
+                                            <span className="text-[10px] text-muted-foreground block truncate mt-1">
+                                                {env.description}
+                                            </span>
+                                        )}
+                                    </div>
+                                    <div className="flex-1 flex items-center gap-2">
+                                        <Input
+                                            type={env.isSecret ? "password" : "text"}
+                                            value={env.value}
+                                            onChange={(e) => {
+                                                const updated = [...wizardEnvVars];
+                                                updated[idx].value = e.target.value;
+                                                setWizardEnvVars(updated);
+                                            }}
+                                            placeholder="Value..."
+                                            className="font-mono text-xs h-8 flex-1"
+                                        />
+                                        <Button
+                                            type="button"
+                                            variant="ghost"
+                                            size="sm"
+                                            onClick={() => {
+                                                const updated = [...wizardEnvVars];
+                                                updated[idx].isSecret = !updated[idx].isSecret;
+                                                setWizardEnvVars(updated);
+                                            }}
+                                            title={env.isSecret ? "Secret (Encrypted & Masked)" : "Public (Client Visible)"}
+                                            className={cn("h-8 w-8 p-0 shrink-0", env.isSecret ? "text-amber-500" : "text-muted-foreground")}
+                                        >
+                                            {env.isSecret ? <Lock className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+                                        </Button>
+                                        <Button
+                                            type="button"
+                                            variant="ghost"
+                                            size="sm"
+                                            onClick={() => {
+                                                setWizardEnvVars(prev => prev.filter((_, i) => i !== idx));
+                                            }}
+                                            className="h-8 w-8 p-0 text-muted-foreground hover:text-destructive shrink-0"
+                                        >
+                                            <Trash2 className="h-3.5 w-3.5" />
+                                        </Button>
+                                    </div>
+                                </div>
+                            ))}
+                            <div className="flex items-center justify-between pt-1">
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => setWizardEnvVars(prev => [...prev, { key: '', value: '', isSecret: true }])}
+                                    className="h-7 text-xs gap-1.5"
+                                >
+                                    <Plus className="h-3.5 w-3.5" />
+                                    Add Another Variable
+                                </Button>
+                                <span className="text-[10px] text-muted-foreground">
+                                    Variables with NEXT_PUBLIC_ or VITE_ prefixes are exposed to the browser.
+                                </span>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            ) : (
+                <div className="space-y-2">
+                    <textarea
+                        value={wizardRawEnvText}
+                        onChange={(e) => setWizardRawEnvText(e.target.value)}
+                        placeholder="PASTE .ENV CONTENT HERE:&#10;DATABASE_URL=postgresql://user:pass@host:5432/db&#10;NEXT_PUBLIC_APP_URL=https://myapp.fluxbasedb.me&#10;SECRET_KEY=sk_live_..."
+                        rows={5}
+                        className="w-full rounded-md border border-input bg-transparent px-3 py-2 text-xs font-mono shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring resize-y"
+                    />
+                    <div className="flex items-center justify-between">
+                        <Button
+                            type="button"
+                            variant="secondary"
+                            size="sm"
+                            onClick={() => {
+                                const lines = wizardRawEnvText.split(/\r?\n/);
+                                const parsed: Array<{ key: string; value: string; isSecret: boolean }> = [];
+                                for (const raw of lines) {
+                                    const line = raw.trim();
+                                    if (!line || line.startsWith('#')) continue;
+                                    const eq = line.indexOf('=');
+                                    if (eq <= 0) continue;
+                                    const k = line.slice(0, eq).trim().toUpperCase().replace(/[^A-Z0-9_]/g, '_');
+                                    let v = line.slice(eq + 1).trim();
+                                    if ((v.startsWith('"') && v.endsWith('"')) || (v.startsWith("'") && v.endsWith("'"))) {
+                                        v = v.slice(1, -1);
+                                    }
+                                    if (/^[A-Z_][A-Z0-9_]*$/.test(k)) {
+                                        const isPub = k.startsWith('NEXT_PUBLIC_') || k.startsWith('VITE_') || k.startsWith('PUBLIC_');
+                                        parsed.push({ key: k, value: v, isSecret: !isPub });
+                                    }
+                                }
+                                if (parsed.length > 0) {
+                                    setWizardEnvVars(prev => {
+                                        const existing = new Set(prev.map(p => p.key));
+                                        const additions = parsed.filter(p => !existing.has(p.key));
+                                        return [...prev, ...additions];
+                                    });
+                                    setWizardEnvMode('keyvalue');
+                                    toast({
+                                        title: 'Variables Imported',
+                                        description: `Extracted ${parsed.length} variables into Key-Value editor.`
+                                    });
+                                } else {
+                                    toast({
+                                        title: 'No variables found',
+                                        description: 'Paste standard KEY=VALUE lines.',
+                                        variant: 'destructive'
+                                    });
+                                }
+                            }}
+                            className="h-7 text-xs gap-1.5"
+                        >
+                            <Code className="h-3 w-3" />
+                            Parse into Key-Value
+                        </Button>
+                        <span className="text-[10px] text-muted-foreground">
+                            Lines beginning with # comments are skipped.
+                        </span>
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+
     // FIRST-TIME SETUP WIZARD (When no hosting site exists for project)
     if (!site) {
         return (
-            <div className="p-6 md:p-10 max-w-4xl mx-auto">
-                <div className="text-center mb-10">
-                    <div className="inline-flex p-3 rounded-2xl bg-primary/10 border border-primary/20 text-primary mb-4">
+            <div className="p-6 md:p-10 max-w-4xl mx-auto space-y-8">
+                <div className="text-center space-y-3">
+                    <div className="inline-flex p-3 rounded-2xl bg-primary/10 border border-primary/20 text-primary">
                         <Globe className="h-8 w-8" />
                     </div>
-                    <h1 className="text-3xl font-bold tracking-tight mb-2">Deploy Your Web Application</h1>
-                    <p className="text-muted-foreground text-base max-w-lg mx-auto">
+                    <h1 className="text-3xl font-bold tracking-tight">Deploy Your Web Application</h1>
+                    <p className="text-muted-foreground text-sm max-w-lg mx-auto">
                         Ship web applications, frontend projects, and static sites with instant preview URLs, custom domains, and zero-latency database access.
                     </p>
                 </div>
 
                 <Card className="border-border/60 bg-card/60 backdrop-blur-sm shadow-xl">
-                    <CardHeader className="border-b border-border/40 pb-6">
-                        <CardTitle className="text-lg">Site Configuration</CardTitle>
-                        <CardDescription>Choose your public subdomain and framework preset to get started.</CardDescription>
+                    <CardHeader className="border-b border-border/40 pb-5">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                            <div>
+                                <CardTitle className="text-lg flex items-center gap-2">
+                                    <Sparkles className="h-4 w-4 text-primary" />
+                                    Site Configuration
+                                </CardTitle>
+                                <CardDescription>
+                                    Use AI to automatically inspect your code repository or configure manually.
+                                </CardDescription>
+                            </div>
+                            <div className="flex p-1 bg-muted/70 border border-border/50 rounded-xl self-start sm:self-auto">
+                                <button
+                                    type="button"
+                                    onClick={() => setWizardMode('ai')}
+                                    className={cn(
+                                        "flex items-center gap-1.5 py-1.5 px-3 rounded-lg text-xs font-medium transition-all",
+                                        wizardMode === 'ai'
+                                            ? "bg-background text-foreground shadow-sm border border-border/50"
+                                            : "text-muted-foreground hover:text-foreground"
+                                    )}
+                                >
+                                    <Sparkles className="h-3 w-3 text-primary" />
+                                    AI Smart Import
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => setWizardMode('manual')}
+                                    className={cn(
+                                        "flex items-center gap-1.5 py-1.5 px-3 rounded-lg text-xs font-medium transition-all",
+                                        wizardMode === 'manual'
+                                            ? "bg-background text-foreground shadow-sm border border-border/50"
+                                            : "text-muted-foreground hover:text-foreground"
+                                    )}
+                                >
+                                    <Settings className="h-3 w-3" />
+                                    Manual Preset
+                                </button>
+                            </div>
+                        </div>
                     </CardHeader>
                     <CardContent className="space-y-6 pt-6">
-                        <div>
-                            <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2 block">
-                                Subdomain
-                            </label>
-                            <div className="flex items-center gap-2">
-                                <div className="relative flex-1">
-                                    <Input
-                                        value={wizardSubdomain}
-                                        onChange={(e) => setWizardSubdomain(e.target.value)}
-                                        placeholder="my-cool-app"
-                                        className="font-mono text-sm pr-36"
-                                    />
-                                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-mono text-muted-foreground pointer-events-none">
-                                        .fluxbasedb.me
-                                    </span>
+                        {wizardMode === 'ai' ? (
+                            <div className="space-y-6">
+                                {/* Repository Input Section */}
+                                <div className="space-y-3">
+                                    <div className="flex items-center justify-between">
+                                        <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                                            GitHub Repository
+                                        </label>
+                                        {githubData?.connected && (
+                                            <Badge variant="outline" className="text-[11px] text-emerald-400 bg-emerald-500/10 border-emerald-500/20 gap-1">
+                                                <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
+                                                GitHub Connected
+                                            </Badge>
+                                        )}
+                                    </div>
+
+                                    <div className="flex flex-col sm:flex-row gap-2">
+                                        <div className="relative flex-1">
+                                            <GitBranch className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                                            <Input
+                                                value={wizardRepoInput}
+                                                onChange={(e) => setWizardRepoInput(e.target.value)}
+                                                placeholder="owner/repo or https://github.com/owner/repo"
+                                                className="pl-9 font-mono text-sm"
+                                            />
+                                        </div>
+                                        <div className="w-full sm:w-32">
+                                            <Input
+                                                value={wizardRepoBranch}
+                                                onChange={(e) => setWizardRepoBranch(e.target.value)}
+                                                placeholder="main"
+                                                className="font-mono text-xs"
+                                                title="Branch name"
+                                            />
+                                        </div>
+                                        <Button
+                                            type="button"
+                                            onClick={() => handleAnalyzeRepo()}
+                                            disabled={isAnalyzingRepo || !wizardRepoInput.trim()}
+                                            className="gap-2 shrink-0"
+                                        >
+                                            {isAnalyzingRepo ? (
+                                                <>
+                                                    <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+                                                    Inspecting...
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <Sparkles className="h-3.5 w-3.5 text-primary-foreground" />
+                                                    Inspect with AI
+                                                </>
+                                            )}
+                                        </Button>
+                                    </div>
+
+                                    {/* Quick Repo Selector from connected account */}
+                                    {githubData?.repos && githubData.repos.length > 0 && !aiAnalysisResult && (
+                                        <div className="space-y-1.5 pt-1">
+                                            <span className="text-[11px] text-muted-foreground">
+                                                Or choose from your repositories:
+                                            </span>
+                                            <div className="flex flex-wrap gap-1.5 max-h-24 overflow-y-auto pr-1">
+                                                {githubData.repos.slice(0, 10).map((r: any) => (
+                                                    <button
+                                                        key={r.id}
+                                                        type="button"
+                                                        onClick={() => {
+                                                            setWizardRepoInput(r.full_name);
+                                                            setWizardRepoBranch(r.default_branch || 'main');
+                                                            handleAnalyzeRepo(r.full_name);
+                                                        }}
+                                                        className="text-xs px-2.5 py-1 rounded-lg border border-border/60 bg-muted/40 hover:bg-muted text-foreground hover:border-primary/50 transition-all font-mono flex items-center gap-1.5"
+                                                    >
+                                                        <GitBranch className="h-3 w-3 text-muted-foreground" />
+                                                        {r.name}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+
+                                {/* Loading Animation */}
+                                {isAnalyzingRepo && (
+                                    <div className="p-6 rounded-xl border border-primary/30 bg-primary/5 space-y-3 text-center animate-pulse">
+                                        <div className="inline-flex p-3 rounded-full bg-primary/10 text-primary">
+                                            <Cpu className="h-6 w-6 animate-spin" />
+                                        </div>
+                                        <div className="space-y-1">
+                                            <p className="text-sm font-semibold text-foreground">
+                                                AI Inspecting Repository Structure...
+                                            </p>
+                                            <p className="text-xs text-muted-foreground max-w-md mx-auto">
+                                                Fetching file tree, detecting framework configs, analyzing dependencies, and discovering environment variables.
+                                            </p>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* AI Inspection Results Panel */}
+                                {aiAnalysisResult && !isAnalyzingRepo && (
+                                    <div className="space-y-5 p-5 rounded-2xl border border-primary/30 bg-card/80 shadow-md">
+                                        {/* AI Banner */}
+                                        <div className="space-y-2">
+                                            <div className="flex items-center justify-between">
+                                                <Badge className="bg-primary/10 text-primary border-primary/30 gap-1.5 py-1 px-3 text-xs">
+                                                    <Sparkles className="h-3.5 w-3.5" />
+                                                    AI Architecture: {aiAnalysisResult.config?.frameworkName}
+                                                </Badge>
+                                                <span className="text-[11px] font-mono text-muted-foreground">
+                                                    {aiAnalysisResult.aiAnalysis?.confidence}% confidence
+                                                </span>
+                                            </div>
+                                            <p className="text-xs text-muted-foreground leading-relaxed pl-1">
+                                                {aiAnalysisResult.aiAnalysis?.explanation}
+                                            </p>
+                                        </div>
+
+                                        {/* Repository Structure Visualizer */}
+                                        <div className="space-y-2 pt-1 border-t border-border/40">
+                                            <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground block">
+                                                Repository Structure ({aiAnalysisResult.treeSummary?.totalFiles} files detected)
+                                            </span>
+                                            <div className="flex flex-wrap gap-1.5">
+                                                {aiAnalysisResult.treeSummary?.mainFolders?.map((f: string) => (
+                                                    <Badge key={f} variant="outline" className="text-xs font-mono bg-muted/40 gap-1 border-border/70">
+                                                        <Folder className="h-3 w-3 text-amber-400" />
+                                                        {f}/
+                                                    </Badge>
+                                                ))}
+                                                {aiAnalysisResult.treeSummary?.keyFiles?.map((f: string) => (
+                                                    <Badge key={f} variant="outline" className="text-xs font-mono bg-muted/40 gap-1 border-border/70">
+                                                        <FileCode className="h-3 w-3 text-sky-400" />
+                                                        {f}
+                                                    </Badge>
+                                                ))}
+                                                <Badge variant="outline" className="text-xs font-mono bg-primary/5 text-primary border-primary/20">
+                                                    pkg: {aiAnalysisResult.treeSummary?.packageManager}
+                                                </Badge>
+                                            </div>
+                                        </div>
+
+                                        {/* Auto-filled Build Settings */}
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2 border-t border-border/40">
+                                            <div>
+                                                <label className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-1 block">
+                                                    Build Command
+                                                </label>
+                                                <Input
+                                                    value={wizardBuildCommand}
+                                                    onChange={(e) => setWizardBuildCommand(e.target.value)}
+                                                    className="font-mono text-xs"
+                                                    placeholder="npm run build"
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-1 block">
+                                                    Output Directory
+                                                </label>
+                                                <Input
+                                                    value={wizardOutputDir}
+                                                    onChange={(e) => setWizardOutputDir(e.target.value)}
+                                                    className="font-mono text-xs"
+                                                    placeholder="dist"
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-1 block">
+                                                    Install Command
+                                                </label>
+                                                <Input
+                                                    value={wizardInstallCommand}
+                                                    onChange={(e) => setWizardInstallCommand(e.target.value)}
+                                                    className="font-mono text-xs"
+                                                    placeholder="npm install --legacy-peer-deps"
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-1 block">
+                                                    Root Directory
+                                                </label>
+                                                <Input
+                                                    value={wizardRootDir}
+                                                    onChange={(e) => setWizardRootDir(e.target.value)}
+                                                    className="font-mono text-xs"
+                                                    placeholder="."
+                                                />
+                                            </div>
+                                        </div>
+
+                                        {/* Discovered & Custom Environment Variables */}
+                                        {renderWizardEnvSection()}
+                                    </div>
+                                )}
+
+                                {/* Subdomain Configuration */}
+                                <div>
+                                    <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2 block">
+                                        Public Subdomain
+                                    </label>
+                                    <div className="flex items-center gap-2">
+                                        <div className="relative flex-1">
+                                            <Input
+                                                value={wizardSubdomain}
+                                                onChange={(e) => setWizardSubdomain(e.target.value)}
+                                                placeholder="my-cool-app"
+                                                className="font-mono text-sm pr-36"
+                                            />
+                                            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-mono text-muted-foreground pointer-events-none">
+                                                .fluxbasedb.me
+                                            </span>
+                                        </div>
+                                    </div>
+                                    <p className="text-xs text-muted-foreground mt-1.5">
+                                        Must be 3-63 characters, lowercase letters, numbers, and hyphens.
+                                    </p>
                                 </div>
                             </div>
-                            <p className="text-xs text-muted-foreground mt-1.5">
-                                Must be 3-63 characters, lowercase letters, numbers, and hyphens.
-                            </p>
-                        </div>
+                        ) : (
+                            /* Manual Configuration Mode */
+                            <div className="space-y-6">
+                                <div>
+                                    <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2 block">
+                                        Subdomain
+                                    </label>
+                                    <div className="flex items-center gap-2">
+                                        <div className="relative flex-1">
+                                            <Input
+                                                value={wizardSubdomain}
+                                                onChange={(e) => setWizardSubdomain(e.target.value)}
+                                                placeholder="my-cool-app"
+                                                className="font-mono text-sm pr-36"
+                                            />
+                                            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-mono text-muted-foreground pointer-events-none">
+                                                .fluxbasedb.me
+                                            </span>
+                                        </div>
+                                    </div>
+                                    <p className="text-xs text-muted-foreground mt-1.5">
+                                        Must be 3-63 characters, lowercase letters, numbers, and hyphens.
+                                    </p>
+                                </div>
 
-                        <div>
-                            <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2 block">
-                                Framework Preset
-                            </label>
-                            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                                {[
-                                    { id: 'static', label: 'Static HTML' },
-                                    { id: 'next', label: 'Next.js' },
-                                    { id: 'vite', label: 'Vite / React' },
-                                    { id: 'vue', label: 'Vue / Nuxt' },
-                                ].map((fw) => (
-                                    <button
-                                        key={fw.id}
-                                        type="button"
-                                        onClick={() => setWizardFramework(fw.id)}
-                                        className={cn(
-                                            "flex flex-col items-start p-3.5 rounded-lg border text-left transition-all",
-                                            wizardFramework === fw.id
-                                                ? "border-primary bg-primary/10 text-primary shadow-sm"
-                                                : "border-border/60 hover:border-border hover:bg-secondary/40 text-foreground"
-                                        )}
-                                    >
-                                        <span className="text-sm font-medium">{fw.label}</span>
-                                        <span className="text-xs text-muted-foreground mt-0.5">Auto-build supported</span>
-                                    </button>
-                                ))}
+                                <div>
+                                    <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2 block">
+                                        Framework Preset
+                                    </label>
+                                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                                        {[
+                                            { id: 'static', label: 'Static HTML' },
+                                            { id: 'next', label: 'Next.js' },
+                                            { id: 'vite', label: 'Vite / React' },
+                                            { id: 'vue', label: 'Vue / Nuxt' },
+                                        ].map((fw) => (
+                                            <button
+                                                key={fw.id}
+                                                type="button"
+                                                onClick={() => setWizardFramework(fw.id)}
+                                                className={cn(
+                                                    "flex flex-col items-start p-3.5 rounded-lg border text-left transition-all",
+                                                    wizardFramework === fw.id
+                                                        ? "border-primary bg-primary/10 text-primary shadow-sm"
+                                                        : "border-border/60 hover:border-border hover:bg-secondary/40 text-foreground"
+                                                )}
+                                            >
+                                                <span className="text-sm font-medium">{fw.label}</span>
+                                                <span className="text-xs text-muted-foreground mt-0.5">Auto-build supported</span>
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+
+                                {/* Environment Variables in Manual Mode */}
+                                {renderWizardEnvSection()}
                             </div>
-                        </div>
+                        )}
 
-                        <div className="pt-4 border-t border-border/40 flex justify-end">
+                        <div className="pt-4 border-t border-border/40 flex justify-between items-center">
+                            <span className="text-xs text-muted-foreground">
+                                {wizardMode === 'ai' && aiAnalysisResult
+                                    ? 'AI has configured optimal build and CDN settings.'
+                                    : 'You can change build settings anytime after provisioning.'}
+                            </span>
                             <Button
                                 onClick={handleCreateSite}
                                 disabled={isCreatingSite || !wizardSubdomain.trim()}
                                 className="gap-2 px-6"
                             >
-                                {isCreatingSite ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Rocket className="h-4 w-4" />}
-                                Provision Site &amp; Continue
+                                {isCreatingSite ? (
+                                    <>
+                                        <RefreshCw className="h-4 w-4 animate-spin" />
+                                        Provisioning &amp; Deploying...
+                                    </>
+                                ) : (
+                                    <>
+                                        <Rocket className="h-4 w-4" />
+                                        {wizardMode === 'ai' && aiAnalysisResult ? 'Provision & Deploy with AI Config' : 'Provision Site & Continue'}
+                                    </>
+                                )}
                             </Button>
                         </div>
                     </CardContent>
@@ -1140,6 +1869,23 @@ export default function HostingPage() {
                                     <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
                                     Active
                                 </Badge>
+                                {site.is_fullstack ? (
+                                    <Badge variant="outline" className="bg-blue-500/10 text-blue-400 border-blue-500/20 text-xs gap-1">
+                                        <Server className="h-3 w-3" />
+                                        Full-Stack (Node.js)
+                                    </Badge>
+                                ) : (
+                                    <Badge variant="outline" className="bg-zinc-500/10 text-zinc-400 border-zinc-500/20 text-xs gap-1">
+                                        <Globe className="h-3 w-3" />
+                                        Static Site
+                                    </Badge>
+                                )}
+                                {site.is_fullstack && site.backend_status === 'running' && (
+                                    <Badge variant="outline" className="bg-emerald-500/10 text-emerald-400 border-emerald-500/20 text-xs gap-1">
+                                        <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                                        Port: {site.backend_port}
+                                    </Badge>
+                                )}
                                 <Badge variant="secondary" className="text-xs uppercase font-mono tracking-wider">
                                     {plan}
                                 </Badge>
@@ -1152,6 +1898,19 @@ export default function HostingPage() {
                 </div>
 
                 <div className="flex items-center gap-2">
+                    {site.is_fullstack && (
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={handleRestartBackend}
+                            disabled={isRestartingBackend}
+                            className="gap-1.5 text-xs text-muted-foreground hover:text-foreground"
+                            title="Restart Node.js standalone backend process"
+                        >
+                            <RefreshCw className={cn("h-3.5 w-3.5", isRestartingBackend && "animate-spin")} />
+                            <span>{isRestartingBackend ? 'Restarting...' : 'Restart Server'}</span>
+                        </Button>
+                    )}
                     <Button
                         variant="outline"
                         size="sm"
@@ -1172,6 +1931,16 @@ export default function HostingPage() {
                     >
                         <UploadCloud className="h-3.5 w-3.5" />
                         Deploy Bundle
+                    </Button>
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setIsDeleteSiteOpen(true)}
+                        className="gap-1.5 text-xs text-muted-foreground hover:text-destructive hover:bg-destructive/10 hover:border-destructive/30"
+                        title="Delete hosted web application (keeps database project untouched)"
+                    >
+                        <Trash2 className="h-3.5 w-3.5" />
+                        <span className="hidden sm:inline">Delete Hosted App</span>
                     </Button>
                 </div>
             </div>
@@ -1297,7 +2066,7 @@ export default function HostingPage() {
                                 </CardTitle>
                             </CardHeader>
                             <CardContent className="pt-0 space-y-4">
-                                <div className="grid grid-cols-2 gap-3 p-3 bg-secondary/30 rounded-lg text-xs">
+                                <div className="grid grid-cols-3 gap-3 p-3 bg-secondary/30 rounded-lg text-xs">
                                     <div>
                                         <span className="text-muted-foreground block">Files Uploaded</span>
                                         <span className="font-semibold">{site.prod_file_count || 0} files</span>
@@ -1305,6 +2074,10 @@ export default function HostingPage() {
                                     <div>
                                         <span className="text-muted-foreground block">Bundle Size</span>
                                         <span className="font-semibold">{formatBytes(parseInt(site.prod_size_bytes || '0', 10))}</span>
+                                    </div>
+                                    <div>
+                                        <span className="text-muted-foreground block">Type</span>
+                                        <span className="font-semibold capitalize">{site.is_fullstack ? 'Full-Stack (SSR)' : 'Static Site'}</span>
                                     </div>
                                 </div>
                                 <div className="flex items-center gap-2">
@@ -1794,6 +2567,44 @@ export default function HostingPage() {
                                             />
                                         </div>
                                     </div>
+                                </div>
+
+                                {/* Environment Variables (Collapsible) */}
+                                <div className="border border-border/40 rounded-lg overflow-hidden">
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowDeployEnv(!showDeployEnv)}
+                                        className="w-full flex items-center justify-between px-3 py-2.5 text-xs font-semibold text-muted-foreground uppercase tracking-wider hover:bg-secondary/30 transition-colors"
+                                    >
+                                        <span className="flex items-center gap-2">
+                                            <KeyRound className="h-3.5 w-3.5" />
+                                            Environment Variables
+                                            {deployEnvText.trim() && (
+                                                <Badge variant="secondary" className="text-[10px] px-1.5 py-0 h-4 font-mono">
+                                                    {deployEnvText.trim().split('\n').filter((l: string) => l.trim() && !l.trim().startsWith('#')).length} vars
+                                                </Badge>
+                                            )}
+                                        </span>
+                                        {showDeployEnv ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
+                                    </button>
+                                    {showDeployEnv && (
+                                        <div className="px-3 pb-3 space-y-2 border-t border-border/40">
+                                            <p className="text-[11px] text-muted-foreground pt-2">
+                                                Paste your .env file contents below. These will be saved and available during the build and at runtime.
+                                            </p>
+                                            <textarea
+                                                value={deployEnvText}
+                                                onChange={(e) => setDeployEnvText(e.target.value)}
+                                                placeholder={`DATABASE_URL=postgresql://...\nNEXT_PUBLIC_API_URL=https://...\nSECRET_KEY=sk_live_...`}
+                                                className="w-full bg-background border border-border/60 rounded-md px-3 py-2 text-xs font-mono min-h-[120px] resize-y focus:outline-none focus:ring-1 focus:ring-primary/50 placeholder:text-muted-foreground/40"
+                                                spellCheck={false}
+                                            />
+                                            <p className="text-[10px] text-muted-foreground flex items-center gap-1">
+                                                <Lock className="h-3 w-3" />
+                                                Variables are encrypted at rest. You can also manage them later in the Environment tab.
+                                            </p>
+                                        </div>
+                                    )}
                                 </div>
 
                                 {/* Deploy Action Bar */}
@@ -2323,6 +3134,18 @@ export default function HostingPage() {
                                                             Preview
                                                         </Button>
                                                     )}
+                                                    {dep.branch_url && (
+                                                        <Button
+                                                            variant="outline"
+                                                            size="sm"
+                                                            className="h-8 text-xs gap-1.5 shrink-0"
+                                                            onClick={() => window.open(dep.branch_url, '_blank')}
+                                                            title={`Branch preview: ${dep.branch || 'git branch'}`}
+                                                        >
+                                                            <GitBranch className="h-3.5 w-3.5" />
+                                                            Branch
+                                                        </Button>
+                                                    )}
                                                     {dep.status === 'ready' && !isLive && (
                                                         <Button
                                                             variant="default"
@@ -2659,9 +3482,9 @@ export default function HostingPage() {
                     {/* Danger Zone */}
                     <Card className="border-destructive/30 bg-destructive/5">
                         <CardHeader className="pb-3">
-                            <CardTitle className="text-base text-destructive">Danger Zone</CardTitle>
+                            <CardTitle className="text-base text-destructive">Delete Hosted Application</CardTitle>
                             <CardDescription>
-                                Deleting this site will permanently remove all deployments and release the subdomain.
+                                Permanently take down this hosted web application and release <span className="font-mono text-foreground font-semibold">{site.subdomain}.fluxbasedb.me</span>. Your database tables, SQL queries, schemas, and API keys will remain completely untouched.
                             </CardDescription>
                         </CardHeader>
                         <CardContent>
@@ -2669,9 +3492,10 @@ export default function HostingPage() {
                                 variant="destructive"
                                 size="sm"
                                 onClick={() => setIsDeleteSiteOpen(true)}
-                                className="text-xs"
+                                className="text-xs gap-1.5"
                             >
-                                Delete Hosting Site
+                                <Trash2 className="h-3.5 w-3.5" />
+                                Delete Hosted App
                             </Button>
                         </CardContent>
                     </Card>
@@ -2783,6 +3607,43 @@ export default function HostingPage() {
                                 />
                             </div>
                         </div>
+                        {/* Environment Variables (Collapsible) */}
+                        <div className="border border-border/40 rounded-lg overflow-hidden">
+                            <button
+                                type="button"
+                                onClick={() => setShowDeployEnv(!showDeployEnv)}
+                                className="w-full flex items-center justify-between px-3 py-2.5 text-xs font-semibold text-muted-foreground uppercase tracking-wider hover:bg-secondary/30 transition-colors"
+                            >
+                                <span className="flex items-center gap-2">
+                                    <KeyRound className="h-3.5 w-3.5" />
+                                    Environment Variables
+                                    {deployEnvText.trim() && (
+                                        <Badge variant="secondary" className="text-[10px] px-1.5 py-0 h-4 font-mono">
+                                            {deployEnvText.trim().split('\n').filter((l: string) => l.trim() && !l.trim().startsWith('#')).length} vars
+                                        </Badge>
+                                    )}
+                                </span>
+                                {showDeployEnv ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
+                            </button>
+                            {showDeployEnv && (
+                                <div className="px-3 pb-3 space-y-2 border-t border-border/40">
+                                    <p className="text-[11px] text-muted-foreground pt-2">
+                                        Paste your .env file contents below. These will be saved and available during the build and at runtime.
+                                    </p>
+                                    <textarea
+                                        value={deployEnvText}
+                                        onChange={(e) => setDeployEnvText(e.target.value)}
+                                        placeholder={`DATABASE_URL=postgresql://...\nNEXT_PUBLIC_API_URL=https://...\nSECRET_KEY=sk_live_...`}
+                                        className="w-full bg-background border border-border/60 rounded-md px-3 py-2 text-xs font-mono min-h-[100px] resize-y focus:outline-none focus:ring-1 focus:ring-primary/50 placeholder:text-muted-foreground/40"
+                                        spellCheck={false}
+                                    />
+                                    <p className="text-[10px] text-muted-foreground flex items-center gap-1">
+                                        <Lock className="h-3 w-3" />
+                                        Variables are encrypted at rest. You can also manage them later in the Environment tab.
+                                    </p>
+                                </div>
+                            )}
+                        </div>
                     </div>
 
                     <DialogFooter>
@@ -2880,6 +3741,22 @@ export default function HostingPage() {
                                 <RefreshCw className="h-3 w-3 mr-1" />
                                 Refresh
                             </Button>
+                            {logData?.deployment?.status === 'failed' && (
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    className="h-7 text-xs border-orange-500/40 hover:bg-orange-500/10 text-orange-400 gap-1.5 font-medium shadow-sm"
+                                    onClick={() => handleRunAiDiagnosis(logData.deployment.deploy_id)}
+                                    disabled={isDiagnosing}
+                                >
+                                    {isDiagnosing ? (
+                                        <RefreshCw className="h-3 w-3 animate-spin" />
+                                    ) : (
+                                        <Sparkles className="h-3.5 w-3.5" />
+                                    )}
+                                    AI Diagnose
+                                </Button>
+                            )}
                             <Button
                                 variant="ghost"
                                 size="sm"
@@ -2951,6 +3828,102 @@ export default function HostingPage() {
                         {logData?.deployment?.error_message && (
                             <div className="mt-4 p-3 rounded bg-destructive/10 border border-destructive/20 text-destructive font-semibold">
                                 Error: {logData.deployment.error_message}
+                            </div>
+                        )}
+
+                        {logData?.deployment?.status === 'failed' && (
+                            <div className="mt-4 p-4 rounded-xl border border-destructive/30 bg-destructive/10 space-y-3 font-sans">
+                                <div className="flex items-center justify-between gap-3">
+                                    <div className="flex items-center gap-2">
+                                        <div className="p-1.5 rounded-lg bg-orange-500/10 text-orange-400">
+                                            <Sparkles className="h-4 w-4" />
+                                        </div>
+                                        <div>
+                                            <h4 className="font-bold text-sm text-foreground">Flux AI Deployment Doctor</h4>
+                                            <p className="text-[11px] text-muted-foreground">Automated root cause diagnostics and code resolution</p>
+                                        </div>
+                                    </div>
+                                    <Button
+                                        size="sm"
+                                        variant="outline"
+                                        onClick={() => handleRunAiDiagnosis(logData.deployment.deploy_id)}
+                                        disabled={isDiagnosing}
+                                        className="h-7 text-xs border-orange-500/40 hover:bg-orange-500/10 text-orange-400 gap-1.5 font-medium shrink-0"
+                                    >
+                                        {isDiagnosing ? (
+                                            <>
+                                                <RefreshCw className="h-3 w-3 animate-spin" />
+                                                Analyzing Logs...
+                                            </>
+                                        ) : (
+                                            <>
+                                                <Wand2 className="h-3 w-3" />
+                                                {aiDiagnosis ? 'Re-Analyze' : 'Diagnose with AI'}
+                                            </>
+                                        )}
+                                    </Button>
+                                </div>
+
+                                {aiDiagnosis ? (
+                                    <div className="space-y-3 pt-3 border-t border-border/40 text-xs">
+                                        <div className="flex items-start gap-2">
+                                            <Badge variant="outline" className="capitalize text-[10px] bg-orange-500/10 text-orange-400 border-orange-500/30">
+                                                {aiDiagnosis.category || 'Build Issue'}
+                                            </Badge>
+                                            <span className="font-semibold text-foreground text-sm leading-snug">{aiDiagnosis.summary}</span>
+                                        </div>
+
+                                        <div className="p-3 rounded-lg bg-secondary/70 border border-border/50 text-muted-foreground leading-relaxed space-y-1">
+                                            <span className="font-semibold text-foreground block text-xs">Why This Failed:</span>
+                                            <p className="text-foreground/90">{aiDiagnosis.rootCause}</p>
+                                        </div>
+
+                                        {aiDiagnosis.affectedFile && (
+                                            <div className="flex items-center gap-2 text-xs">
+                                                <span className="text-muted-foreground">Affected File:</span>
+                                                <code className="px-1.5 py-0.5 rounded bg-black/60 text-orange-300 font-mono text-[11px] border border-border/50">
+                                                    {aiDiagnosis.affectedFile}
+                                                </code>
+                                            </div>
+                                        )}
+
+                                        <div className="p-3 rounded-lg bg-emerald-500/10 border border-emerald-500/25 text-emerald-300 space-y-2">
+                                            <div className="flex items-center justify-between">
+                                                <span className="font-semibold text-emerald-400 text-xs flex items-center gap-1.5">
+                                                    <CheckCircle2 className="h-3.5 w-3.5" /> Recommended Fix:
+                                                </span>
+                                                {aiDiagnosis.codeSnippet && (
+                                                    <Button
+                                                        size="sm"
+                                                        variant="ghost"
+                                                        className="h-6 text-[11px] text-emerald-400 hover:text-white px-2"
+                                                        onClick={() => handleCopy(aiDiagnosis.codeSnippet, 'Fix Code')}
+                                                    >
+                                                        <Copy className="h-3 w-3 mr-1" /> Copy Fix
+                                                    </Button>
+                                                )}
+                                            </div>
+                                            <p className="text-foreground/90 text-xs leading-relaxed">{aiDiagnosis.suggestedFix}</p>
+                                            {aiDiagnosis.codeSnippet && (
+                                                <pre className="p-2.5 rounded bg-black/70 border border-border/50 font-mono text-[11px] text-emerald-300 overflow-x-auto whitespace-pre-wrap">
+                                                    <code>{aiDiagnosis.codeSnippet}</code>
+                                                </pre>
+                                            )}
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <div className="flex items-center justify-between text-xs text-muted-foreground pt-1">
+                                        <p>
+                                            Click <strong>&quot;Diagnose with AI&quot;</strong> to parse these build logs and generate the exact file and code fix.
+                                        </p>
+                                    </div>
+                                )}
+
+                                {diagnoseError && (
+                                    <div className="text-xs text-destructive bg-destructive/10 p-2 rounded">
+                                        {diagnoseError}
+                                    </div>
+                                )}
                             </div>
                         )}
 
@@ -3043,19 +4016,37 @@ export default function HostingPage() {
             <AlertDialog open={isDeleteSiteOpen} onOpenChange={setIsDeleteSiteOpen}>
                 <AlertDialogContent>
                     <AlertDialogHeader>
-                        <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
-                        <AlertDialogDescription>
-                            This will delete your hosting site <strong className="text-foreground">{site.subdomain}.fluxbasedb.me</strong> and all {deployments.length} deployment records. This action cannot be undone.
+                        <AlertDialogTitle className="text-destructive flex items-center gap-2">
+                            <Trash2 className="h-5 w-5" />
+                            Delete Hosted Application?
+                        </AlertDialogTitle>
+                        <AlertDialogDescription asChild>
+                            <div className="space-y-3 pt-1 text-sm text-muted-foreground">
+                                <p>
+                                    This will take down <strong className="text-foreground">{site.subdomain}.fluxbasedb.me</strong>, delete all {deployments.length} deployment artifacts, and release the subdomain.
+                                </p>
+                                <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs leading-relaxed">
+                                    <strong className="block mb-0.5 font-semibold text-emerald-300">Your Database Project is 100% Safe:</strong>
+                                    This action only removes the hosted frontend web application. All your PostgreSQL tables, SQL queries, schemas, database rows, storage buckets, and API keys remain completely untouched.
+                                </div>
+                            </div>
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
-                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogCancel disabled={isDeletingSite}>Cancel</AlertDialogCancel>
                         <AlertDialogAction
                             onClick={handleDeleteSite}
                             disabled={isDeletingSite}
                             className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                         >
-                            {isDeletingSite ? 'Deleting...' : 'Delete Site'}
+                            {isDeletingSite ? (
+                                <>
+                                    <RefreshCw className="h-3.5 w-3.5 mr-1.5 animate-spin" />
+                                    Deleting Hosted Site...
+                                </>
+                            ) : (
+                                'Delete Hosted App'
+                            )}
                         </AlertDialogAction>
                     </AlertDialogFooter>
                 </AlertDialogContent>

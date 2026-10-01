@@ -55,6 +55,18 @@ export async function middleware(request: NextRequest) {
         if (pathname === '/api/hosting/verify-domain' || pathname.startsWith('/api/v1/hosting/ai-proxy')) {
             return NextResponse.next();
         }
+
+        // When the hosted site is "fluxbase" (the main full-stack app deployed on fluxbase.fluxbasedb.me),
+        // pass API routes and Next.js Server Actions directly to the running server so auth, database,
+        // and full-stack features work seamlessly!
+        const isFluxbaseSelfSite = cleanHost.startsWith('fluxbase.') || cleanHost.includes('fluxbase-git-');
+        const isServerAction = request.headers.has('next-action');
+        const isApiCall = pathname.startsWith('/api/');
+
+        if (isFluxbaseSelfSite && (isApiCall || isServerAction)) {
+            return NextResponse.next();
+        }
+
         const url = request.nextUrl.clone();
         url.pathname = '/api/hosting/serve';
         url.searchParams.set('path', pathname);

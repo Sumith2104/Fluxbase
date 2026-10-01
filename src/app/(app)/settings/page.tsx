@@ -38,7 +38,7 @@ import { useRouter } from 'next/navigation';
 import { logoutAction } from '../actions';
 import {
     Copy, Check, Shield, Clock,
-    Key, Loader2, AlertTriangle, Database, Sparkles
+    Key, Loader2, AlertTriangle, Database, Sparkles, Globe, ArrowRight
 } from "lucide-react";
 import {
     Select, SelectContent, SelectItem, SelectTrigger, SelectValue
@@ -555,6 +555,28 @@ export default function GeneralSettingsPage() {
                         <CardDescription>These actions are permanent and cannot be undone.</CardDescription>
                     </CardHeader>
                     <CardContent className="space-y-4">
+                        {/* Notice for deleting only hosted app */}
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between rounded-xl border border-primary/20 bg-primary/5 p-4 gap-4">
+                            <div>
+                                <h4 className="font-semibold text-foreground text-sm flex items-center gap-2">
+                                    <Globe className="h-4 w-4 text-primary" />
+                                    Looking to remove only your hosted web app?
+                                </h4>
+                                <p className="text-xs text-muted-foreground mt-0.5">
+                                    You can take down your deployed website and release its subdomain without deleting your database tables or data.
+                                </p>
+                            </div>
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => router.push('/hosting')}
+                                className="rounded-xl shrink-0 text-xs gap-1.5"
+                            >
+                                Manage Hosting
+                                <ArrowRight className="h-3.5 w-3.5" />
+                            </Button>
+                        </div>
+
                         {/* 1. DELETE THIS PROJECT */}
                         <div className="flex flex-col sm:flex-row sm:items-center justify-between rounded-xl border border-border bg-background p-4 gap-4">
                             <div>

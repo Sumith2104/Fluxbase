@@ -1,5 +1,7 @@
 'use client';
 
+export const dynamic = 'force-dynamic';
+
 import * as React from 'react';
 import Link from 'next/link';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -7,6 +9,7 @@ import {
     Download, Book, Code2, Webhook, Database, ShieldCheck, Shield,
     Zap, Copy, Check, ArrowRight, HardDrive, AlertCircle,
     Info, Lock, Users, Eye, KeyRound, Globe, Cpu, ChevronRight, Bot, Sparkles, Printer,
+    Rocket, Server, CheckCircle2, AlertTriangle, FileCode2, Terminal,
     Infinity as InfinityIcon
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -99,6 +102,7 @@ function Endpoint({ method, path }: { method: 'GET' | 'POST' | 'DELETE' | 'PATCH
 const NAV_SECTIONS = [
     { id: 'getting-started', label: 'Getting Started', icon: Zap },
     { id: 'authentication', label: 'Authentication', icon: KeyRound },
+    { id: 'hosting-deployment', label: 'Hosting & Deployment', icon: Rocket },
     { id: 'flux-ai-gateway', label: 'Flux', icon: Bot },
     { id: 'mcp-gateway', label: 'MCP AI Gateway', icon: Cpu },
     { id: 'core-api', label: 'Core SQL API', icon: Database },
@@ -323,6 +327,207 @@ Content-Type: application/json`} />
                             <Callout type="info">
                                 Rotate API keys any time from <strong>Settings → API Keys</strong>. Old keys are invalidated immediately.
                             </Callout>
+                        </Section>
+
+                        {/* ── App Hosting & Deployments ── */}
+                        <Section id="hosting-deployment" title="App Hosting & Deployment Requirements" icon={Rocket}>
+                            <p>
+                                Fluxbase Hosting enables you to deploy full-stack <strong className="text-white">Next.js applications</strong>, modern frontend frameworks (<strong className="text-white">Vite, React, Vue, SvelteKit, Astro</strong>), and static web applications directly from GitHub or local archives.
+                            </p>
+                            <p>
+                                To ensure deterministic, high-speed builds and zero-downtime rollouts, ensure your repository satisfies the following framework and build requirements before deploying.
+                            </p>
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 my-6">
+                                <div className="p-4 rounded-xl border border-border bg-card/60 space-y-2">
+                                    <div className="flex items-center gap-2 text-white font-semibold text-sm">
+                                        <Server className="h-4 w-4 text-orange-400" /> Full-Stack Apps (Next.js / Node)
+                                    </div>
+                                    <p className="text-xs text-muted-foreground/80 leading-relaxed">
+                                        Supports API route handlers, Server Actions, SSR, dynamic middleware, and background workers via Next.js Standalone containerization.
+                                    </p>
+                                </div>
+                                <div className="p-4 rounded-xl border border-border bg-card/60 space-y-2">
+                                    <div className="flex items-center gap-2 text-white font-semibold text-sm">
+                                        <Globe className="h-4 w-4 text-emerald-400" /> Static Sites & SPAs (Vite / Astro)
+                                    </div>
+                                    <p className="text-xs text-muted-foreground/80 leading-relaxed">
+                                        Pure frontends compiled into static bundles (<code className="text-[11px] font-mono text-emerald-300">out/</code> or <code className="text-[11px] font-mono text-emerald-300">dist/</code>) and distributed across our high-performance global edge network.
+                                    </p>
+                                </div>
+                            </div>
+
+                            <h3 className="text-lg font-bold text-white mt-8 mb-3 flex items-center gap-2">
+                                <CheckCircle2 className="h-4 w-4 text-orange-400" />
+                                1. Next.js Prerendering & Dynamic Routes
+                            </h3>
+                            <p>
+                                In Next.js App Router (Next.js 14 and 15), Next.js automatically attempts to statically prerender (<code className="text-xs font-mono text-foreground/80 bg-muted px-1.5 py-0.5 rounded">SSG</code>) every route into an HTML file during <code className="text-xs font-mono text-foreground/80 bg-muted px-1.5 py-0.5 rounded">next build</code>. 
+                            </p>
+                            <p>
+                                If a page references browser globals (<code className="text-xs font-mono text-foreground/80 bg-muted px-1 rounded">window</code>, <code className="text-xs font-mono text-foreground/80 bg-muted px-1 rounded">localStorage</code>, <code className="text-xs font-mono text-foreground/80 bg-muted px-1 rounded">document</code>), dynamic search parameters (<code className="text-xs font-mono text-foreground/80 bg-muted px-1 rounded">useSearchParams()</code> without Suspense), or live database queries, the static generation pass will abort with an unhandled server error:
+                            </p>
+
+                            <CodeBlock title="Common Next.js Build Prerender Error" code={`Error occurred prerendering page "/dashboard". Read more: https://nextjs.org/docs/messages/prerender-error
+[Error: An error occurred in the Server Components render. ...] { digest: '3977694363' }
+Export encountered an error on /dashboard/page: /dashboard, exiting the build.`} />
+
+                            <Callout type="warning">
+                                <strong>Requirement:</strong> For any page or API route that relies on dynamic client state, request headers, cookies, or real-time data, add <strong className="text-amber-300">export const dynamic = &apos;force-dynamic&apos;;</strong> to ensure Next.js renders it on-demand instead of failing build-time prerendering.
+                            </Callout>
+
+                            <CodeBlock title="app/dashboard/page.tsx" code={`// Mark route as dynamic to skip build-time static HTML baking
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
+export default async function DashboardPage() {
+    // Dynamic runtime queries, authentication checks, or cookies run cleanly on request
+    return <DashboardView />;
+}`} />
+
+                            <h3 className="text-lg font-bold text-white mt-10 mb-3 flex items-center gap-2">
+                                <FileCode2 className="h-4 w-4 text-orange-400" />
+                                2. Recommended Next.js Configuration
+                            </h3>
+                            <p>
+                                For maximum stability and optimal containerized deployments, configure your <code className="text-xs font-mono text-foreground/80 bg-muted px-1.5 py-0.5 rounded">next.config.js</code> or <code className="text-xs font-mono text-foreground/80 bg-muted px-1.5 py-0.5 rounded">next.config.ts</code> with the following settings:
+                            </p>
+
+                            <CodeBlock title="next.config.ts" code={`import type { NextConfig } from 'next';
+
+const nextConfig: NextConfig = {
+  // Use 'standalone' for fullstack SSR (API routes, server actions, middleware)
+  // Use 'export' for purely client-side static SPAs without a Node backend
+  output: 'standalone',
+
+  // Disable server-side image optimization if deploying without specialized image proxies
+  images: {
+    unoptimized: true,
+  },
+
+  // Prevent minor linting warnings or strict type mismatches from failing production builds
+  eslint: {
+    ignoreDuringBuilds: true,
+  },
+  typescript: {
+    ignoreBuildErrors: true,
+  },
+};
+
+export default nextConfig;`} />
+
+                            <h3 className="text-lg font-bold text-white mt-10 mb-3 flex items-center gap-2">
+                                <Terminal className="h-4 w-4 text-orange-400" />
+                                3. Build & Package Scripts (package.json)
+                            </h3>
+                            <p>
+                                The deployment engine inspects your repository&apos;s <code className="text-xs font-mono text-foreground/80 bg-muted px-1.5 py-0.5 rounded">package.json</code> to detect your framework and execution scripts:
+                            </p>
+
+                            <div className="space-y-3 my-4">
+                                <div className="flex items-start gap-3 p-3.5 rounded-lg border border-border bg-card/40">
+                                    <div className="text-orange-400 font-mono text-xs font-bold pt-0.5 shrink-0">1. Build Script:</div>
+                                    <div className="text-xs text-muted-foreground/85 leading-relaxed">
+                                        Ensure <code className="font-mono text-foreground">scripts.build</code> is defined (e.g. <code className="font-mono text-orange-300">&quot;build&quot;: &quot;next build&quot;</code> or <code className="font-mono text-orange-300">&quot;build&quot;: &quot;vite build&quot;</code>).
+                                    </div>
+                                </div>
+                                <div className="flex items-start gap-3 p-3.5 rounded-lg border border-border bg-card/40">
+                                    <div className="text-orange-400 font-mono text-xs font-bold pt-0.5 shrink-0">2. Dependencies:</div>
+                                    <div className="text-xs text-muted-foreground/85 leading-relaxed">
+                                        All compilation tooling (TypeScript, Tailwind, PostCSS, Vite plugins) should be in <code className="font-mono text-foreground">devDependencies</code> or <code className="font-mono text-foreground">dependencies</code> so they are available in the build sandbox.
+                                    </div>
+                                </div>
+                                <div className="flex items-start gap-3 p-3.5 rounded-lg border border-border bg-card/40">
+                                    <div className="text-orange-400 font-mono text-xs font-bold pt-0.5 shrink-0">3. Peer Dependencies:</div>
+                                    <div className="text-xs text-muted-foreground/85 leading-relaxed">
+                                        If using libraries with conflicting peer dependencies (e.g. React 19 vs older third-party packages), ensure your package lockfile is valid or tested with <code className="font-mono text-orange-300">--legacy-peer-deps</code>.
+                                    </div>
+                                </div>
+                            </div>
+
+                            <h3 className="text-lg font-bold text-white mt-10 mb-3 flex items-center gap-2">
+                                <KeyRound className="h-4 w-4 text-orange-400" />
+                                4. Environment Variables & Client Prefixes
+                            </h3>
+                            <p>
+                                Client-side code bundled into the browser only has access to environment variables that use your framework&apos;s designated prefix:
+                            </p>
+
+                            <div className="overflow-x-auto my-4 rounded-xl border border-border bg-card">
+                                <table className="w-full text-left text-sm">
+                                    <thead className="bg-secondary text-muted-foreground/80 font-mono text-xs">
+                                        <tr>
+                                            <th className="px-4 py-3">Framework</th>
+                                            <th className="px-4 py-3">Client Variable Prefix</th>
+                                            <th className="px-4 py-3">Example Variable</th>
+                                            <th className="px-4 py-3">Backend / Secret Variables</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-border/60">
+                                        <tr className="hover:bg-muted/40">
+                                            <td className="px-4 py-3 font-semibold text-white text-xs">Next.js</td>
+                                            <td className="px-4 py-3 font-mono text-orange-400 text-xs">NEXT_PUBLIC_</td>
+                                            <td className="px-4 py-3 font-mono text-foreground/85 text-xs">NEXT_PUBLIC_API_URL</td>
+                                            <td className="px-4 py-3 text-muted-foreground/75 text-xs">Available in API routes / Server Actions only</td>
+                                        </tr>
+                                        <tr className="hover:bg-muted/40">
+                                            <td className="px-4 py-3 font-semibold text-white text-xs">Vite / React / Vue</td>
+                                            <td className="px-4 py-3 font-mono text-emerald-400 text-xs">VITE_</td>
+                                            <td className="px-4 py-3 font-mono text-foreground/85 text-xs">VITE_BACKEND_URL</td>
+                                            <td className="px-4 py-3 text-muted-foreground/75 text-xs">Inlined into client JS at build time</td>
+                                        </tr>
+                                        <tr className="hover:bg-muted/40">
+                                            <td className="px-4 py-3 font-semibold text-white text-xs">Astro</td>
+                                            <td className="px-4 py-3 font-mono text-purple-400 text-xs">PUBLIC_</td>
+                                            <td className="px-4 py-3 font-mono text-foreground/85 text-xs">PUBLIC_SITE_URL</td>
+                                            <td className="px-4 py-3 text-muted-foreground/75 text-xs">Available in Astro server endpoints</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+
+                            <Callout type="info">
+                                You can configure production environment variables anytime in <strong>Hosting → Select Site → Settings → Environment Variables</strong>. Variables are securely injected into your build sandbox and production runtime.
+                            </Callout>
+
+                            <h3 className="text-lg font-bold text-white mt-10 mb-3 flex items-center gap-2">
+                                <AlertTriangle className="h-4 w-4 text-amber-400" />
+                                5. Troubleshooting Build & Deployment Errors
+                            </h3>
+
+                            <div className="overflow-x-auto my-4 rounded-xl border border-border bg-card">
+                                <table className="w-full text-left text-sm">
+                                    <thead className="bg-secondary text-muted-foreground/80 font-mono text-xs">
+                                        <tr>
+                                            <th className="px-4 py-3">Error in Build Log</th>
+                                            <th className="px-4 py-3">Root Cause</th>
+                                            <th className="px-4 py-3">Immediate Resolution</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-border/60">
+                                        <tr className="hover:bg-muted/40">
+                                            <td className="px-4 py-3 font-mono text-red-400 text-xs">Error occurred prerendering page &quot;...&quot;</td>
+                                            <td className="px-4 py-3 text-foreground/85 text-xs">Browser API or unhandled dynamic context invoked during static build generation.</td>
+                                            <td className="px-4 py-3 text-emerald-400 text-xs font-mono">export const dynamic = &apos;force-dynamic&apos;;</td>
+                                        </tr>
+                                        <tr className="hover:bg-muted/40">
+                                            <td className="px-4 py-3 font-mono text-amber-400 text-xs">Command timed out after 600s: npm ci</td>
+                                            <td className="px-4 py-3 text-foreground/85 text-xs">Lockfile has peer dependency mismatches or is resolving thousands of conflicting packages.</td>
+                                            <td className="px-4 py-3 text-muted-foreground/80 text-xs">Run <code className="font-mono text-foreground">npm install --package-lock-only</code> or resolve conflicting peer dependencies.</td>
+                                        </tr>
+                                        <tr className="hover:bg-muted/40">
+                                            <td className="px-4 py-3 font-mono text-red-400 text-xs">Framework binary not found in PATH</td>
+                                            <td className="px-4 py-3 text-foreground/85 text-xs">The framework CLI (such as <code className="font-mono">next</code> or <code className="font-mono">vite</code>) is not declared in <code className="font-mono">package.json</code>.</td>
+                                            <td className="px-4 py-3 text-muted-foreground/80 text-xs">Add the framework package directly to <code className="font-mono">dependencies</code> or <code className="font-mono">devDependencies</code>.</td>
+                                        </tr>
+                                        <tr className="hover:bg-muted/40">
+                                            <td className="px-4 py-3 font-mono text-amber-400 text-xs">Image Optimization using Next.js default loader</td>
+                                            <td className="px-4 py-3 text-foreground/85 text-xs">Next.js &lt;Image /&gt; requires a live Node.js server unless unoptimized is enabled.</td>
+                                            <td className="px-4 py-3 text-muted-foreground/80 text-xs">Add <code className="font-mono text-foreground">images: &#123; unoptimized: true &#125;</code> to your <code className="font-mono">next.config.js</code>.</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
                         </Section>
 
                         {/* ── 3. Flux (AI Gateway) ── */}

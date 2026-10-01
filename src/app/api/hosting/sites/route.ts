@@ -94,7 +94,23 @@ export async function POST(req: NextRequest) {
 
     try {
         const body = await req.json();
-        const { projectId, subdomain, isSpa, framework, rootDirectory, notFoundPage, aiModelsEnabled } = body;
+        const {
+            projectId,
+            subdomain,
+            isSpa,
+            framework,
+            rootDirectory,
+            notFoundPage,
+            aiModelsEnabled,
+            buildCommand,
+            outputDirectory,
+            installCommand,
+            githubRepo,
+            branch,
+            envVars,
+            rawEnvText,
+            environment = 'production'
+        } = body;
 
         if (!projectId) {
             return NextResponse.json({ success: false, error: 'projectId required' }, { status: 400 });
@@ -123,10 +139,73 @@ export async function POST(req: NextRequest) {
             }
 
             const site = await getOrCreateHostingSite(projectId, auth.userId, subdomain);
-            return NextResponse.json({ success: true, site });
+
+            if (framework || buildCommand || outputDirectory || installCommand || rootDirectory || githubRepo) {
+                await pool.query(
+                    `UPDATE fluxbase_global.hosting_sites 
+                     SET framework = COALESCE($1, framework),
+                         build_command = COALESCE($2, build_command),
+                         output_directory = COALESCE($3, output_directory),
+                         install_command = COALESCE($4, install_command),
+                         root_directory = COALESCE($5, root_directory),
+                         github_repo = COALESCE($6, github_repo),
+                         github_branch = COALESCE($7, github_branch)
+                     WHERE site_id = $8`,
+                    [
+                        framework || null,
+                        buildCommand || null,
+                        outputDirectory || null,
+                        installCommand || null,
+                        rootDirectory || null,
+                        githubRepo || null,
+                        branch || 'main',
+                        site.site_id
+                    ]
+                );
+            }
+
+            // Save environment variables if provided during site provisioning
+            let savedEnvCount = 0;
+            if (envVars || rawEnvText) {
+                const { saveSiteEnvVars } = await import('@/lib/hosting-env');
+                const envRes = await saveSiteEnvVars({
+                    siteId: site.site_id,
+                    projectId,
+                    envVars,
+                    rawEnvText,
+                    environment
+                });
+                savedEnvCount = envRes.savedCount;
+            }
+
+            const refreshed = await pool.query('SELECT * FROM fluxbase_global.hosting_sites WHERE site_id = $1', [site.site_id]);
+            return NextResponse.json({ success: true, site: refreshed.rows[0], savedEnvCount });
         }
 
         const site = existing.rows[0];
+
+        // If environment variables were submitted when updating the site
+        if (envVars || rawEnvText) {
+            const { saveSiteEnvVars } = await import('@/lib/hosting-env');
+            await saveSiteEnvVars({
+                siteId: site.site_id,
+                projectId,
+                envVars,
+                rawEnvText,
+                environment
+            });
+        }
+
+        if (body.action === 'restart-backend') {
+            const { restartBackendProcess } = await import('@/lib/hosting-runner');
+            const res = await restartBackendProcess(site.site_id);
+            if (res.success) {
+                const refreshed = await pool.query('SELECT * FROM fluxbase_global.hosting_sites WHERE site_id = $1', [site.site_id]);
+                return NextResponse.json({ success: true, message: `Backend process restarted on port ${res.port}`, site: refreshed.rows[0] });
+            } else {
+                return NextResponse.json({ success: false, error: res.error }, { status: 500 });
+            }
+        }
 
         // Updating existing site
         const updates: string[] = [];
@@ -173,6 +252,31 @@ export async function POST(req: NextRequest) {
         if (typeof aiModelsEnabled === 'boolean') {
             updates.push(`ai_models_enabled = $${pIndex++}`);
             values.push(aiModelsEnabled);
+        }
+
+        if (buildCommand !== undefined) {
+            updates.push(`build_command = $${pIndex++}`);
+            values.push(buildCommand || null);
+        }
+
+        if (outputDirectory !== undefined) {
+            updates.push(`output_directory = $${pIndex++}`);
+            values.push(outputDirectory || null);
+        }
+
+        if (installCommand !== undefined) {
+            updates.push(`install_command = $${pIndex++}`);
+            values.push(installCommand || null);
+        }
+
+        if (githubRepo !== undefined) {
+            updates.push(`github_repo = $${pIndex++}`);
+            values.push(githubRepo || null);
+        }
+
+        if (branch !== undefined) {
+            updates.push(`github_branch = $${pIndex++}`);
+            values.push(branch || 'main');
         }
 
         if (updates.length > 0) {
@@ -223,14 +327,26 @@ export async function DELETE(req: NextRequest) {
         const project = await getProjectById(site.project_id, auth.userId);
         if (!project) return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 403 });
 
+        // Clean up tenant directory and custom domain symlinks on edge server
+        try {
+            const { deleteFromTenantsEdge } = await import('@/lib/hosting-engine');
+            const customDomains = site.custom_domain ? [site.custom_domain] : [];
+            await deleteFromTenantsEdge(site.subdomain, customDomains);
+        } catch (edgeErr: any) {
+            console.error('Failed to clean up edge tenant files:', edgeErr?.message);
+        }
+
         await pool.query('DELETE FROM fluxbase_global.hosting_sites WHERE site_id = $1', [siteId]);
 
         try {
             const { redis } = await import('@/lib/redis');
             await redis.del(`hosting:site:${site.subdomain}`);
+            if (site.custom_domain) {
+                await redis.del(`hosting:site:${site.custom_domain}`);
+            }
         } catch {}
 
-        return NextResponse.json({ success: true, message: 'Site deleted' });
+        return NextResponse.json({ success: true, message: 'Hosting site deleted. Database project remains intact.' });
     } catch (err: any) {
         return NextResponse.json({ success: false, error: err.message }, { status: 500 });
     }

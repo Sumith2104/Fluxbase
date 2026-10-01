@@ -3,7 +3,7 @@ import { resolveHostingSite, serveHostedAsset, logHostingAccess } from '@/lib/ho
 
 export const dynamic = 'force-dynamic';
 
-export async function GET(req: NextRequest) {
+async function handleHostingServe(req: NextRequest) {
     const { searchParams } = new URL(req.url);
     const hostParam = searchParams.get('host');
     const pathParam = searchParams.get('path');
@@ -52,6 +52,94 @@ export async function GET(req: NextRequest) {
     const userAgent = req.headers.get('user-agent') || '';
     const referer = req.headers.get('referer') || '';
 
+    // Check if site has an active full-stack standalone Node.js/Next.js backend server
+    const { getBackendPort } = await import('@/lib/hosting-runner');
+    const backendPort = await getBackendPort(targetHost, siteInfo.siteId);
+
+    const isStaticAsset = targetPath.startsWith('/_next/static/') ||
+        targetPath.startsWith('/static/') ||
+        /\.(?:png|jpg|jpeg|gif|webp|svg|ico|css|js|map|woff2?|ttf|eot)$/i.test(targetPath);
+
+    // For full-stack sites with a live backend: proxy ALL requests (SSR pages, API routes,
+    // server components, static assets) - the backend handles everything including _next/static.
+    // This ensures auth-protected pages, server actions, and SSR work correctly.
+    if (backendPort) {
+        try {
+            // Build a clean query string: strip middleware rewrite params (host, path)
+            // so the backend only sees the original client query params
+            const rewriteParams = new URLSearchParams(req.nextUrl.search);
+            rewriteParams.delete('host');
+            rewriteParams.delete('path');
+            const queryStr = rewriteParams.toString() ? `?${rewriteParams.toString()}` : '';
+            const proxyUrl = `http://127.0.0.1:${backendPort}${targetPath}${queryStr}`;
+
+            const proxyHeaders = new Headers(req.headers);
+            proxyHeaders.set('host', targetHost);
+            proxyHeaders.set('x-forwarded-host', targetHost);
+            proxyHeaders.set('x-forwarded-proto', 'https');
+            // Remove headers that interfere with proxy target interpretation
+            proxyHeaders.delete('accept-encoding');
+
+            const method = req.method;
+            const hasBody = method !== 'GET' && method !== 'HEAD';
+            const body = hasBody ? await req.arrayBuffer() : undefined;
+
+            const proxyRes = await fetch(proxyUrl, {
+                method,
+                headers: proxyHeaders,
+                body,
+                redirect: 'manual'
+            });
+
+            // CRITICAL: Buffer the entire response body as a concrete ArrayBuffer.
+            // Passing proxyRes.body (ReadableStream) directly to NextResponse causes
+            // empty bodies in Next.js because the stream can get consumed/locked internally,
+            // especially when content-encoding is stripped.
+            const proxyBody = await proxyRes.arrayBuffer();
+
+            const resHeaders = new Headers(proxyRes.headers);
+            resHeaders.delete('content-encoding');
+            resHeaders.delete('transfer-encoding');
+            // Set the correct content-length for the buffered response
+            resHeaders.set('content-length', proxyBody.byteLength.toString());
+
+            return new NextResponse(proxyBody, {
+                status: proxyRes.status,
+                headers: resHeaders
+            });
+        } catch (proxyErr: any) {
+            console.error(`[FullStack Proxy Error] Failed to proxy to backend on port ${backendPort}:`, proxyErr?.message);
+            // Return a proper JSON error instead of silently falling through
+            return NextResponse.json(
+                { error: `Backend server on port ${backendPort} is not responding. It may be restarting.`, status: 502 },
+                {
+                    status: 502,
+                    headers: {
+                        'Retry-After': '3',
+                        'X-Flux-Hosting-Status': 'ProxyError'
+                    }
+                }
+            );
+        }
+    }
+
+    // If this is an API call or non-GET dynamic mutation on a full-stack site where backend is starting/unavailable:
+    // Return a structured JSON response instead of falling through to static S3 asset lookup (which throws 405 Method Not Allowed)
+    const isDynamicApiOrAction = targetPath.startsWith('/api/') || req.headers.has('next-action') || (req.method !== 'GET' && req.method !== 'HEAD');
+    if (isDynamicApiOrAction && (siteInfo.isFullstack || !isStaticAsset)) {
+        return NextResponse.json(
+            { error: 'Backend server is initializing or recovering. Please retry shortly.', status: 503 },
+            {
+                status: 503,
+                headers: {
+                    'Content-Type': 'application/json; charset=utf-8',
+                    'Retry-After': '3',
+                    'X-Flux-Hosting-Status': 'BackendInitializing'
+                }
+            }
+        );
+    }
+
     try {
         const result = await serveHostedAsset(siteInfo, targetPath);
 
@@ -86,3 +174,13 @@ export async function GET(req: NextRequest) {
         });
     }
 }
+
+export {
+    handleHostingServe as GET,
+    handleHostingServe as POST,
+    handleHostingServe as PUT,
+    handleHostingServe as DELETE,
+    handleHostingServe as PATCH,
+    handleHostingServe as OPTIONS,
+    handleHostingServe as HEAD
+};

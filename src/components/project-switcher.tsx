@@ -59,7 +59,7 @@ export function ProjectSwitcher({
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <Button variant="ghost" className="min-w-0 px-1.5 text-sm font-semibold sm:px-2 sm:text-lg">
-          <span className="max-w-[calc(100vw-10rem)] truncate sm:max-w-[300px]">
+          <span className="max-w-[130px] sm:max-w-[180px] md:max-w-[220px] lg:max-w-[280px] truncate">
             {headerTitle}
           </span>
           <ChevronsUpDown className="ml-2 h-4 w-4 text-muted-foreground flex-shrink-0" />
@@ -91,7 +91,7 @@ export function ProjectSwitcher({
                 {/* Metadata Badges Container (Fixed Width/Alignment) */}
                 <div className="flex items-center gap-1.5 flex-shrink-0">
                     <span className={cn(
-                        "text-[9px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wider border",
+                        "text-[9px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wider border shrink-0 whitespace-nowrap",
                         project.dialect?.toLowerCase() === 'mysql' 
                           ? 'bg-orange-500/10 text-orange-600 dark:text-orange-400 border-orange-500/20' 
                           : 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20'
@@ -101,7 +101,7 @@ export function ProjectSwitcher({
                     
                     {project.role && (
                         <span className={cn(
-                            "text-[9px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wider border shadow-sm transition-colors",
+                            "text-[9px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wider border shadow-sm transition-colors shrink-0 whitespace-nowrap",
                             project.role === 'admin' ? 'bg-amber-500/10 text-amber-400 border-amber-500/20 group-hover:bg-amber-500/20' : 
                             project.role === 'developer' ? 'bg-blue-500/10 text-blue-400 border-blue-500/20 group-hover:bg-blue-500/20' : 
                             'bg-secondary text-muted-foreground border-border group-hover:bg-muted'

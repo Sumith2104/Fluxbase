@@ -64,7 +64,7 @@ export async function GET(req: NextRequest) {
 
         if (site) {
             const depRes = await pool.query(
-                `SELECT deploy_id, version, environment, status, source, preview_url, 
+                `SELECT deploy_id, version, environment, status, source, preview_url, branch_url, branch, framework_slug,
                         total_size_bytes, file_count, created_at, deployed_at
                  FROM fluxbase_global.hosting_deployments
                  WHERE site_id = $1

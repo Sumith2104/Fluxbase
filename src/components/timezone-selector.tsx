@@ -53,10 +53,10 @@ export function TimezoneSelector() {
     };
 
     return (
-        <div className="hidden sm:flex items-center">
+        <div className="hidden sm:flex items-center shrink-0">
             <Select value={project.timezone || ''} onValueChange={handleTimezoneChange}>
-                <SelectTrigger className="h-6 gap-1 px-2 py-0 text-xs border bg-secondary/30 hover:bg-secondary/50 w-auto font-normal opacity-80 focus:ring-0 rounded-full !outline-none">
-                    <Globe className="h-3 w-3" />
+                <SelectTrigger className="h-6 gap-1 px-2 py-0 text-xs border bg-secondary/30 hover:bg-secondary/50 w-auto font-normal opacity-80 focus:ring-0 rounded-full !outline-none shrink-0 whitespace-nowrap">
+                    <Globe className="h-3 w-3 shrink-0" />
                     <SelectValue placeholder="Select timezone" />
                 </SelectTrigger>
                 <SelectContent align="end" className="max-h-[300px]">

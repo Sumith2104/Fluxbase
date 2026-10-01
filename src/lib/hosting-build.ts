@@ -2,10 +2,38 @@ import path from 'path';
 import os from 'os';
 import fs from 'fs/promises';
 import { existsSync } from 'fs';
+import crypto from 'crypto';
 import { spawn } from 'child_process';
 import { ExtractedFile, detectMimeType, sanitizePath } from '@/lib/hosting-engine';
 import logger from '@/lib/logger';
 import { getPgPool } from '@/lib/pg';
+import { detectFrameworkRecord, createMemoryDetectorFilesystem } from '@/lib/hosting-frameworks';
+import { compileSuperstaticRoutes, UserVercelConfig } from '@/lib/hosting-router';
+
+/**
+ * Recovers zombie deployments that were stuck in 'building' or 'uploading' due to server restarts.
+ * Call this on application startup.
+ */
+export async function cleanupZombieDeployments(): Promise<number> {
+    try {
+        const pool = getPgPool();
+        const result = await pool.query(
+            `UPDATE fluxbase_global.hosting_deployments
+             SET status = 'failed',
+                 error_message = 'Build process was interrupted by a server restart. Please redeploy.'
+             WHERE status IN ('building', 'uploading', 'queued')
+               AND created_at < NOW() - INTERVAL '5 minutes'
+             RETURNING deploy_id`
+        );
+        if (result.rowCount && result.rowCount > 0) {
+            logger.info(`[Hosting] Recovered ${result.rowCount} zombie deployment(s): ${result.rows.map((r: any) => r.deploy_id).join(', ')}`);
+        }
+        return result.rowCount || 0;
+    } catch (err) {
+        logger.warn('[Hosting] Failed to cleanup zombie deployments:', err);
+        return 0;
+    }
+}
 
 export interface DetectedFramework {
     name: string;
@@ -35,9 +63,12 @@ export function detectFramework(files: ExtractedFile[]): DetectedFramework {
         const hasLockfile = files.some(f => f.path === 'package-lock.json');
         const hasYarnLock = files.some(f => f.path === 'yarn.lock');
         const hasPnpmLock = files.some(f => f.path === 'pnpm-lock.yaml');
+        const hasBunLock = files.some(f => f.path === 'bun.lockb' || f.path === 'bun.lock');
 
-        let defaultInstall = 'npm install --legacy-peer-deps --no-audit --no-fund';
-        if (hasYarnLock) {
+        let defaultInstall = 'npm install --legacy-peer-deps --include=dev --no-audit --no-fund --prefer-offline --maxsockets=5';
+        if (hasBunLock) {
+            defaultInstall = 'bun install --no-save';
+        } else if (hasYarnLock) {
             defaultInstall = 'yarn install --frozen-lockfile';
         } else if (hasPnpmLock) {
             defaultInstall = 'pnpm install --frozen-lockfile';
@@ -125,10 +156,25 @@ export function detectFramework(files: ExtractedFile[]): DetectedFramework {
  * Checks whether the files already contain built static HTML assets
  */
 export function findBuiltAssets(files: ExtractedFile[], targetOutputDir?: string): ExtractedFile[] | null {
-    // 1. Direct index.html at root
-    const rootIndex = files.find(f => f.path === 'index.html');
-    if (rootIndex && (!targetOutputDir || targetOutputDir === '.' || targetOutputDir === '/')) {
-        return files;
+    // Check if the project has a package.json with a build script
+    // If so, a root index.html is typically a source template (e.g. Vite, Astro, Svelte), NOT a pre-built bundle!
+    let hasBuildScript = false;
+    const pkgFile = files.find(f => f.path === 'package.json');
+    if (pkgFile) {
+        try {
+            const pkg = JSON.parse(pkgFile.buffer.toString('utf8'));
+            if (pkg.scripts && (pkg.scripts.build || pkg.scripts['build:prod'] || pkg.scripts['build:static'])) {
+                hasBuildScript = true;
+            }
+        } catch {}
+    }
+
+    // 1. Direct index.html at root (only pre-built if there is NO build script to run)
+    if (!hasBuildScript) {
+        const rootIndex = files.find(f => f.path === 'index.html');
+        if (rootIndex && (!targetOutputDir || targetOutputDir === '.' || targetOutputDir === '/')) {
+            return files;
+        }
     }
 
     // 2. Check candidate directories: targetOutputDir or common defaults
@@ -231,6 +277,7 @@ function runStreamingCommand(
             cwd: options.cwd,
             env: options.env,
             windowsHide: true,
+            stdio: ['ignore', 'pipe', 'pipe'],
         });
 
         if (options.deployId) {
@@ -300,19 +347,33 @@ export async function executeProjectBuild(params: {
     deployId: string;
     siteId: string;
     projectId: string;
+    subdomain?: string;
     files: ExtractedFile[];
     buildCommand?: string;
     outputDirectory?: string;
     installCommand?: string;
+    rootDirectory?: string;
     envVars?: Record<string, string>;
     onLogUpdate?: (fullLogs: string, status?: string) => Promise<void> | void;
-}): Promise<{ files: ExtractedFile[]; buildLogs: string; framework: string }> {
+}): Promise<{
+    files: ExtractedFile[];
+    buildLogs: string;
+    framework: string;
+    routingManifest?: any[];
+    routingConfig?: any;
+    isFullstack?: boolean;
+    backendPort?: number;
+    standaloneS3Key?: string;
+    backendEntryScript?: string;
+    backendWorkingDir?: string;
+}> {
     const {
         deployId,
-        files,
+        files: rawFiles,
         buildCommand,
         outputDirectory,
         installCommand,
+        rootDirectory,
         envVars = {},
         onLogUpdate
     } = params;
@@ -377,6 +438,35 @@ export async function executeProjectBuild(params: {
 
     log(`Starting deployment compilation for ${deployId}`);
 
+    // If custom rootDirectory is specified (e.g. monorepo subfolder), scope the files
+    let files = rawFiles;
+    const cleanRootDir = rootDirectory ? rootDirectory.replace(/^\/+|\/+$/g, '').replace(/^\.\//, '') : '';
+    if (cleanRootDir && cleanRootDir !== '.' && cleanRootDir !== '/') {
+        const prefix = `${cleanRootDir}/`;
+        const scoped = rawFiles
+            .filter(f => f.path.startsWith(prefix))
+            .map(f => ({
+                ...f,
+                path: f.path.slice(prefix.length)
+            }));
+        if (scoped.length > 0) {
+            files = scoped;
+            log(`Scoped build to root directory: ${cleanRootDir} (${files.length} files)`);
+        }
+    }
+
+    // Parse vercel.json if present
+    let userVercelConfig: UserVercelConfig = {};
+    const vercelJsonFile = files.find(f => f.path === 'vercel.json' || f.path.endsWith('/vercel.json'));
+    if (vercelJsonFile) {
+        try {
+            userVercelConfig = JSON.parse(vercelJsonFile.buffer.toString('utf8'));
+            log('[Vercel Config] Loaded user vercel.json configuration (cleanUrls, rewrites, redirects, headers).');
+        } catch (vErr: any) {
+            log(`[Vercel Config Warning] Failed to parse vercel.json: ${vErr.message}`);
+        }
+    }
+
     // Check if pre-built assets already exist in the archive
     const existingBuilt = findBuiltAssets(files, outputDirectory);
     const hasPackageJson = files.some(f => f.path === 'package.json' || f.path.endsWith('/package.json'));
@@ -385,21 +475,41 @@ export async function executeProjectBuild(params: {
     if (existingBuilt && existingBuilt.some(f => f.path === 'index.html')) {
         log(`Detected pre-built static bundle (${existingBuilt.length} assets ready for deployment).`);
         log(`Found root index.html. Skipping build step.`);
+        const compiledRoutes = compileSuperstaticRoutes(userVercelConfig, []);
         await flushLogsToDb('building');
         return {
             files: existingBuilt,
             buildLogs: logs.join('\n'),
-            framework: 'static'
+            framework: 'static',
+            routingManifest: compiledRoutes,
+            routingConfig: userVercelConfig
         };
     }
 
-    const detected = detectFramework(files);
+    // Run deterministic Vercel framework auto-detection
+    const fsMem = createMemoryDetectorFilesystem(files);
+    const detectedRecord = await detectFrameworkRecord(fsMem, {
+        rootDir: cleanRootDir || '.',
+        customBuildCommand: buildCommand,
+        customInstallCommand: installCommand,
+        customOutputDirectory: outputDirectory
+    });
+
+    const detected = {
+        name: detectedRecord.framework.name,
+        framework: detectedRecord.framework.slug,
+        buildCommand: detectedRecord.buildCommand,
+        installCommand: detectedRecord.installCommand,
+        outputDirectory: detectedRecord.outputDirectory,
+        envPrefix: detectedRecord.envPrefix
+    };
+
     let effectiveBuildCmd = buildCommand !== undefined && buildCommand !== '' ? buildCommand : detected.buildCommand;
     let effectiveInstallCmd = installCommand !== undefined && installCommand !== '' ? installCommand : detected.installCommand;
     let effectiveOutDir = outputDirectory !== undefined && outputDirectory !== '' ? outputDirectory : detected.outputDirectory;
 
     // Next.js specific normalization
-    if (detected.framework === 'next') {
+    if (detected.framework === 'nextjs' || detected.framework === 'next') {
         if (!effectiveOutDir || effectiveOutDir === 'dist') {
             effectiveOutDir = 'out';
         }
@@ -408,11 +518,17 @@ export async function executeProjectBuild(params: {
         }
         // Always prefer npm install --legacy-peer-deps to avoid lockfile peer dependency deadlocks
         if (!effectiveInstallCmd || effectiveInstallCmd.includes('npm ci') || effectiveInstallCmd === 'npm install') {
-            effectiveInstallCmd = 'npm install --legacy-peer-deps --include=dev --no-audit --no-fund';
+            effectiveInstallCmd = 'npm install --legacy-peer-deps --include=dev --no-audit --no-fund --prefer-offline';
         }
     }
 
-    log(`Framework auto-detection: ${detected.name}`);
+    let compiledRoutes = compileSuperstaticRoutes(
+        userVercelConfig,
+        detectedRecord.framework.defaultRoutes || []
+    );
+
+    log(`Framework auto-detection: ${detected.name} (${detected.framework})`);
+    log(`Client Environment Prefix: ${detected.envPrefix}`);
     log(`Install command: ${effectiveInstallCmd || '(none)'}`);
     log(`Build command: ${effectiveBuildCmd || '(none)'}`);
     log(`Output directory: ${effectiveOutDir}`);
@@ -430,13 +546,30 @@ export async function executeProjectBuild(params: {
 
     // Clean execution environment: strip turbopack and Next.js dev server variables
     // For dependency installation, set NODE_ENV to development so npm installs all devDependencies (TypeScript, Tailwind, etc.)
+    // Set up a persistent npm cache directory so repeated builds benefit from cached packages
+    const npmCacheDir = path.join(os.tmpdir(), 'fluxbase-npm-cache');
+    await fs.mkdir(npmCacheDir, { recursive: true }).catch(() => {});
+
     const installEnv: NodeJS.ProcessEnv = {
         ...process.env,
-        ...envVars,
         NODE_ENV: 'development',
         CI: 'true',
-        NEXT_TELEMETRY_DISABLED: '1'
+        NEXT_TELEMETRY_DISABLED: '1',
+        // Prevent OOM on large builds (Next.js, heavy Tailwind projects, etc.)
+        NODE_OPTIONS: '--max-old-space-size=4096',
+        // Use persistent npm cache for faster re-installs
+        npm_config_cache: npmCacheDir,
+        // Suppress npm update notifier noise in build logs
+        NO_UPDATE_NOTIFIER: '1'
     };
+    // Sanitize host internal platform infrastructure variables so client build scripts don't accidentally connect
+    delete installEnv.AWS_RDS_POSTGRES_URL;
+    delete installEnv.DATABASE_URL;
+    delete installEnv.POSTGRES_URL;
+    delete installEnv.REDIS_URL;
+    delete installEnv.REDIS_HOST;
+    delete installEnv.SMS_WEBHOOK_SECRET;
+    delete installEnv.PAYMENT_WEBHOOK_SECRET;
     delete installEnv.npm_config_production;
     delete installEnv.TURBOPACK;
     delete installEnv.__NEXT_TURBOPACK;
@@ -445,6 +578,9 @@ export async function executeProjectBuild(params: {
     delete installEnv.__NEXT_PROCESSED_ENV;
     delete installEnv.__NEXT_PRIVATE_PREBUNDLED_REACT;
     delete installEnv.__NEXT_STRICT_NEXT_HEAD;
+
+    // Apply explicit site user-configured environment variables
+    Object.assign(installEnv, envVars);
 
     // Prepend sandbox node_modules/.bin to PATH so local framework binaries are prioritized
     const localBin = path.join(buildDir, 'node_modules', '.bin');
@@ -459,20 +595,39 @@ export async function executeProjectBuild(params: {
             await fs.writeFile(filePath, file.buffer);
         }
 
-        // Ensure tsconfig.json has baseUrl: "." for proper @/* alias resolution across nested route groups
+        // Ensure tsconfig.json has baseUrl: "." and @/* path alias for proper module resolution
         const tsconfigPath = path.join(buildDir, 'tsconfig.json');
         if (existsSync(tsconfigPath)) {
             try {
                 let tsconfigRaw = await fs.readFile(tsconfigPath, 'utf8');
+                let patched = false;
                 if (!tsconfigRaw.includes('"baseUrl"') && !tsconfigRaw.includes("'baseUrl'")) {
                     if (tsconfigRaw.includes('"compilerOptions"')) {
                         tsconfigRaw = tsconfigRaw.replace(
                             /("compilerOptions"\s*:\s*\{)/,
                             '$1\n    "baseUrl": ".",'
                         );
-                        await fs.writeFile(tsconfigPath, tsconfigRaw);
-                        log('Configured baseUrl: "." in tsconfig.json for module alias resolution');
+                        patched = true;
                     }
+                }
+                if (!tsconfigRaw.includes('"@/*"') && !tsconfigRaw.includes("'@/*'")) {
+                    if (tsconfigRaw.includes('"paths"')) {
+                        tsconfigRaw = tsconfigRaw.replace(
+                            /("paths"\s*:\s*\{)/,
+                            '$1\n      "@/*": ["./*", "./src/*"],'
+                        );
+                        patched = true;
+                    } else if (tsconfigRaw.includes('"compilerOptions"')) {
+                        tsconfigRaw = tsconfigRaw.replace(
+                            /("compilerOptions"\s*:\s*\{)/,
+                            '$1\n    "paths": { "@/*": ["./*", "./src/*"] },'
+                        );
+                        patched = true;
+                    }
+                }
+                if (patched) {
+                    await fs.writeFile(tsconfigPath, tsconfigRaw);
+                    log('Configured baseUrl: "." and "@/*" path alias in tsconfig.json');
                 }
             } catch (tsErr: any) {
                 log(`Notice: Could not patch tsconfig.json: ${tsErr.message}`);
@@ -480,7 +635,7 @@ export async function executeProjectBuild(params: {
         }
 
         // For Next.js projects: Ensure static optimizations and production env
-        if (detected.framework === 'next') {
+        if (detected.framework === 'next' || detected.framework === 'nextjs') {
             log('Configuring Next.js build optimizations...');
             const envContent = Object.entries(envVars)
                 .map(([k, v]) => `${k}=${v}`)
@@ -489,10 +644,52 @@ export async function executeProjectBuild(params: {
                 await fs.writeFile(path.join(buildDir, '.env.production'), envContent);
             }
 
-            const buildEnhancements = `
-  images: { unoptimized: true },
-  typescript: { ignoreBuildErrors: true },
-  eslint: { ignoreDuringBuilds: true },`;
+            // Detect whether this project uses server-side features that are incompatible with `output: 'export'`
+            const hasApiRoutes = files.some(f =>
+                f.path.includes('/api/') && (f.path.endsWith('/route.ts') || f.path.endsWith('/route.js'))
+            );
+            const hasMiddleware = files.some(f =>
+                f.path === 'middleware.ts' || f.path === 'middleware.js' ||
+                f.path === 'src/middleware.ts' || f.path === 'src/middleware.js'
+            );
+            const hasServerActions = files.some(f => {
+                if (!f.path.endsWith('.ts') && !f.path.endsWith('.tsx') && !f.path.endsWith('.js') && !f.path.endsWith('.jsx')) return false;
+                try {
+                    const content = f.buffer.toString('utf8').slice(0, 500);
+                    return content.includes("'use server'") || content.includes('"use server"');
+                } catch { return false; }
+            });
+            // Check if config already has output set to something (e.g. 'standalone')
+            let existingConfigHasOutput = false;
+            for (const cfg of ['next.config.ts', 'next.config.mjs', 'next.config.js']) {
+                const cfgPath = path.join(buildDir, cfg);
+                if (existsSync(cfgPath)) {
+                    try {
+                        const c = await fs.readFile(cfgPath, 'utf8');
+                        if (c.includes("output:") || c.includes("output :")) {
+                            existingConfigHasOutput = true;
+                        }
+                    } catch {}
+                    break;
+                }
+            }
+
+            const canUseStaticExport = !hasApiRoutes && !hasMiddleware && !hasServerActions && !existingConfigHasOutput;
+
+            if (canUseStaticExport) {
+                log('Project is compatible with static export (no API routes, middleware, or server actions detected).');
+            } else {
+                const reasons: string[] = [];
+                if (hasApiRoutes) reasons.push('API routes');
+                if (hasMiddleware) reasons.push('middleware');
+                if (hasServerActions) reasons.push('server actions');
+                if (existingConfigHasOutput) reasons.push('existing output config');
+                log(`Server-side features detected (${reasons.join(', ')}). Using standard build with .next harvesting.`);
+            }
+
+            // Build enhancements: output:'export' for purely static, output:'standalone' for full-stack
+            const targetOutput = canUseStaticExport ? 'export' : 'standalone';
+            const buildEnhancements = `\n  output: '${targetOutput}',\n  images: { unoptimized: true },\n  typescript: { ignoreBuildErrors: true },\n  eslint: { ignoreDuringBuilds: true },`;
 
             const nextConfigs = ['next.config.ts', 'next.config.mjs', 'next.config.js'];
             let foundConfig = false;
@@ -502,19 +699,35 @@ export async function executeProjectBuild(params: {
                     foundConfig = true;
                     try {
                         let content = await fs.readFile(cfgPath, 'utf8');
-                        if (!content.includes('unoptimized: true') && !content.includes('unoptimized:true')) {
-                            if (content.includes('nextConfig = {')) {
-                                content = content.replace('nextConfig = {', `nextConfig = {${buildEnhancements}`);
+                        const needsImageOpt = !content.includes('unoptimized: true') && !content.includes('unoptimized:true');
+                        const hasOutput = content.includes("output:") || content.includes("output :");
+                        const needsOutput = !hasOutput;
+
+                        const enhancements = needsOutput && needsImageOpt ? buildEnhancements
+                            : needsOutput ? `\n  output: '${targetOutput}',`
+                            : needsImageOpt ? `\n  images: { unoptimized: true },\n  typescript: { ignoreBuildErrors: true },\n  eslint: { ignoreDuringBuilds: true },`
+                            : null;
+
+                        if (enhancements) {
+                            // Match common config patterns including defineConfig, satisfies, etc.
+                            const configPatterns = [
+                                'nextConfig = {',
+                                'const nextConfig: NextConfig = {',
+                                'module.exports = {',
+                                'export default {',
+                                'defineConfig({'
+                            ];
+                            let injected = false;
+                            for (const pattern of configPatterns) {
+                                if (content.includes(pattern)) {
+                                    content = content.replace(pattern, `${pattern}${enhancements}`);
+                                    injected = true;
+                                    break;
+                                }
+                            }
+                            if (injected) {
                                 await fs.writeFile(cfgPath, content);
-                                log(`Injected build optimizations into ${cfg}`);
-                            } else if (content.includes('const nextConfig: NextConfig = {')) {
-                                content = content.replace('const nextConfig: NextConfig = {', `const nextConfig: NextConfig = {${buildEnhancements}`);
-                                await fs.writeFile(cfgPath, content);
-                                log(`Injected build optimizations into ${cfg}`);
-                            } else if (content.includes('module.exports = {')) {
-                                content = content.replace('module.exports = {', `module.exports = {${buildEnhancements}`);
-                                await fs.writeFile(cfgPath, content);
-                                log(`Injected build optimizations into ${cfg}`);
+                                log(`Injected build optimizations into ${cfg}${needsOutput ? ` (+ output: ${targetOutput})` : ''}`);
                             }
                         }
                     } catch (err: any) {
@@ -525,53 +738,126 @@ export async function executeProjectBuild(params: {
             }
 
             if (!foundConfig) {
-                const minimalConfig = `/** @type {import('next').NextConfig} */
-const nextConfig = {
-  images: { unoptimized: true },
-  typescript: { ignoreBuildErrors: true },
-  eslint: { ignoreDuringBuilds: true }
-};
-export default nextConfig;
-`;
+                const minimalConfig = `/** @type {import('next').NextConfig} */\nconst nextConfig = {\n  output: '${targetOutput}',\n  images: { unoptimized: true },\n  typescript: { ignoreBuildErrors: true },\n  eslint: { ignoreDuringBuilds: true }\n};\nexport default nextConfig;\n`;
                 await fs.writeFile(path.join(buildDir, 'next.config.mjs'), minimalConfig);
-                log('Created default next.config.mjs with build optimizations');
+                log(`Created default next.config.mjs with output: ${targetOutput} + build optimizations`);
             }
         }
 
+        // Vercel-Style Persistent Dependency Cache (node_modules) & Build Cache (.next/cache)
+        const siteCacheDir = path.join(os.tmpdir(), 'fluxbase-site-cache', params.siteId || 'default');
+        const cachedNodeModules = path.join(siteCacheDir, 'node_modules');
+        const cachedNextCache = path.join(siteCacheDir, '.next-cache');
+        const hashFilePath = path.join(siteCacheDir, 'deps-fingerprint.txt');
+        await fs.mkdir(siteCacheDir, { recursive: true }).catch(() => {});
+
+        // Compute fingerprint of lockfiles & package.json
+        const lockFiles = files.filter(f => 
+            f.path === 'package.json' || 
+            f.path === 'package-lock.json' || 
+            f.path === 'yarn.lock' || 
+            f.path === 'pnpm-lock.yaml' || 
+            f.path === 'bun.lockb'
+        );
+        let currentHash = '';
+        if (lockFiles.length > 0) {
+            const h = crypto.createHash('sha256');
+            for (const lf of lockFiles.sort((a, b) => a.path.localeCompare(b.path))) {
+                h.update(lf.path).update(lf.buffer);
+            }
+            currentHash = h.digest('hex');
+        }
+
+        let prevHash = '';
+        if (existsSync(hashFilePath)) {
+            try {
+                prevHash = (await fs.readFile(hashFilePath, 'utf8')).trim();
+            } catch {}
+        }
+
+        // Link persistent node_modules cache into sandbox build workspace
+        const destNodeModules = path.join(buildDir, 'node_modules');
+        let hasWarmNodeModules = false;
+        try {
+            await fs.mkdir(cachedNodeModules, { recursive: true });
+            const cachedBin = path.join(cachedNodeModules, '.bin');
+            if (existsSync(cachedBin)) {
+                if (!existsSync(destNodeModules)) {
+                    await fs.symlink(cachedNodeModules, destNodeModules, 'junction');
+                    hasWarmNodeModules = true;
+                } else {
+                    hasWarmNodeModules = true;
+                }
+            } else {
+                // Incomplete cache: clear it so clean install recreates binaries
+                await fs.rm(cachedNodeModules, { recursive: true, force: true }).catch(() => {});
+                await fs.mkdir(cachedNodeModules, { recursive: true }).catch(() => {});
+            }
+        } catch (symErr) {
+            logger.warn('Failed to link cached node_modules:', symErr);
+        }
+
+        const isDepsCacheHit = !!(currentHash && prevHash && currentHash === prevHash && hasWarmNodeModules);
+
         // Execute install command with full devDependencies available
-        if (effectiveInstallCmd) {
-            // Automatically ensure --legacy-peer-deps is passed for npm install to prevent peer dependency deadlocks
-            if (effectiveInstallCmd.startsWith('npm install') && !effectiveInstallCmd.includes('--legacy-peer-deps')) {
-                effectiveInstallCmd = effectiveInstallCmd.replace('npm install', 'npm install --legacy-peer-deps --include=dev --no-audit --no-fund');
+        if (isDepsCacheHit) {
+            log('[Cache Hit] Dependencies are unchanged from previous deployment. Skipping package install (0.02s).');
+            await flushLogsToDb('building');
+        } else if (effectiveInstallCmd) {
+            // Check if package-lock.json exists for ultra-fast deterministic install (Vercel parity: 20-30s)
+            const hasLockfile = existsSync(path.join(buildDir, 'package-lock.json'));
+            if (hasLockfile && effectiveInstallCmd.startsWith('npm install')) {
+                effectiveInstallCmd = 'npm ci --prefer-offline --no-audit --no-fund';
+            } else if (effectiveInstallCmd.startsWith('npm install') && !effectiveInstallCmd.includes('--legacy-peer-deps')) {
+                effectiveInstallCmd = effectiveInstallCmd.replace('npm install', 'npm install --legacy-peer-deps --include=dev --no-audit --no-fund --prefer-offline');
             }
             log(`Running install: ${effectiveInstallCmd}`);
             await flushLogsToDb('building');
             try {
+                // If attempting strict npm ci, use a tight 2-min timeout so peer-conflict hangs quickly fall back to --legacy-peer-deps
+                const initialTimeout = effectiveInstallCmd.includes('npm ci') ? 120000 : 600000;
                 await runStreamingCommand(effectiveInstallCmd, {
                     cwd: buildDir,
                     env: installEnv,
-                    timeoutMs: 240000, // 4 mins
+                    timeoutMs: initialTimeout,
                     onLog: logStream,
                     deployId
                 });
                 log('Dependencies resolved successfully.');
+                if (currentHash) {
+                    await fs.writeFile(hashFilePath, currentHash).catch(() => {});
+                }
                 await flushLogsToDb();
             } catch (instErr: any) {
                 if (activeBuildJobs.get(deployId)?.isCanceled) {
                     throw new Error('Deployment canceled by user');
                 }
                 log(`Install notice: ${instErr.message}`);
-                if (effectiveInstallCmd.includes('npm ci')) {
-                    log('Falling back to npm install --legacy-peer-deps --include=dev --no-audit --no-fund...');
+                // Universal retry: whether it was npm ci, timeout, or any other install failure,
+                // attempt a clean npm install with maximum timeout as a last resort
+                const isTimeout = instErr.message?.includes('timed out');
+                const canRetry = effectiveInstallCmd.includes('npm ci') || effectiveInstallCmd.includes('yarn') || effectiveInstallCmd.includes('pnpm') || isTimeout;
+                if (canRetry) {
+                    const retryCmd = 'npm install --legacy-peer-deps --include=dev --no-audit --no-fund --prefer-offline';
+                    log(`Retrying with fallback: ${retryCmd}${isTimeout ? ' (extended timeout: 15 min)' : ''}...`);
+                    await flushLogsToDb('building');
                     try {
-                        await runStreamingCommand('npm install --legacy-peer-deps --include=dev --no-audit --no-fund', {
+                        // Delete any partial node_modules from the failed attempt
+                        const nodeModulesPath = path.join(buildDir, 'node_modules');
+                        if (existsSync(nodeModulesPath)) {
+                            await fs.rm(nodeModulesPath, { recursive: true, force: true }).catch(() => {});
+                        }
+                        await runStreamingCommand(retryCmd, {
                             cwd: buildDir,
                             env: installEnv,
-                            timeoutMs: 240000,
+                            timeoutMs: isTimeout ? 900000 : 600000,
                             onLog: logStream,
                             deployId
                         });
                         log('Dependencies resolved with fallback install.');
+                        if (currentHash) {
+                            await fs.writeFile(hashFilePath, currentHash).catch(() => {});
+                        }
                         await flushLogsToDb();
                     } catch (fallbackErr: any) {
                         throw new Error(`Failed to install dependencies: ${fallbackErr.message}`);
@@ -586,6 +872,34 @@ export default nextConfig;
             throw new Error('Deployment canceled by user');
         }
 
+        // Ensure .bin directory exists; if missing, run npm rebuild to regenerate binaries
+        const localBinDir = path.join(buildDir, 'node_modules', '.bin');
+        if (!existsSync(localBinDir) && existsSync(path.join(buildDir, 'node_modules'))) {
+            log('[Build Setup] Generating missing CLI binaries via npm rebuild...');
+            await runStreamingCommand('npm rebuild', {
+                cwd: buildDir,
+                env: installEnv,
+                timeoutMs: 120000,
+                onLog: logStream,
+                deployId
+            }).catch(() => {});
+        }
+
+        // Link persistent Next.js build cache (.next/cache) for instant incremental rebuilds
+        if (detected.framework === 'next' || detected.framework === 'nextjs') {
+            const buildNextCache = path.join(buildDir, '.next', 'cache');
+            try {
+                await fs.mkdir(cachedNextCache, { recursive: true });
+                await fs.mkdir(path.dirname(buildNextCache), { recursive: true });
+                if (!existsSync(buildNextCache)) {
+                    await fs.symlink(cachedNextCache, buildNextCache, 'junction');
+                    log('[Next.js Cache] Restored incremental build cache (.next/cache).');
+                }
+            } catch (cErr: any) {
+                logger.warn('Failed to link Next.js build cache:', cErr);
+            }
+        }
+
         // Execute build command with NODE_ENV=production
         if (effectiveBuildCmd) {
             const buildEnv: NodeJS.ProcessEnv = {
@@ -594,15 +908,79 @@ export default nextConfig;
             };
             log(`Running build: ${effectiveBuildCmd}`);
             await flushLogsToDb('building');
-            await runStreamingCommand(effectiveBuildCmd, {
-                cwd: buildDir,
-                env: buildEnv,
-                timeoutMs: 300000, // 5 mins
-                onLog: logStream,
-                deployId
-            });
-            log('Build process completed successfully.');
-            await flushLogsToDb();
+            try {
+                await runStreamingCommand(effectiveBuildCmd, {
+                    cwd: buildDir,
+                    env: buildEnv,
+                    timeoutMs: 600000, // 10 mins - complex framework builds (Next.js with many pages, heavy Tailwind) need this
+                    onLog: logStream,
+                    deployId
+                });
+                log('Build process completed successfully.');
+                await flushLogsToDb();
+            } catch (buildErr: any) {
+                if (activeBuildJobs.get(deployId)?.isCanceled) {
+                    throw new Error('Deployment canceled by user');
+                }
+
+                // Check if binary was missing or not recognized in PATH
+                const isBinaryMissing = buildErr.message?.includes('not recognized') || 
+                    buildErr.message?.includes('not found') || 
+                    logs.some(l => l.includes('not recognized') || l.includes('command not found'));
+
+                if (isBinaryMissing && (detected.framework === 'next' || detected.framework === 'nextjs')) {
+                    log('Notice: Framework binary not found in PATH. Retrying with direct npx next build...');
+                    await flushLogsToDb('building');
+                    await runStreamingCommand('npx next build', {
+                        cwd: buildDir,
+                        env: buildEnv,
+                        timeoutMs: 600000,
+                        onLog: logStream,
+                        deployId
+                    });
+                    log('Build process completed successfully via npx fallback.');
+                    await flushLogsToDb();
+                } else {
+                    // Check if build failed due to output: 'export' incompatibility (e.g. dynamic server usage, missing generateStaticParams)
+                    const isExportIncompatible = logs.some(l =>
+                        l.includes('output: "export"') ||
+                        l.includes("output: 'export'") ||
+                        l.includes('cannot be exported with "output: export"') ||
+                        l.includes('missing "generateStaticParams()"') ||
+                        l.includes('Dynamic server usage') ||
+                        l.includes('getServerSideProps is not supported with output: export')
+                    );
+
+                if (isExportIncompatible && (detected.framework === 'next' || detected.framework === 'nextjs')) {
+                    log('Notice: Static export failed due to dynamic Next.js features. Retrying without output: export (harvesting via .next/)...');
+                    // Remove output: 'export' from any next.config
+                    for (const cfg of ['next.config.ts', 'next.config.mjs', 'next.config.js']) {
+                        const cfgPath = path.join(buildDir, cfg);
+                        if (existsSync(cfgPath)) {
+                            try {
+                                let content = await fs.readFile(cfgPath, 'utf8');
+                                content = content.replace(/output:\s*['"]export['"],?/g, '');
+                                await fs.writeFile(cfgPath, content);
+                                log(`Stripped output: 'export' from ${cfg} for fallback build`);
+                            } catch {}
+                            break;
+                        }
+                    }
+                    await flushLogsToDb('building');
+                    log(`Retrying build: ${effectiveBuildCmd}`);
+                    await runStreamingCommand(effectiveBuildCmd, {
+                        cwd: buildDir,
+                        env: buildEnv,
+                        timeoutMs: 600000,
+                        onLog: logStream,
+                        deployId
+                    });
+                    log('Build process completed successfully on fallback harvest mode.');
+                    } else {
+                        throw buildErr;
+                    }
+                }
+            }
         }
 
         // Locate build output directory
@@ -630,11 +1008,31 @@ export default nextConfig;
             }
         }
 
-        if (existsSync(searchDir)) {
+        // Check for Build Output API v3 (.vercel/output)
+        const v3OutputDir = path.join(buildDir, '.vercel', 'output');
+        const v3ConfigPath = path.join(v3OutputDir, 'config.json');
+        const v3StaticDir = path.join(v3OutputDir, 'static');
+
+        if (existsSync(v3ConfigPath)) {
+            log('[Build Output API v3] Detected .vercel/output/config.json');
+            try {
+                const v3Config = JSON.parse(await fs.readFile(v3ConfigPath, 'utf8'));
+                if (v3Config.routes) {
+                    userVercelConfig.routes = [...(userVercelConfig.routes || []), ...v3Config.routes];
+                    compiledRoutes = compileSuperstaticRoutes(userVercelConfig, detectedRecord.framework.defaultRoutes || []);
+                }
+            } catch (v3Err: any) {
+                log(`[Build Output API v3 Warning] Failed to parse config.json: ${v3Err.message}`);
+            }
+            if (existsSync(v3StaticDir)) {
+                log('[Build Output API v3] Collecting static assets from .vercel/output/static/...');
+                await walk(v3StaticDir, v3StaticDir);
+            }
+        } else if (existsSync(searchDir)) {
             // Mode A: Explicit output directory (e.g. out, dist, build)
             log(`Collecting generated assets from ${path.relative(buildDir, searchDir) || effectiveOutDir}...`);
             await walk(searchDir, searchDir);
-        } else if (detected.framework === 'next' && existsSync(path.join(buildDir, '.next'))) {
+        } else if ((detected.framework === 'nextjs' || detected.framework === 'next') && existsSync(path.join(buildDir, '.next'))) {
             // Mode B: Standard Next.js production build (.next directory generated)
             log('Harvesting Next.js production build artifacts from .next...');
 
@@ -648,14 +1046,21 @@ export default nextConfig;
             // 2. Pre-rendered HTML from App Router (.next/server/app)
             const appServerDir = path.join(buildDir, '.next', 'server', 'app');
             if (existsSync(appServerDir)) {
-                async function harvestAppHtml(dir: string) {
+                async function harvestAppHtml(dir: string, routePrefix = '') {
                     const entries = await fs.readdir(dir, { withFileTypes: true });
                     for (const entry of entries) {
                         const full = path.join(dir, entry.name);
                         if (entry.isDirectory()) {
-                            if (entry.name !== 'api') {
-                                await harvestAppHtml(full);
-                            }
+                            // Skip API routes, internal Next.js dirs, and route group markers
+                            if (entry.name === 'api' || entry.name === '_not-found') continue;
+                            // Handle route groups: (group) -> strip the parens from the path
+                            const dirSegment = entry.name.startsWith('(') && entry.name.endsWith(')')
+                                ? '' // Route groups don't add URL segments
+                                : entry.name;
+                            const nextPrefix = dirSegment
+                                ? (routePrefix ? `${routePrefix}/${dirSegment}` : dirSegment)
+                                : routePrefix;
+                            await harvestAppHtml(full, nextPrefix);
                         } else if (entry.isFile() && entry.name.endsWith('.html')) {
                             const buf = await fs.readFile(full);
                             if (entry.name === '_not-found.html') {
@@ -665,23 +1070,34 @@ export default nextConfig;
                                     size: buf.length,
                                     mimeType: 'text/html'
                                 });
-                            } else if ((entry.name === 'index.html' || entry.name === 'page.html') && dir === appServerDir) {
+                            } else if ((entry.name === 'index.html' || entry.name === 'page.html') && !routePrefix) {
+                                // Root page
                                 builtFiles.push({
                                     path: 'index.html',
                                     buffer: buf,
                                     size: buf.length,
                                     mimeType: 'text/html'
                                 });
+                            } else if (entry.name === 'page.html' && routePrefix) {
+                                // Nested route page -> /routePrefix/index.html
+                                builtFiles.push({
+                                    path: sanitizePath(`${routePrefix}/index.html`),
+                                    buffer: buf,
+                                    size: buf.length,
+                                    mimeType: 'text/html'
+                                });
                             } else {
                                 const routeName = entry.name.replace(/\.html$/, '');
+                                const fullRoute = routePrefix ? `${routePrefix}/${routeName}` : routeName;
+                                // Create both /route.html and /route/index.html for clean URLs
                                 builtFiles.push({
-                                    path: entry.name,
+                                    path: `${fullRoute}.html`,
                                     buffer: buf,
                                     size: buf.length,
                                     mimeType: 'text/html'
                                 });
                                 builtFiles.push({
-                                    path: sanitizePath(`${routeName}/index.html`),
+                                    path: sanitizePath(`${fullRoute}/index.html`),
                                     buffer: buf,
                                     size: buf.length,
                                     mimeType: 'text/html'
@@ -772,13 +1188,114 @@ export default nextConfig;
             log('Warning: No index.html found at root of build output. SPA routing may not function without an entrypoint.');
         }
 
+        // Check for fullstack standalone Next.js server bundle or persistent Node.js service (Render-style)
+        let isFullstack = false;
+        let backendPort: number | undefined;
+        let standaloneS3Key: string | undefined;
+        let backendEntryScript: string | undefined;
+        let backendWorkingDir: string | undefined;
+
+        const standaloneDir = path.join(buildDir, '.next', 'standalone');
+        const hasNextStandalone = existsSync(standaloneDir);
+        const hasNodeEntry = existsSync(path.join(buildDir, 'server.js')) || 
+            existsSync(path.join(buildDir, 'index.js')) || 
+            existsSync(path.join(buildDir, 'app.js'));
+        const isNodeBackend = hasNextStandalone || (hasPackageJson && hasNodeEntry && detected.framework !== 'static');
+
+        if (isNodeBackend) {
+            log('[Server Engine] Detected persistent server-based service (Render/Vercel architecture).');
+            try {
+                const siteId = params.siteId || 'default';
+                const siteSubdomain = params.subdomain || siteId;
+                const persistentBackendDir = path.join(process.cwd(), '.fluxbase-backends', siteId);
+                await fs.rm(persistentBackendDir, { recursive: true, force: true }).catch(() => {});
+                await fs.mkdir(persistentBackendDir, { recursive: true }).catch(() => {});
+
+                if (hasNextStandalone) {
+                    // Next.js standalone requirement: copy static and public assets into standalone dir
+                    const staticSrc = path.join(buildDir, '.next', 'static');
+                    const staticDest = path.join(standaloneDir, '.next', 'static');
+                    if (existsSync(staticSrc)) {
+                        await fs.cp(staticSrc, staticDest, { recursive: true }).catch(() => {});
+                    }
+                    const publicSrc = path.join(buildDir, 'public');
+                    const publicDest = path.join(standaloneDir, 'public');
+                    if (existsSync(publicSrc)) {
+                        await fs.cp(publicSrc, publicDest, { recursive: true }).catch(() => {});
+                    }
+                    await fs.cp(standaloneDir, persistentBackendDir, { recursive: true });
+                } else {
+                    // Standard Node.js backend (Express, Fastify, NestJS, etc.)
+                    await fs.cp(buildDir, persistentBackendDir, { recursive: true });
+                }
+
+                // Locate entry script in persistent directory
+                const { locateBackendEntryScript } = await import('@/lib/hosting-runner');
+                const entry = locateBackendEntryScript(persistentBackendDir);
+                if (entry) {
+                    backendEntryScript = entry;
+                }
+                backendWorkingDir = persistentBackendDir;
+
+                // Step 4: Archive standalone bundle and upload to S3 for disaster recovery & multi-server support
+                log('[Server Engine] Packaging standalone server bundle for cloud persistence...');
+                try {
+                    const { createStandaloneArchive } = await import('@/lib/hosting-archive');
+                    const { uploadToS3 } = await import('@/lib/storage');
+                    const archiveBuffer = await createStandaloneArchive(persistentBackendDir);
+                    const s3Key = `hosting/deployments/${deployId}/standalone.tar.gz`;
+                    await uploadToS3(s3Key, archiveBuffer, 'application/gzip');
+                    standaloneS3Key = s3Key;
+                    log(`[Server Engine] Standalone bundle archived & saved to S3 (${(archiveBuffer.length / 1024 / 1024).toFixed(1)} MB)`);
+
+                    // Update deployment record immediately
+                    await pool.query(
+                        `UPDATE fluxbase_global.hosting_deployments 
+                         SET standalone_s3_key = $1, is_fullstack = true 
+                         WHERE deploy_id = $2`,
+                        [s3Key, deployId]
+                    );
+                } catch (s3ArchiveErr: any) {
+                    log(`[Server Engine Warning] Could not upload standalone archive to S3: ${s3ArchiveErr?.message}`);
+                }
+
+                const { startBackendProcess } = await import('@/lib/hosting-runner');
+                log('[Server Engine] Spawning persistent background service with auto-recovery...');
+                const runnerRes = await startBackendProcess({
+                    siteId,
+                    deployId,
+                    subdomain: siteSubdomain,
+                    standaloneDir: persistentBackendDir,
+                    entryScript: backendEntryScript,
+                    envVars,
+                    logStream: log
+                });
+                if (runnerRes.success) {
+                    isFullstack = true;
+                    backendPort = runnerRes.port;
+                    log(`[Server Engine] Persistent service is LIVE on port ${runnerRes.port}!`);
+                } else {
+                    log(`[Server Engine Notice] Service launcher: ${runnerRes.error}`);
+                }
+            } catch (runnerErr: any) {
+                log(`[Server Engine Warning] Could not spawn persistent service: ${runnerErr?.message}`);
+            }
+        }
+
         log(`Build complete: ${builtFiles.length} files generated.`);
         await flushLogsToDb();
 
         return {
             files: builtFiles,
             buildLogs: logs.join('\n'),
-            framework: detected.framework
+            framework: detected.framework,
+            routingManifest: compiledRoutes,
+            routingConfig: userVercelConfig,
+            isFullstack,
+            backendPort,
+            standaloneS3Key,
+            backendEntryScript,
+            backendWorkingDir
         };
 
     } catch (err: any) {
@@ -804,6 +1321,19 @@ export default nextConfig;
                 errorSummary = descriptiveLine.replace(/^\[[^\]]+\]\s*/, '').trim();
             }
         }
+
+        // Detect output: 'export' incompatibility errors and provide a clear message
+        const isExportError = errorSummary.includes('output: "export"') ||
+            errorSummary.includes("output: 'export'") ||
+            errorSummary.includes('getServerSideProps') ||
+            errorSummary.includes('API routes are not supported') ||
+            errorSummary.includes('Dynamic server usage') ||
+            logs.some(l => l.includes('output: "export"') || l.includes('getServerSideProps is not supported with output'));
+
+        if (isExportError && (detected.framework === 'next' || detected.framework === 'nextjs')) {
+            errorSummary = `This Next.js project uses server-side features incompatible with static export. ${errorSummary}`;
+        }
+
         log(`BUILD FAILED: ${errorSummary}`);
         await flushLogsToDb('failed');
         const customErr = new Error(errorSummary);
@@ -812,6 +1342,19 @@ export default nextConfig;
     } finally {
         activeBuildJobs.delete(deployId);
         if (flushTimeout) clearTimeout(flushTimeout);
+        // Safely unlink junctions before removing build directory so cache is preserved
+        try {
+            const destNodeModules = path.join(buildDir, 'node_modules');
+            const lstat = await fs.lstat(destNodeModules).catch(() => null);
+            if (lstat && (lstat.isSymbolicLink() || (process.platform === 'win32' && (lstat as any).isSymbolicLink()))) {
+                await fs.unlink(destNodeModules).catch(() => {});
+            }
+            const destNextCache = path.join(buildDir, '.next', 'cache');
+            const nextStat = await fs.lstat(destNextCache).catch(() => null);
+            if (nextStat && (nextStat.isSymbolicLink() || (process.platform === 'win32' && (nextStat as any).isSymbolicLink()))) {
+                await fs.unlink(destNextCache).catch(() => {});
+            }
+        } catch {}
         // Clean up scratch build directory
         try {
             await fs.rm(buildDir, { recursive: true, force: true });

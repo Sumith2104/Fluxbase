@@ -966,7 +966,7 @@ export function EditorClient({
                                                 </SheetRoot>
                                                 <Table className="h-4 w-4 text-primary shrink-0" />
                                                 <span className="font-semibold text-foreground text-sm tracking-tight">{currentTable.table_name}</span>
-                                                <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10.5px] font-mono font-medium bg-muted/60 text-muted-foreground border border-border/40">
+                                                <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10.5px] font-mono font-medium bg-muted/60 text-muted-foreground border border-border/40 shrink-0 whitespace-nowrap">
                                                     {rowCount.toLocaleString()} rows
                                                 </span>
                                             </div>

@@ -3,7 +3,7 @@ import { getAuthContextFromRequest } from '@/lib/auth';
 import { requireReadScope, requireWriteScope } from '@/lib/require-scope';
 import { getPgPool } from '@/lib/pg';
 import { getProjectById } from '@/lib/data';
-import { encryptEnvValue, decryptEnvValue, parseEnvFile } from '@/lib/hosting-env';
+import { encryptEnvValue, decryptEnvValue, parseEnvFile, saveSiteEnvVars } from '@/lib/hosting-env';
 import { checkHostingEnvVarLimit } from '@/lib/limits';
 
 export const dynamic = 'force-dynamic';
@@ -76,7 +76,7 @@ export async function POST(req: NextRequest) {
 
     try {
         const body = await req.json();
-        const { siteId, key, value, environment = 'production', isSecret, rawEnvText } = body;
+        const { siteId, key, value, environment = 'production', isSecret, rawEnvText, envVars } = body;
 
         if (!siteId) {
             return NextResponse.json({ success: false, error: 'siteId required' }, { status: 400 });
@@ -90,62 +90,37 @@ export async function POST(req: NextRequest) {
         const project = await getProjectById(site.project_id, auth.userId);
         if (!project) return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 403 });
 
-        // Bulk paste handler
-        if (rawEnvText && typeof rawEnvText === 'string') {
-            const parsed = parseEnvFile(rawEnvText);
-            if (parsed.length === 0) {
-                return NextResponse.json({ success: false, error: 'No valid environment variables found in pasted content' }, { status: 400 });
-            }
-
-            await checkHostingEnvVarLimit(site.project_id, siteId, parsed.length);
-
-            const insertedOrUpdated: any[] = [];
-            for (const item of parsed) {
-                const encrypted = encryptEnvValue(item.value);
-                const res = await pool.query(
-                    `INSERT INTO fluxbase_global.hosting_env_vars (
-                        site_id, environment, key, value, is_secret
-                    ) VALUES ($1, $2, $3, $4, $5)
-                    ON CONFLICT (site_id, environment, key)
-                    DO UPDATE SET value = $4, is_secret = $5, updated_at = CURRENT_TIMESTAMP
-                    RETURNING id, environment, key, is_secret`,
-                    [siteId, environment, item.key, encrypted, item.isSecret]
-                );
-                insertedOrUpdated.push(res.rows[0]);
-            }
+        // Bulk paste or multiple variables handler
+        if (rawEnvText || envVars) {
+            const result = await saveSiteEnvVars({
+                siteId,
+                projectId: site.project_id,
+                envVars,
+                rawEnvText,
+                environment
+            });
 
             return NextResponse.json({
                 success: true,
-                message: `Saved ${insertedOrUpdated.length} environment variables`,
-                count: insertedOrUpdated.length
+                message: `Saved ${result.savedCount} environment variables`,
+                count: result.savedCount,
+                items: result.items
             });
         }
 
         // Single key-value add or update
         if (!key || value === undefined) {
-            return NextResponse.json({ success: false, error: 'key and value are required' }, { status: 400 });
+            return NextResponse.json({ success: false, error: 'key and value or envVars/rawEnvText are required' }, { status: 400 });
         }
 
-        if (!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(key)) {
-            return NextResponse.json({ success: false, error: 'Variable name must contain only letters, numbers, and underscores, and cannot start with a number' }, { status: 400 });
-        }
+        const result = await saveSiteEnvVars({
+            siteId,
+            projectId: site.project_id,
+            envVars: [{ key, value, isSecret, environment }],
+            environment
+        });
 
-        await checkHostingEnvVarLimit(site.project_id, siteId, 1);
-
-        const isSec = isSecret !== undefined ? Boolean(isSecret) : !(key.startsWith('NEXT_PUBLIC_') || key.startsWith('VITE_') || key.startsWith('PUBLIC_'));
-        const encrypted = encryptEnvValue(value);
-
-        const res = await pool.query(
-            `INSERT INTO fluxbase_global.hosting_env_vars (
-                site_id, environment, key, value, is_secret
-            ) VALUES ($1, $2, $3, $4, $5)
-            ON CONFLICT (site_id, environment, key)
-            DO UPDATE SET value = $4, is_secret = $5, updated_at = CURRENT_TIMESTAMP
-            RETURNING id, environment, key, is_secret`,
-            [siteId, environment, key, encrypted, isSec]
-        );
-
-        return NextResponse.json({ success: true, envVar: res.rows[0] });
+        return NextResponse.json({ success: true, envVar: result.items[0] });
     } catch (err: any) {
         return NextResponse.json({ success: false, error: err.message }, { status: 500 });
     }

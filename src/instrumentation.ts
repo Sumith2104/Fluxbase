@@ -20,5 +20,21 @@ export async function register() {
       }
       console.error('[Process Uncaught Exception]:', err);
     });
+
+    // Recover any deployments left in 'building'/'uploading' state from a previous server session
+    try {
+      const { cleanupZombieDeployments } = await import('@/lib/hosting-build');
+      await cleanupZombieDeployments();
+    } catch {
+      // Non-critical - DB may not be available yet on cold start
+    }
+
+    // Auto-recover and launch persistent full-stack backend services (Next.js/Node.js)
+    try {
+      const { recoverAllRunningBackends } = await import('@/lib/hosting-runner');
+      await recoverAllRunningBackends();
+    } catch (recErr: any) {
+      console.warn('[Startup Backend Recovery Notice]:', recErr?.message);
+    }
   }
 }

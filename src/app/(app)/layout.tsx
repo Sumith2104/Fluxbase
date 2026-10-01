@@ -460,12 +460,12 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
                     <Link href="/settings" className="underline underline-offset-2 ml-1 opacity-90 hover:opacity-100">Manage in Settings</Link>
                 </div>
             ) : null}
-            <header className="sticky top-0 z-40 flex h-12 max-w-full items-center gap-2 border-b border-border bg-background/95 px-2 backdrop-blur-md sm:gap-4 sm:px-4 md:px-6">
-                <div className="flex min-w-0 flex-1 items-center gap-1.5 sm:gap-2">
+            <header className="sticky top-0 z-40 flex h-12 w-full max-w-full items-center justify-between gap-2 border-b border-border bg-background/95 px-2 backdrop-blur-md sm:gap-3 sm:px-4 md:px-6">
+                <div className="flex min-w-0 items-center gap-1.5 sm:gap-2">
                     <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                             <button
-                                className="group relative hidden rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 sm:block cursor-pointer transition-transform duration-150 hover:scale-105"
+                                className="group relative hidden rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 sm:block cursor-pointer transition-transform duration-150 hover:scale-105 shrink-0"
                                 title="Open account menu"
                             >
                                 <BorderBeam size="sm" colorVariant="ocean" borderRadius={9999} className="rounded-full">
@@ -563,12 +563,12 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
                         const isMysqlDialect = liveProject.dialect?.toLowerCase() === 'mysql';
 
                         return (
-                            <div className="flex items-center gap-1.5">
+                            <div className="flex items-center gap-1.5 shrink-0 flex-nowrap">
                                 {/* Dialect Badge (PostgreSQL / MySQL) */}
                                 <Badge
                                     variant="secondary"
                                     className={cn(
-                                        "hidden sm:inline-flex transition-colors shadow-none text-[9px] uppercase font-bold tracking-wider rounded-md border font-mono",
+                                        "hidden sm:inline-flex transition-colors shadow-none text-[9px] uppercase font-bold tracking-wider rounded-md border font-mono shrink-0 whitespace-nowrap",
                                         isMysqlDialect
                                             ? "bg-orange-500/10 text-orange-600 dark:text-orange-400 border-orange-500/20"
                                             : "bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20"
@@ -581,7 +581,7 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
                                 <Badge
                                     variant="secondary"
                                     className={cn(
-                                        "hidden sm:inline-flex transition-colors shadow-none text-[9px] uppercase font-bold tracking-wider rounded-md border font-mono",
+                                        "hidden sm:inline-flex transition-colors shadow-none text-[9px] uppercase font-bold tracking-wider rounded-md border font-mono shrink-0 whitespace-nowrap",
                                         projectRole === 'admin' && "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20",
                                         projectRole === 'developer' && "bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20",
                                         projectRole === 'viewer' && "bg-secondary text-muted-foreground border-border"
@@ -594,7 +594,7 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
                                 {!isProjectOwner && (
                                     <Badge
                                         variant="outline"
-                                        className="hidden sm:inline-flex transition-colors shadow-none text-[9px] uppercase font-bold tracking-wider rounded-md border font-mono bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/20"
+                                        className="hidden sm:inline-flex transition-colors shadow-none text-[9px] uppercase font-bold tracking-wider rounded-md border font-mono bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/20 shrink-0 whitespace-nowrap"
                                     >
                                         Team
                                     </Badge>
@@ -605,7 +605,7 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
                                     <Badge
                                         variant="secondary"
                                         className={cn(
-                                            "hidden sm:inline-flex transition-colors shadow-none text-[9px] uppercase font-bold tracking-wider rounded-md border font-mono",
+                                            "hidden sm:inline-flex transition-colors shadow-none text-[9px] uppercase font-bold tracking-wider rounded-md border font-mono shrink-0 whitespace-nowrap",
                                             effectiveUserRole === 'org_owner' && "bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/20",
                                             effectiveUserRole === 'employee' && "bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20",
                                             effectiveUserRole === 'student' && "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20"
@@ -619,7 +619,7 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
                                 <Badge
                                     variant="outline"
                                     className={cn(
-                                        "hidden sm:inline-flex transition-colors shadow-none text-[9px] uppercase font-bold tracking-wider rounded-md font-mono",
+                                        "hidden lg:inline-flex transition-colors shadow-none text-[9px] uppercase font-bold tracking-wider rounded-md font-mono shrink-0 whitespace-nowrap",
                                         isStudent
                                             ? (planType === 'Max'
                                                 ? "border-amber-500/50 bg-amber-500/10 text-amber-600 dark:text-amber-500"
@@ -638,28 +638,28 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
                             </div>
                         );
                     })()}
-                    <div className="hidden md:block">
+                    <div className="hidden md:block shrink-0">
                         <TimezoneSelector />
                     </div>
                 </div>
-                <div className="hidden sm:flex sm:flex-1"></div>
+                <div className="flex-1 min-w-2"></div>
                 {userId ? (
                     <div className="flex shrink-0 items-center gap-0.5">
-                        <div className="hidden sm:block">
+                        <div className="hidden md:block">
                             <CommandPalette />
                         </div>
                         <div className="w-px h-5 bg-border mx-1 hidden md:block" />
                         <StatusIndicator />
-                        <div className="hidden sm:block">
+                        <div className="hidden lg:block">
                             <ChangelogPopover />
                         </div>
-                        <div className="hidden sm:block">
+                        <div className="hidden lg:block">
                             <FeedbackWidget />
                         </div>
-                        <div className="hidden sm:block">
+                        <div className="hidden xl:block">
                             <KeyboardShortcuts />
                         </div>
-                        <div className="mx-1 hidden h-5 w-px bg-border sm:block" />
+                        <div className="mx-1 hidden h-5 w-px bg-border lg:block" />
                         {userId && (
                             <BorderBeam size="sm" colorVariant="ocean" borderRadius={8} className="rounded-lg">
                                 <button

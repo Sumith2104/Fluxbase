@@ -82,6 +82,24 @@ export async function getPresignedUrl(
     return getSignedUrl(client, command, { expiresIn });
 }
 
+/**
+ * Downloads an object from S3 as a Buffer.
+ */
+export async function downloadFromS3(key: string): Promise<Buffer> {
+    const client = getS3Client();
+    const bucket = getS3Bucket();
+    const command = new GetObjectCommand({
+        Bucket: bucket,
+        Key: key,
+    });
+    const res = await client.send(command);
+    if (!res.Body) {
+        throw new Error(`S3 object body is empty for key: ${key}`);
+    }
+    const byteArray = await res.Body.transformToByteArray();
+    return Buffer.from(byteArray);
+}
+
 // Plan-based size limits (in bytes)
 export const PLAN_STORAGE_LIMITS = {
     free: 50 * 1024 * 1024,             // 50 MB per file

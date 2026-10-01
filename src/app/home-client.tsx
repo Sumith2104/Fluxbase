@@ -61,7 +61,7 @@ export default function Home() {
     }
 
     const fadeIn = {
-        initial: { opacity: 0, y: 20 },
+        initial: false,
         animate: { opacity: 1, y: 0 },
         transition: { duration: 0.6 }
     };
@@ -103,7 +103,7 @@ export default function Home() {
                         )}
 
                         <motion.div
-                            initial={{ scale: 0.9, opacity: 0 }}
+                            initial={false}
                             animate={{ scale: 1, opacity: 1 }}
                             transition={{ duration: 0.5 }}
                             className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-border text-muted-foreground text-xs font-mono"

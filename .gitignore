@@ -2,8 +2,10 @@
 
 # dependencies
 node_modules/
+fluxbase-client/node_modules/
 wh_test/node_modules/
 wh_test/.env
+*.zip
 /.pnp
 .pnp.*
 .yarn/*
@@ -84,5 +86,12 @@ backups/
 *.sql
 *.dump
 scripts/backup_*.mjs
+
+# Local hosting runtime & build sandboxes
+.fluxbase-backends/
+scratch_*.txt
+scratch_*.mjs
+scratch_*.js
+
 # End
 

@@ -350,14 +350,80 @@ export class GitHubClient {
         return Buffer.from(data.content, data.encoding || 'base64');
     }
 
-    async getRepoZipball(owner: string, repo: string, ref: string = 'main'): Promise<Buffer> {
+    async getRepoZipball(
+        owner: string,
+        repo: string,
+        ref: string = 'main',
+        onProgress?: (downloadedBytes: number) => void
+    ): Promise<Buffer> {
         const url = `https://api.github.com/repos/${owner}/${repo}/zipball/${encodeURIComponent(ref)}`;
-        const res = await fetch(url, { headers: this.headers, redirect: 'follow' });
-        if (!res.ok) {
-            throw new Error(`GitHub API error downloading repository zip (${res.status}): ${await res.text()}`);
+        const controller = new AbortController();
+        const maxTimeoutMs = 600_000; // 10 minutes maximum duration
+        const idleTimeoutMs = 60_000; // 60 seconds inactivity timeout (resets on each received chunk)
+
+        let idleTimer: NodeJS.Timeout | null = null;
+        const resetIdleTimer = () => {
+            if (idleTimer) clearTimeout(idleTimer);
+            idleTimer = setTimeout(() => {
+                controller.abort(new Error(`GitHub archive download stalled (no data received for ${idleTimeoutMs / 1000}s)`));
+            }, idleTimeoutMs);
+        };
+
+        const maxTimer = setTimeout(() => {
+            controller.abort(new Error(`GitHub archive download exceeded maximum time limit of ${maxTimeoutMs / 1000}s`));
+        }, maxTimeoutMs);
+
+        resetIdleTimer();
+
+        try {
+            const res = await fetch(url, {
+                headers: {
+                    ...this.headers,
+                    Accept: 'application/vnd.github.v3+json, application/zip, application/octet-stream, */*'
+                },
+                redirect: 'follow',
+                signal: controller.signal
+            });
+
+            if (!res.ok) {
+                const errText = await res.text().catch(() => '');
+                throw new Error(`GitHub API error downloading repository zip (${res.status}): ${errText}`);
+            }
+
+            if (!res.body) {
+                const arrayBuf = await res.arrayBuffer();
+                return Buffer.from(arrayBuf);
+            }
+
+            const reader = res.body.getReader();
+            const chunks: Uint8Array[] = [];
+            let totalBytes = 0;
+            let lastReportTime = Date.now();
+
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+                if (value) {
+                    resetIdleTimer();
+                    chunks.push(value);
+                    totalBytes += value.length;
+                    const now = Date.now();
+                    if (onProgress && (now - lastReportTime > 2000)) {
+                        lastReportTime = now;
+                        onProgress(totalBytes);
+                    }
+                }
+            }
+
+            if (onProgress) {
+                onProgress(totalBytes);
+            }
+
+            return Buffer.concat(chunks);
+        } finally {
+            if (idleTimer) clearTimeout(idleTimer);
+            clearTimeout(maxTimer);
         }
-        const arrayBuf = await res.arrayBuffer();
-        return Buffer.from(arrayBuf);
     }
 
     async getLatestCommit(owner: string, repo: string, branch: string = 'main'): Promise<{ sha: string; message: string; author: string }> {
@@ -425,6 +491,138 @@ export class GitHubClient {
             return false;
         }
     }
+
+    /**
+     * Fetches the entire repository tree recursively in a single GitHub API call
+     */
+    async getRepoTree(
+        owner: string,
+        repo: string,
+        branch: string = 'main'
+    ): Promise<{ path: string; mode: string; type: 'blob' | 'tree'; size?: number; sha: string }[]> {
+        const url = `https://api.github.com/repos/${owner}/${repo}/git/trees/${encodeURIComponent(branch)}?recursive=1`;
+        let res = await fetch(url, { headers: this.headers });
+        if (!res.ok && (branch === 'main' || branch === 'master')) {
+            const altBranch = branch === 'main' ? 'master' : 'main';
+            const altUrl = `https://api.github.com/repos/${owner}/${repo}/git/trees/${encodeURIComponent(altBranch)}?recursive=1`;
+            const altRes = await fetch(altUrl, { headers: this.headers });
+            if (altRes.ok) {
+                res = altRes;
+            }
+        }
+        if (!res.ok) {
+            throw new Error(`GitHub API error fetching repo tree (${res.status}): ${await res.text()}`);
+        }
+        const data = await res.json();
+        return data.tree || [];
+    }
+
+    /**
+     * Posts a commit status check to GitHub (like Vercel Deployment status)
+     */
+    async createCommitStatus(
+        owner: string,
+        repo: string,
+        sha: string,
+        params: {
+            state: 'pending' | 'success' | 'failure' | 'error';
+            target_url?: string;
+            description: string;
+            context?: string;
+        }
+    ): Promise<boolean> {
+        try {
+            const res = await fetch(`https://api.github.com/repos/${owner}/${repo}/statuses/${sha}`, {
+                method: 'POST',
+                headers: this.headers,
+                body: JSON.stringify({
+                    state: params.state,
+                    target_url: params.target_url,
+                    description: params.description.slice(0, 140),
+                    context: params.context || 'Fluxbase'
+                })
+            });
+            return res.ok;
+        } catch (e) {
+            logger.warn('Failed to post GitHub commit status:', e);
+            return false;
+        }
+    }
+
+    /**
+     * Posts or updates a preview bot comment on a pull request
+     */
+    async postOrUpdatePRComment(
+        owner: string,
+        repo: string,
+        pullNumber: number,
+        commentBody: string,
+        marker: string = '<!-- fluxbase-preview-comment -->'
+    ): Promise<boolean> {
+        try {
+            const listRes = await fetch(`https://api.github.com/repos/${owner}/${repo}/issues/${pullNumber}/comments?per_page=50`, {
+                headers: this.headers
+            });
+            if (!listRes.ok) return false;
+            const comments = await listRes.json();
+            const existing = Array.isArray(comments) ? comments.find((c: any) => c.body && c.body.includes(marker)) : null;
+
+            const body = `${marker}\n${commentBody}`;
+
+            if (existing) {
+                const updateRes = await fetch(`https://api.github.com/repos/${owner}/${repo}/issues/comments/${existing.id}`, {
+                    method: 'PATCH',
+                    headers: this.headers,
+                    body: JSON.stringify({ body })
+                });
+                return updateRes.ok;
+            } else {
+                const createRes = await fetch(`https://api.github.com/repos/${owner}/${repo}/issues/${pullNumber}/comments`, {
+                    method: 'POST',
+                    headers: this.headers,
+                    body: JSON.stringify({ body })
+                });
+                return createRes.ok;
+            }
+        } catch (e) {
+            logger.warn('Failed to post or update PR comment:', e);
+            return false;
+        }
+    }
 }
+
+/**
+ * Fetches public repository tree even without OAuth user token
+ */
+export async function fetchPublicRepoTree(
+    owner: string,
+    repo: string,
+    branch: string = 'main',
+    token?: string
+): Promise<{ path: string; mode: string; type: 'blob' | 'tree'; size?: number; sha: string }[]> {
+    const headers: Record<string, string> = {
+        Accept: 'application/vnd.github.v3+json',
+        'User-Agent': 'Fluxbase-Cloud',
+    };
+    if (token) {
+        headers.Authorization = `Bearer ${token}`;
+    }
+    const url = `https://api.github.com/repos/${owner}/${repo}/git/trees/${encodeURIComponent(branch)}?recursive=1`;
+    let res = await fetch(url, { headers });
+    if (!res.ok && (branch === 'main' || branch === 'master')) {
+        const altBranch = branch === 'main' ? 'master' : 'main';
+        const altUrl = `https://api.github.com/repos/${owner}/${repo}/git/trees/${encodeURIComponent(altBranch)}?recursive=1`;
+        const altRes = await fetch(altUrl, { headers });
+        if (altRes.ok) {
+            res = altRes;
+        }
+    }
+    if (!res.ok) {
+        throw new Error(`GitHub API error (${res.status}): ${await res.text()}`);
+    }
+    const data = await res.json();
+    return data.tree || [];
+}
+
 
 
