@@ -848,22 +848,18 @@ export async function executeProjectBuild(params: {
             log('[Cache Hit] Dependencies are unchanged from previous deployment. Skipping package install (0.02s).');
             await flushLogsToDb('building');
         } else if (effectiveInstallCmd) {
-            // Check if package-lock.json exists for ultra-fast deterministic install (Vercel parity: 20-30s)
-            const hasLockfile = existsSync(path.join(buildDir, 'package-lock.json'));
-            if (hasLockfile && effectiveInstallCmd.startsWith('npm install')) {
-                effectiveInstallCmd = 'npm ci --prefer-offline --no-audit --no-fund';
-            } else if (effectiveInstallCmd.startsWith('npm install') && !effectiveInstallCmd.includes('--legacy-peer-deps')) {
-                effectiveInstallCmd = effectiveInstallCmd.replace('npm install', 'npm install --legacy-peer-deps --include=dev --no-audit --no-fund --prefer-offline');
+            // Ensure all npm installations use legacy-peer-deps and devDependencies to avoid peer dependency conflicts
+            if (effectiveInstallCmd.startsWith('npm install') || effectiveInstallCmd.startsWith('npm ci')) {
+                effectiveInstallCmd = 'npm install --legacy-peer-deps --include=dev --no-audit --no-fund --prefer-offline';
             }
             log(`Running install: ${effectiveInstallCmd}`);
             await flushLogsToDb('building');
             try {
-                // If attempting strict npm ci, use a tight 2-min timeout so peer-conflict hangs quickly fall back to --legacy-peer-deps
-                const initialTimeout = effectiveInstallCmd.includes('npm ci') ? 120000 : 600000;
+                // Generous 10-minute timeout for large dependency trees
                 await runStreamingCommand(effectiveInstallCmd, {
                     cwd: buildDir,
                     env: installEnv,
-                    timeoutMs: initialTimeout,
+                    timeoutMs: 600000,
                     onLog: logStream,
                     deployId
                 });
@@ -877,37 +873,38 @@ export async function executeProjectBuild(params: {
                     throw new Error('Deployment canceled by user');
                 }
                 log(`Install notice: ${instErr.message}`);
-                // Universal retry: whether it was npm ci, timeout, or any other install failure,
-                // attempt a clean npm install with maximum timeout as a last resort
+                // Resilient fallback retry: clean node_modules and retry with extended 15-minute timeout
                 const isTimeout = instErr.message?.includes('timed out');
-                const canRetry = effectiveInstallCmd.includes('npm ci') || effectiveInstallCmd.includes('yarn') || effectiveInstallCmd.includes('pnpm') || isTimeout;
-                if (canRetry) {
-                    const retryCmd = 'npm install --legacy-peer-deps --include=dev --no-audit --no-fund --prefer-offline';
-                    log(`Retrying with fallback: ${retryCmd}${isTimeout ? ' (extended timeout: 15 min)' : ''}...`);
-                    await flushLogsToDb('building');
-                    try {
-                        // Delete any partial node_modules from the failed attempt
-                        const nodeModulesPath = path.join(buildDir, 'node_modules');
-                        if (existsSync(nodeModulesPath)) {
+                const retryCmd = 'npm install --legacy-peer-deps --include=dev --no-audit --no-fund --prefer-offline';
+                log(`Retrying with clean install: ${retryCmd}${isTimeout ? ' (extended timeout: 15 min)' : ''}...`);
+                await flushLogsToDb('building');
+                try {
+                    // Windows-safe directory cleanup: wait for OS file handles to release, then move/remove
+                    const nodeModulesPath = path.join(buildDir, 'node_modules');
+                    if (existsSync(nodeModulesPath)) {
+                        await new Promise(r => setTimeout(r, 1500));
+                        const stalePath = path.join(buildDir, `node_modules_stale_${Date.now()}`);
+                        try {
+                            await fs.rename(nodeModulesPath, stalePath);
+                            fs.rm(stalePath, { recursive: true, force: true }).catch(() => {});
+                        } catch {
                             await fs.rm(nodeModulesPath, { recursive: true, force: true }).catch(() => {});
                         }
-                        await runStreamingCommand(retryCmd, {
-                            cwd: buildDir,
-                            env: installEnv,
-                            timeoutMs: isTimeout ? 900000 : 600000,
-                            onLog: logStream,
-                            deployId
-                        });
-                        log('Dependencies resolved with fallback install.');
-                        if (currentHash) {
-                            await fs.writeFile(hashFilePath, currentHash).catch(() => {});
-                        }
-                        await flushLogsToDb();
-                    } catch (fallbackErr: any) {
-                        throw new Error(`Failed to install dependencies: ${fallbackErr.message}`);
                     }
-                } else {
-                    throw new Error(`Failed to install dependencies: ${instErr.message}`);
+                    await runStreamingCommand(retryCmd, {
+                        cwd: buildDir,
+                        env: installEnv,
+                        timeoutMs: 900000,
+                        onLog: logStream,
+                        deployId
+                    });
+                    log('Dependencies resolved with fallback install.');
+                    if (currentHash) {
+                        await fs.writeFile(hashFilePath, currentHash).catch(() => {});
+                    }
+                    await flushLogsToDb();
+                } catch (fallbackErr: any) {
+                    throw new Error(`Failed to install dependencies: ${fallbackErr.message}`);
                 }
             }
         }
