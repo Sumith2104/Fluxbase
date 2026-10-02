@@ -99,23 +99,29 @@ export async function findAvailablePort(startPort = 3200, endPort = 3900): Promi
 /**
  * Waits for a server on a given port to become responsive via HTTP
  */
-export async function waitForPortReady(port: number, timeoutMs = 35000): Promise<boolean> {
+export async function waitForPortReady(port: number, timeoutMs = 45000): Promise<boolean> {
     const startTime = Date.now();
     while (Date.now() - startTime < timeoutMs) {
-        const isUp = await new Promise<boolean>((resolve) => {
-            const req = http.get(`http://127.0.0.1:${port}/`, { timeout: 1500 }, (res) => {
-                res.resume();
-                resolve(true); // Any HTTP response (200, 308, 404) means server is listening!
+        // First check TCP socket readiness
+        const tcpUp = await isPortListening(port, 300);
+        if (tcpUp) {
+            // Test HTTP response with generous timeout to accommodate cold compilations
+            const httpUp = await new Promise<boolean>((resolve) => {
+                const req = http.get(`http://127.0.0.1:${port}/`, { timeout: 4000 }, (res) => {
+                    res.resume();
+                    resolve(true); // Any HTTP response (200, 308, 404) means server is listening!
+                });
+                req.on('error', () => resolve(false));
+                req.on('timeout', () => {
+                    req.destroy();
+                    // Even if HTTP request timed out during cold route compilation, TCP socket is open and listening
+                    resolve(true);
+                });
             });
-            req.on('error', () => resolve(false));
-            req.on('timeout', () => {
-                req.destroy();
-                resolve(false);
-            });
-        });
 
-        if (isUp) return true;
-        await new Promise(r => setTimeout(r, 400));
+            if (httpUp) return true;
+        }
+        await new Promise(r => setTimeout(r, 500));
     }
     return false;
 }
