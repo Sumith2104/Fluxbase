@@ -514,7 +514,18 @@ export async function executeProjectBuild(params: {
         if (!effectiveOutDir || effectiveOutDir === 'dist') {
             effectiveOutDir = 'out';
         }
-        if (!effectiveBuildCmd) {
+        // Always prefer npm run build when package.json contains a build script
+        const pkgFile = files.find(f => f.path === 'package.json' || f.path.endsWith('/package.json'));
+        let hasBuildScript = false;
+        if (pkgFile) {
+            try {
+                const pj = JSON.parse(pkgFile.buffer.toString('utf8'));
+                hasBuildScript = !!(pj.scripts && pj.scripts.build);
+            } catch {}
+        }
+        if (hasBuildScript) {
+            effectiveBuildCmd = 'npm run build';
+        } else if (!effectiveBuildCmd) {
             effectiveBuildCmd = 'npm run build';
         }
     }
@@ -583,6 +594,18 @@ export async function executeProjectBuild(params: {
     delete installEnv.__NEXT_PROCESSED_ENV;
     delete installEnv.__NEXT_PRIVATE_PREBUNDLED_REACT;
     delete installEnv.__NEXT_STRICT_NEXT_HEAD;
+
+    // Critical: Strip all parent Next.js internal/standalone server variables to prevent child builds from inheriting host config
+    // Specifically, __NEXT_PRIVATE_STANDALONE_CONFIG contains the parent app's serialized next.config which causes child Next builds to crash with [TypeError: generate is not a function]
+    for (const k of Object.keys(installEnv)) {
+        if (k.startsWith('__NEXT_') || (k.startsWith('NEXT_') && !k.startsWith('NEXT_PUBLIC_') && k !== 'NEXT_TELEMETRY_DISABLED')) {
+            delete installEnv[k];
+        }
+    }
+    delete installEnv.PORT;
+    delete installEnv.HOSTNAME;
+    delete installEnv.NEXT_DEPLOYMENT_ID;
+    installEnv.PWD = buildDir;
 
     // Decrypt and defensively validate all environment variables (especially URLs)
     const { decryptEnvValue } = await import('@/lib/hosting-env');
@@ -817,31 +840,32 @@ export async function executeProjectBuild(params: {
                         const hasOutput = content.includes("output:") || content.includes("output :");
                         const needsOutput = !hasOutput;
 
-                        const enhancements = needsOutput && needsImageOpt ? buildEnhancements
-                            : needsOutput ? `\n  output: '${targetOutput}',`
-                            : needsImageOpt ? `\n  images: { unoptimized: true },\n  typescript: { ignoreBuildErrors: true },\n  eslint: { ignoreDuringBuilds: true },`
-                            : null;
+                        if (needsImageOpt && /images\s*:\s*\{/.test(content)) {
+                            content = content.replace(/images\s*:\s*\{/, 'images: {\n    unoptimized: true,');
+                        }
 
-                        if (enhancements) {
-                            const configPatterns = [
-                                /(const|let|var)\s+\w+(?:\s*:\s*[A-Za-z0-9_<>.]+)?\s*=\s*\{/,
-                                /module\.exports\s*=\s*\{/,
-                                /export\s+default\s*\{/,
-                                /defineConfig\s*\(\s*\{/,
-                                /nextConfig\s*=\s*\{/
-                            ];
-                            let injected = false;
-                            for (const pattern of configPatterns) {
-                                if (pattern.test(content)) {
-                                    content = content.replace(pattern, (match) => `${match}${enhancements}`);
-                                    injected = true;
-                                    break;
-                                }
+                        const imageSnippet = needsImageOpt && !content.includes('images') ? `\n  images: { unoptimized: true },` : '';
+                        const outputSnippet = needsOutput ? `\n  output: '${targetOutput}',` : '';
+                        const enhancements = `${outputSnippet}${imageSnippet}\n  typescript: { ignoreBuildErrors: true },\n  eslint: { ignoreDuringBuilds: true },`;
+
+                        const configPatterns = [
+                            /(const|let|var)\s+\w+(?:\s*:\s*[A-Za-z0-9_<>.]+)?\s*=\s*\{/,
+                            /module\.exports\s*=\s*\{/,
+                            /export\s+default\s*\{/,
+                            /defineConfig\s*\(\s*\{/,
+                            /nextConfig\s*=\s*\{/
+                        ];
+                        let injected = false;
+                        for (const pattern of configPatterns) {
+                            if (pattern.test(content)) {
+                                content = content.replace(pattern, (match) => `${match}${enhancements}`);
+                                injected = true;
+                                break;
                             }
-                            if (injected) {
-                                await fs.writeFile(cfgPath, content);
-                                log(`Injected build optimizations into ${cfg}${needsOutput ? ` (+ output: ${targetOutput})` : ''}`);
-                            }
+                        }
+                        if (injected) {
+                            await fs.writeFile(cfgPath, content);
+                            log(`Injected build optimizations into ${cfg}${needsOutput ? ` (+ output: ${targetOutput})` : ''}`);
                         } else if (targetOutput === 'standalone' && /output:\s*['"]standalone['"]/.test(content)) {
                             await fs.writeFile(cfgPath, content);
                         }
@@ -859,66 +883,8 @@ export async function executeProjectBuild(params: {
             }
         }
 
-        // Vercel-Style Persistent Dependency Cache (node_modules) & Build Cache (.next/cache)
-        const siteCacheDir = path.join(os.tmpdir(), 'fluxbase-site-cache', params.siteId || 'default');
-        const cachedNodeModules = path.join(siteCacheDir, 'node_modules');
-        const cachedNextCache = path.join(siteCacheDir, '.next-cache');
-        const hashFilePath = path.join(siteCacheDir, 'deps-fingerprint.txt');
-        await fs.mkdir(siteCacheDir, { recursive: true }).catch(() => {});
-
-        // Compute fingerprint of lockfiles & package.json
-        const lockFiles = files.filter(f => 
-            f.path === 'package.json' || 
-            f.path === 'package-lock.json' || 
-            f.path === 'yarn.lock' || 
-            f.path === 'pnpm-lock.yaml' || 
-            f.path === 'bun.lockb'
-        );
-        let currentHash = '';
-        if (lockFiles.length > 0) {
-            const h = crypto.createHash('sha256');
-            for (const lf of lockFiles.sort((a, b) => a.path.localeCompare(b.path))) {
-                h.update(lf.path).update(lf.buffer);
-            }
-            currentHash = h.digest('hex');
-        }
-
-        let prevHash = '';
-        if (existsSync(hashFilePath)) {
-            try {
-                prevHash = (await fs.readFile(hashFilePath, 'utf8')).trim();
-            } catch {}
-        }
-
-        // Link persistent node_modules cache into sandbox build workspace
-        const destNodeModules = path.join(buildDir, 'node_modules');
-        let hasWarmNodeModules = false;
-        try {
-            await fs.mkdir(cachedNodeModules, { recursive: true });
-            const cachedBin = path.join(cachedNodeModules, '.bin');
-            if (existsSync(cachedBin)) {
-                if (!existsSync(destNodeModules)) {
-                    await fs.symlink(cachedNodeModules, destNodeModules, 'junction');
-                    hasWarmNodeModules = true;
-                } else {
-                    hasWarmNodeModules = true;
-                }
-            } else {
-                // Incomplete cache: clear it so clean install recreates binaries
-                await fs.rm(cachedNodeModules, { recursive: true, force: true }).catch(() => {});
-                await fs.mkdir(cachedNodeModules, { recursive: true }).catch(() => {});
-            }
-        } catch (symErr) {
-            logger.warn('Failed to link cached node_modules:', symErr);
-        }
-
-        const isDepsCacheHit = !!(currentHash && prevHash && currentHash === prevHash && hasWarmNodeModules);
-
         // Execute install command with full devDependencies available
-        if (isDepsCacheHit) {
-            log('[Cache Hit] Dependencies are unchanged from previous deployment. Skipping package install (0.02s).');
-            await flushLogsToDb('building');
-        } else if (effectiveInstallCmd) {
+        if (effectiveInstallCmd) {
             // Ensure all npm installations use legacy-peer-deps and devDependencies to avoid peer dependency conflicts
             if (effectiveInstallCmd.startsWith('npm install') || effectiveInstallCmd.startsWith('npm ci')) {
                 effectiveInstallCmd = 'npm install --legacy-peer-deps --include=dev --no-audit --no-fund --prefer-offline';
@@ -935,9 +901,6 @@ export async function executeProjectBuild(params: {
                     deployId
                 });
                 log('Dependencies resolved successfully.');
-                if (currentHash) {
-                    await fs.writeFile(hashFilePath, currentHash).catch(() => {});
-                }
                 await flushLogsToDb();
             } catch (instErr: any) {
                 if (activeBuildJobs.get(deployId)?.isCanceled) {
@@ -970,9 +933,6 @@ export async function executeProjectBuild(params: {
                         deployId
                     });
                     log('Dependencies resolved with fallback install.');
-                    if (currentHash) {
-                        await fs.writeFile(hashFilePath, currentHash).catch(() => {});
-                    }
                     await flushLogsToDb();
                 } catch (fallbackErr: any) {
                     throw new Error(`Failed to install dependencies: ${fallbackErr.message}`);
@@ -995,21 +955,6 @@ export async function executeProjectBuild(params: {
                 onLog: logStream,
                 deployId
             }).catch(() => {});
-        }
-
-        // Link persistent Next.js build cache (.next/cache) for instant incremental rebuilds
-        if (detected.framework === 'next' || detected.framework === 'nextjs') {
-            const buildNextCache = path.join(buildDir, '.next', 'cache');
-            try {
-                await fs.mkdir(cachedNextCache, { recursive: true });
-                await fs.mkdir(path.dirname(buildNextCache), { recursive: true });
-                if (!existsSync(buildNextCache)) {
-                    await fs.symlink(cachedNextCache, buildNextCache, 'junction');
-                    log('[Next.js Cache] Restored incremental build cache (.next/cache).');
-                }
-            } catch (cErr: any) {
-                logger.warn('Failed to link Next.js build cache:', cErr);
-            }
         }
 
         // Execute build command with NODE_ENV=production
@@ -1061,15 +1006,12 @@ export async function executeProjectBuild(params: {
                         l.includes('missing "generateStaticParams()"') ||
                         l.includes('Dynamic server usage') ||
                         l.includes('getServerSideProps is not supported with output: export') ||
-                        l.includes('generate is not a function') ||
-                        l.includes('TypeError: generate is not a function') ||
                         l.includes('Server Actions are not supported with static export') ||
                         l.includes('Server Actions are not supported with export') ||
                         l.includes('Server actions are not supported') ||
                         l.includes('Page with `getServerSideProps` can not be exported') ||
                         l.includes('could not be statically exported')
                     ) || (buildErr?.message && (
-                        buildErr.message.includes('generate is not a function') ||
                         buildErr.message.includes('Server Actions are not supported') ||
                         buildErr.message.includes('output: export')
                     ));
