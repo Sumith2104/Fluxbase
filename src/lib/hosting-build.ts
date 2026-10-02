@@ -684,54 +684,117 @@ export async function executeProjectBuild(params: {
             await fs.writeFile(path.join(buildDir, '.env'), envContent);
         }
 
-        // For Next.js projects: Ensure static optimizations and server detection
+        // For Next.js projects: Comprehensive full-stack server detection and standalone optimization
         if (detected.framework === 'next' || detected.framework === 'nextjs') {
             log('Configuring Next.js build optimizations...');
 
-            // Detect whether this project uses server-side features that are incompatible with `output: 'export'`
-            const hasApiRoutes = files.some(f =>
-                f.path.includes('/api/') && (f.path.endsWith('/route.ts') || f.path.endsWith('/route.js'))
-            );
-            const hasMiddleware = files.some(f =>
-                f.path === 'middleware.ts' || f.path === 'middleware.js' ||
-                f.path === 'src/middleware.ts' || f.path === 'src/middleware.js'
-            );
+            // 1. Detect API Routes across App Router and Pages Router (handling Windows backslashes)
+            const hasApiRoutes = files.some(f => {
+                const p = f.path.replace(/\\/g, '/').toLowerCase();
+                return (
+                    ((p.includes('/api/') || p.startsWith('api/')) && 
+                     (p.endsWith('/route.ts') || p.endsWith('/route.js') || p.endsWith('/route.tsx') || p.endsWith('/route.jsx') || p.endsWith('/route.mjs'))) ||
+                    p.includes('pages/api/') || p.startsWith('pages/api/')
+                );
+            });
+
+            // 2. Detect Middleware
+            const hasMiddleware = files.some(f => {
+                const p = f.path.replace(/\\/g, '/');
+                return p === 'middleware.ts' || p === 'middleware.js' ||
+                       p === 'src/middleware.ts' || p === 'src/middleware.js';
+            });
+
+            // 3. Detect Server Actions ('use server') across all code files (WITHOUT byte truncation)
             const hasServerActions = files.some(f => {
-                if (!f.path.endsWith('.ts') && !f.path.endsWith('.tsx') && !f.path.endsWith('.js') && !f.path.endsWith('.jsx')) return false;
+                const p = f.path.replace(/\\/g, '/');
+                if (!/\.(tsx?|jsx?|mjs|cjs)$/i.test(p)) return false;
                 try {
-                    const content = f.buffer.toString('utf8').slice(0, 500);
-                    return content.includes("'use server'") || content.includes('"use server"');
+                    const text = f.buffer.toString('utf8');
+                    return text.includes("'use server'") || text.includes('"use server"') || text.includes('`use server`');
                 } catch { return false; }
             });
-            // Check if config already has output set to something (e.g. 'standalone')
-            let existingConfigHasOutput = false;
+
+            // 4. Detect dynamic Next.js Server Components, headers, cookies, or SSR methods
+            const hasDynamicServerFeatures = files.some(f => {
+                const p = f.path.replace(/\\/g, '/');
+                if (!/\.(tsx?|jsx?|mjs|cjs)$/i.test(p)) return false;
+                try {
+                    const text = f.buffer.toString('utf8');
+                    return (
+                        text.includes('next/headers') ||
+                        text.includes('getServerSideProps') ||
+                        text.includes('getInitialProps') ||
+                        text.includes("dynamic = 'force-dynamic'") ||
+                        text.includes('dynamic = "force-dynamic"') ||
+                        text.includes('revalidate = 0')
+                    );
+                } catch { return false; }
+            });
+
+            // 5. Detect Backend / Database dependencies in package.json
+            let hasBackendDependencies = false;
+            const pkgFile = files.find(f => f.path.replace(/\\/g, '/') === 'package.json');
+            if (pkgFile) {
+                try {
+                    const pkgJson = JSON.parse(pkgFile.buffer.toString('utf8'));
+                    const allDeps = {
+                        ...(pkgJson.dependencies || {}),
+                        ...(pkgJson.devDependencies || {})
+                    };
+                    const backendPkgs = [
+                        'pg', 'mysql', 'mysql2', '@prisma/client', 'prisma', 'drizzle-orm',
+                        'mongodb', 'mongoose', 'sqlite3', 'better-sqlite3', 'ioredis', 'redis',
+                        'next-auth', '@auth/core', '@auth/nextjs', '@supabase/ssr',
+                        'nodemailer', 'stripe', 'express', 'fastify', 'koa', '@fluxbase/sdk',
+                        'jsonwebtoken', 'bcrypt', 'bcryptjs', 'argon2', 'openai', '@ai-sdk/openai',
+                        'langchain', 'bullmq', 'socket.io', 'ws'
+                    ];
+                    hasBackendDependencies = backendPkgs.some(pkg => allDeps[pkg] !== undefined);
+                } catch {}
+            }
+
+            // 6. Check existing Next.js config for output setting
+            let existingConfigExplicitExport = false;
+            let existingConfigExplicitStandalone = false;
+            let existingConfigRaw = '';
+
             for (const cfg of ['next.config.ts', 'next.config.mjs', 'next.config.js']) {
                 const cfgPath = path.join(buildDir, cfg);
                 if (existsSync(cfgPath)) {
                     try {
-                        const c = await fs.readFile(cfgPath, 'utf8');
-                        if (c.includes("output:") || c.includes("output :")) {
-                            existingConfigHasOutput = true;
+                        existingConfigRaw = await fs.readFile(cfgPath, 'utf8');
+                        if (/output:\s*['"]export['"]/.test(existingConfigRaw)) {
+                            existingConfigExplicitExport = true;
+                        }
+                        if (/output:\s*['"]standalone['"]/.test(existingConfigRaw)) {
+                            existingConfigExplicitStandalone = true;
                         }
                     } catch {}
                     break;
                 }
             }
 
-            const canUseStaticExport = !hasApiRoutes && !hasMiddleware && !hasServerActions && !existingConfigHasOutput;
+            const hasServerFeatures = hasApiRoutes || hasMiddleware || hasServerActions || hasDynamicServerFeatures || hasBackendDependencies || existingConfigExplicitStandalone;
+
+            // Only use static export if user explicitly asked for static export AND there are no conflicting server features.
+            // In all other cases (including Server Actions, API routes, database models, or default Next.js), use standalone mode!
+            const canUseStaticExport = !hasServerFeatures && existingConfigExplicitExport;
 
             if (canUseStaticExport) {
-                log('Project is compatible with static export (no API routes, middleware, or server actions detected).');
+                log('Project is configured for static export (no dynamic server actions, API routes, or backend dependencies).');
             } else {
                 const reasons: string[] = [];
+                if (hasServerActions) reasons.push('Server Actions');
                 if (hasApiRoutes) reasons.push('API routes');
                 if (hasMiddleware) reasons.push('middleware');
-                if (hasServerActions) reasons.push('server actions');
-                if (existingConfigHasOutput) reasons.push('existing output config');
-                log(`Server-side features detected (${reasons.join(', ')}). Using standard build with .next harvesting.`);
+                if (hasDynamicServerFeatures) reasons.push('Dynamic Server Components / headers');
+                if (hasBackendDependencies) reasons.push('database / backend dependencies');
+                if (existingConfigExplicitStandalone) reasons.push('explicit standalone config');
+                if (reasons.length === 0) reasons.push('full-stack default');
+                log(`Server-side features detected (${reasons.join(', ')}). Using full-stack Next.js standalone server mode (output: 'standalone').`);
             }
 
-            // Build enhancements: output:'export' for purely static, output:'standalone' for full-stack
             const targetOutput = canUseStaticExport ? 'export' : 'standalone';
             const buildEnhancements = `\n  output: '${targetOutput}',\n  images: { unoptimized: true },\n  typescript: { ignoreBuildErrors: true },\n  eslint: { ignoreDuringBuilds: true },`;
 
@@ -744,6 +807,13 @@ export async function executeProjectBuild(params: {
                     try {
                         let content = await fs.readFile(cfgPath, 'utf8');
                         const needsImageOpt = !content.includes('unoptimized: true') && !content.includes('unoptimized:true');
+
+                        // If switching to standalone mode, remove conflicting output: 'export'
+                        if (targetOutput === 'standalone' && /output:\s*['"]export['"]/.test(content)) {
+                            content = content.replace(/output:\s*['"]export['"]/g, "output: 'standalone'");
+                            log(`[Config Optimizer] Replaced output: 'export' with output: 'standalone' in ${cfg} to support Server Actions & dynamic routes.`);
+                        }
+
                         const hasOutput = content.includes("output:") || content.includes("output :");
                         const needsOutput = !hasOutput;
 
@@ -753,18 +823,17 @@ export async function executeProjectBuild(params: {
                             : null;
 
                         if (enhancements) {
-                            // Match common config patterns including defineConfig, satisfies, etc.
                             const configPatterns = [
-                                'nextConfig = {',
-                                'const nextConfig: NextConfig = {',
-                                'module.exports = {',
-                                'export default {',
-                                'defineConfig({'
+                                /(const|let|var)\s+\w+(?:\s*:\s*[A-Za-z0-9_<>.]+)?\s*=\s*\{/,
+                                /module\.exports\s*=\s*\{/,
+                                /export\s+default\s*\{/,
+                                /defineConfig\s*\(\s*\{/,
+                                /nextConfig\s*=\s*\{/
                             ];
                             let injected = false;
                             for (const pattern of configPatterns) {
-                                if (content.includes(pattern)) {
-                                    content = content.replace(pattern, `${pattern}${enhancements}`);
+                                if (pattern.test(content)) {
+                                    content = content.replace(pattern, (match) => `${match}${enhancements}`);
                                     injected = true;
                                     break;
                                 }
@@ -773,6 +842,8 @@ export async function executeProjectBuild(params: {
                                 await fs.writeFile(cfgPath, content);
                                 log(`Injected build optimizations into ${cfg}${needsOutput ? ` (+ output: ${targetOutput})` : ''}`);
                             }
+                        } else if (targetOutput === 'standalone' && /output:\s*['"]standalone['"]/.test(content)) {
+                            await fs.writeFile(cfgPath, content);
                         }
                     } catch (err: any) {
                         log(`Warning: Failed to update ${cfg}: ${err.message}`);
@@ -982,41 +1053,56 @@ export async function executeProjectBuild(params: {
                     log('Build process completed successfully via npx fallback.');
                     await flushLogsToDb();
                 } else {
-                    // Check if build failed due to output: 'export' incompatibility (e.g. dynamic server usage, missing generateStaticParams)
+                    // Check if build failed due to output: 'export' incompatibility (e.g. Server Actions, dynamic server usage, missing generateStaticParams)
                     const isExportIncompatible = logs.some(l =>
                         l.includes('output: "export"') ||
                         l.includes("output: 'export'") ||
                         l.includes('cannot be exported with "output: export"') ||
                         l.includes('missing "generateStaticParams()"') ||
                         l.includes('Dynamic server usage') ||
-                        l.includes('getServerSideProps is not supported with output: export')
-                    );
+                        l.includes('getServerSideProps is not supported with output: export') ||
+                        l.includes('generate is not a function') ||
+                        l.includes('TypeError: generate is not a function') ||
+                        l.includes('Server Actions are not supported with static export') ||
+                        l.includes('Server Actions are not supported with export') ||
+                        l.includes('Server actions are not supported') ||
+                        l.includes('Page with `getServerSideProps` can not be exported') ||
+                        l.includes('could not be statically exported')
+                    ) || (buildErr?.message && (
+                        buildErr.message.includes('generate is not a function') ||
+                        buildErr.message.includes('Server Actions are not supported') ||
+                        buildErr.message.includes('output: export')
+                    ));
 
-                if (isExportIncompatible && (detected.framework === 'next' || detected.framework === 'nextjs')) {
-                    log('Notice: Static export failed due to dynamic Next.js features. Retrying without output: export (harvesting via .next/)...');
-                    // Remove output: 'export' from any next.config
-                    for (const cfg of ['next.config.ts', 'next.config.mjs', 'next.config.js']) {
-                        const cfgPath = path.join(buildDir, cfg);
-                        if (existsSync(cfgPath)) {
-                            try {
-                                let content = await fs.readFile(cfgPath, 'utf8');
-                                content = content.replace(/output:\s*['"]export['"],?/g, '');
-                                await fs.writeFile(cfgPath, content);
-                                log(`Stripped output: 'export' from ${cfg} for fallback build`);
-                            } catch {}
-                            break;
+                    if (isExportIncompatible && (detected.framework === 'next' || detected.framework === 'nextjs')) {
+                        log('Notice: Static export failed due to dynamic Next.js features or Server Actions. Retrying with full-stack standalone mode (output: "standalone")...');
+                        // Replace output: 'export' with output: 'standalone' in next.config
+                        for (const cfg of ['next.config.ts', 'next.config.mjs', 'next.config.js']) {
+                            const cfgPath = path.join(buildDir, cfg);
+                            if (existsSync(cfgPath)) {
+                                try {
+                                    let content = await fs.readFile(cfgPath, 'utf8');
+                                    if (/output:\s*['"]export['"]/.test(content)) {
+                                        content = content.replace(/output:\s*['"]export['"]/g, "output: 'standalone'");
+                                    } else if (!content.includes("output: 'standalone'")) {
+                                        content = content.replace(/(\bnextConfig\s*=\s*\{)/, "$1\n  output: 'standalone',");
+                                    }
+                                    await fs.writeFile(cfgPath, content);
+                                    log(`Configured output: 'standalone' in ${cfg} for full-stack retry build`);
+                                } catch {}
+                                break;
+                            }
                         }
-                    }
-                    await flushLogsToDb('building');
-                    log(`Retrying build: ${effectiveBuildCmd}`);
-                    await runStreamingCommand(effectiveBuildCmd, {
-                        cwd: buildDir,
-                        env: buildEnv,
-                        timeoutMs: 600000,
-                        onLog: logStream,
-                        deployId
-                    });
-                    log('Build process completed successfully on fallback harvest mode.');
+                        await flushLogsToDb('building');
+                        log(`Retrying build with standalone output: ${effectiveBuildCmd}`);
+                        await runStreamingCommand(effectiveBuildCmd, {
+                            cwd: buildDir,
+                            env: buildEnv,
+                            timeoutMs: 600000,
+                            onLog: logStream,
+                            deployId
+                        });
+                        log('Build process completed successfully in full-stack standalone mode.');
                     } else {
                         throw buildErr;
                     }
@@ -1276,7 +1362,34 @@ export async function executeProjectBuild(params: {
                 if (entry) {
                     backendEntryScript = entry;
                 }
-                backendWorkingDir = persistentBackendDir;
+                const entryWorkingDir = backendEntryScript ? path.dirname(backendEntryScript) : persistentBackendDir;
+                backendWorkingDir = entryWorkingDir;
+
+                // If entry script is in a subdirectory (e.g. nested Next.js standalone), ensure static/public assets are linked there too
+                if (entryWorkingDir !== persistentBackendDir) {
+                    const nestedNextStatic = path.join(entryWorkingDir, '.next', 'static');
+                    const srcStatic = path.join(persistentBackendDir, '.next', 'static');
+                    if (existsSync(srcStatic) && !existsSync(nestedNextStatic)) {
+                        await fs.mkdir(path.dirname(nestedNextStatic), { recursive: true });
+                        await fs.cp(srcStatic, nestedNextStatic, { recursive: true }).catch(() => {});
+                    }
+                    const nestedPublic = path.join(entryWorkingDir, 'public');
+                    const srcPublic = path.join(persistentBackendDir, 'public');
+                    if (existsSync(srcPublic) && !existsSync(nestedPublic)) {
+                        await fs.cp(srcPublic, nestedPublic, { recursive: true }).catch(() => {});
+                    }
+                }
+
+                // Write decrypted environment variables to persistent backend for runtime access
+                const envProdContent = Object.entries(sanitizedEnvVars).map(([k, v]) => `${k}=${v}`).join('\n');
+                if (envProdContent) {
+                    await fs.writeFile(path.join(persistentBackendDir, '.env.production'), envProdContent).catch(() => {});
+                    await fs.writeFile(path.join(persistentBackendDir, '.env'), envProdContent).catch(() => {});
+                    if (entryWorkingDir !== persistentBackendDir) {
+                        await fs.writeFile(path.join(entryWorkingDir, '.env.production'), envProdContent).catch(() => {});
+                        await fs.writeFile(path.join(entryWorkingDir, '.env'), envProdContent).catch(() => {});
+                    }
+                }
 
                 // Step 4: Archive standalone bundle and upload to S3 for disaster recovery & multi-server support
                 log('[Server Engine] Packaging standalone server bundle for cloud persistence...');
@@ -1300,23 +1413,25 @@ export async function executeProjectBuild(params: {
                     log(`[Server Engine Warning] Could not upload standalone archive to S3: ${s3ArchiveErr?.message}`);
                 }
 
+                // Node backend was generated, mark fullstack true
+                isFullstack = true;
+
                 const { startBackendProcess } = await import('@/lib/hosting-runner');
                 log('[Server Engine] Spawning persistent background service with auto-recovery...');
                 const runnerRes = await startBackendProcess({
                     siteId,
                     deployId,
                     subdomain: siteSubdomain,
-                    standaloneDir: persistentBackendDir,
+                    standaloneDir: entryWorkingDir,
                     entryScript: backendEntryScript,
-                    envVars,
+                    envVars: sanitizedEnvVars,
                     logStream: log
                 });
                 if (runnerRes.success) {
-                    isFullstack = true;
                     backendPort = runnerRes.port;
                     log(`[Server Engine] Persistent service is LIVE on port ${runnerRes.port}!`);
                 } else {
-                    log(`[Server Engine Notice] Service launcher: ${runnerRes.error}`);
+                    log(`[Server Engine Notice] Service launcher: ${runnerRes.error}. Standalone server registered and will auto-boot on first HTTP request.`);
                 }
             } catch (runnerErr: any) {
                 log(`[Server Engine Warning] Could not spawn persistent service: ${runnerErr?.message}`);

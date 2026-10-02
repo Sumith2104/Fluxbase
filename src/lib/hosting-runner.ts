@@ -99,7 +99,7 @@ export async function findAvailablePort(startPort = 3200, endPort = 3900): Promi
 /**
  * Waits for a server on a given port to become responsive via HTTP
  */
-export async function waitForPortReady(port: number, timeoutMs = 25000): Promise<boolean> {
+export async function waitForPortReady(port: number, timeoutMs = 35000): Promise<boolean> {
     const startTime = Date.now();
     while (Date.now() - startTime < timeoutMs) {
         const isUp = await new Promise<boolean>((resolve) => {
@@ -118,6 +118,28 @@ export async function waitForPortReady(port: number, timeoutMs = 25000): Promise
         await new Promise(r => setTimeout(r, 400));
     }
     return false;
+}
+
+/**
+ * Recursively searches a directory for server entry files (server.js, index.js, app.js)
+ */
+function findEntryRecursive(currentDir: string, depth = 0, maxDepth = 4): string | null {
+    if (depth > maxDepth || !fs.existsSync(currentDir)) return null;
+    try {
+        const entries = fs.readdirSync(currentDir, { withFileTypes: true });
+        for (const target of ['server.js', 'index.js', 'app.js', 'main.js']) {
+            if (entries.some(e => e.isFile() && e.name === target)) {
+                return path.join(currentDir, target);
+            }
+        }
+        for (const entry of entries) {
+            if (entry.isDirectory() && entry.name !== 'node_modules' && entry.name !== '.git' && entry.name !== 'cache') {
+                const found = findEntryRecursive(path.join(currentDir, entry.name), depth + 1, maxDepth);
+                if (found) return found;
+            }
+        }
+    } catch {}
+    return null;
 }
 
 /**
@@ -145,7 +167,10 @@ export function locateBackendEntryScript(dir: string): string | null {
         } catch {}
     }
 
-    return possibleEntries.find(p => fs.existsSync(p)) || null;
+    const immediate = possibleEntries.find(p => fs.existsSync(p));
+    if (immediate) return immediate;
+
+    return findEntryRecursive(dir);
 }
 
 /**

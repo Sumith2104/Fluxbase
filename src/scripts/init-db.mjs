@@ -206,12 +206,28 @@ async function initDb() {
                 ai_models_enabled BOOLEAN DEFAULT false,
                 ai_models_quota   INTEGER DEFAULT 1000,
 
+                backend_port      INTEGER,
+                backend_pid       INTEGER,
+                backend_status    VARCHAR(50) DEFAULT 'stopped',
+                is_fullstack      BOOLEAN DEFAULT false,
+                deployment_type   VARCHAR(50) DEFAULT 'static',
+                backend_entry_script TEXT,
+                backend_working_dir TEXT,
+
                 status          VARCHAR(20) DEFAULT 'active',
                 created_at      TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
                 updated_at      TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
 
                 UNIQUE (project_id)
             );
+
+            ALTER TABLE fluxbase_global.hosting_sites ADD COLUMN IF NOT EXISTS backend_port INTEGER;
+            ALTER TABLE fluxbase_global.hosting_sites ADD COLUMN IF NOT EXISTS backend_pid INTEGER;
+            ALTER TABLE fluxbase_global.hosting_sites ADD COLUMN IF NOT EXISTS backend_status VARCHAR(50) DEFAULT 'stopped';
+            ALTER TABLE fluxbase_global.hosting_sites ADD COLUMN IF NOT EXISTS is_fullstack BOOLEAN DEFAULT false;
+            ALTER TABLE fluxbase_global.hosting_sites ADD COLUMN IF NOT EXISTS deployment_type VARCHAR(50) DEFAULT 'static';
+            ALTER TABLE fluxbase_global.hosting_sites ADD COLUMN IF NOT EXISTS backend_entry_script TEXT;
+            ALTER TABLE fluxbase_global.hosting_sites ADD COLUMN IF NOT EXISTS backend_working_dir TEXT;
 
             CREATE INDEX IF NOT EXISTS idx_hosting_sites_subdomain ON fluxbase_global.hosting_sites(subdomain);
             CREATE INDEX IF NOT EXISTS idx_hosting_sites_custom_domain ON fluxbase_global.hosting_sites(custom_domain) WHERE custom_domain IS NOT NULL;
@@ -238,6 +254,9 @@ async function initDb() {
                 total_size_bytes BIGINT DEFAULT 0,
                 entry_file      VARCHAR(255) DEFAULT 'index.html',
 
+                standalone_s3_key TEXT,
+                is_fullstack    BOOLEAN DEFAULT false,
+
                 status          VARCHAR(20) DEFAULT 'uploading',
                 error_message   TEXT,
 
@@ -249,6 +268,9 @@ async function initDb() {
 
                 preview_url     TEXT
             );
+
+            ALTER TABLE fluxbase_global.hosting_deployments ADD COLUMN IF NOT EXISTS standalone_s3_key TEXT;
+            ALTER TABLE fluxbase_global.hosting_deployments ADD COLUMN IF NOT EXISTS is_fullstack BOOLEAN DEFAULT false;
 
             CREATE INDEX IF NOT EXISTS idx_hosting_deploys_site ON fluxbase_global.hosting_deployments(site_id, created_at DESC);
             CREATE INDEX IF NOT EXISTS idx_hosting_deploys_status ON fluxbase_global.hosting_deployments(status);

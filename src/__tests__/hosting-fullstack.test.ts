@@ -77,6 +77,18 @@ describe('Fullstack Hosting Engine', () => {
             }
         });
 
+        it('finds server.js recursively inside nested subfolder of standalone directory', () => {
+            const testDir = path.join(os.tmpdir(), `fluxbase-test-entry-nested-${Date.now()}`);
+            try {
+                fs.mkdirSync(path.join(testDir, 'standalone', 'apps', 'web'), { recursive: true });
+                fs.writeFileSync(path.join(testDir, 'standalone', 'apps', 'web', 'server.js'), '// nested server');
+                const script = locateBackendEntryScript(testDir);
+                expect(script).toBe(path.join(testDir, 'standalone', 'apps', 'web', 'server.js'));
+            } finally {
+                fs.rmSync(testDir, { recursive: true, force: true });
+            }
+        });
+
         it('returns null when no valid node.js entrypoint exists', () => {
             const testDir = path.join(os.tmpdir(), `fluxbase-test-entry-none-${Date.now()}`);
             try {

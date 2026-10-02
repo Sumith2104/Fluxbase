@@ -537,17 +537,17 @@ export async function createDeployment(params: {
                     );
                 }
 
-                if (buildRes.isFullstack && buildRes.backendPort) {
+                if (buildRes.isFullstack) {
                     await pool.query(
                         `UPDATE fluxbase_global.hosting_sites 
-                         SET backend_port = $1, 
+                         SET backend_port = COALESCE($1, backend_port), 
                              backend_status = $2, 
                              is_fullstack = true,
                              deployment_type = 'fullstack',
                              backend_entry_script = COALESCE($3, backend_entry_script),
                              backend_working_dir = COALESCE($4, backend_working_dir)
                          WHERE site_id = $5`,
-                        [buildRes.backendPort, 'running', buildRes.backendEntryScript || null, buildRes.backendWorkingDir || null, siteId]
+                        [buildRes.backendPort || null, buildRes.backendPort ? 'running' : 'starting', buildRes.backendEntryScript || null, buildRes.backendWorkingDir || null, siteId]
                     );
                 }
             } catch (bErr: any) {
@@ -1035,17 +1035,17 @@ export async function executeGitHubDeployment(params: ExecuteGitHubDeploymentPar
                 await pool.query('UPDATE fluxbase_global.hosting_sites SET framework = $1 WHERE site_id = $2', [buildRes.framework, site.site_id]);
             }
 
-            if (buildRes.isFullstack && buildRes.backendPort) {
+            if (buildRes.isFullstack) {
                 await pool.query(
                     `UPDATE fluxbase_global.hosting_sites 
-                     SET backend_port = $1, 
+                     SET backend_port = COALESCE($1, backend_port), 
                          backend_status = $2, 
                          is_fullstack = true,
                          deployment_type = 'fullstack',
                          backend_entry_script = COALESCE($3, backend_entry_script),
                          backend_working_dir = COALESCE($4, backend_working_dir)
                      WHERE site_id = $5`,
-                    [buildRes.backendPort, 'running', buildRes.backendEntryScript || null, buildRes.backendWorkingDir || null, site.site_id]
+                    [buildRes.backendPort || null, buildRes.backendPort ? 'running' : 'starting', buildRes.backendEntryScript || null, buildRes.backendWorkingDir || null, site.site_id]
                 );
             }
 
