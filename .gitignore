@@ -93,5 +93,18 @@ scratch_*.txt
 scratch_*.mjs
 scratch_*.js
 
+# Agent & GSD tooling
+.agent/
+.gemini/
+.gsd/
+adapters/
+GSD-STYLE.md
+PROJECT_RULES.md
+VERSION
+model_capabilities.yaml
+scripts/search_repo.*
+scripts/setup_search.*
+scripts/validate-*
+
 # End
 
