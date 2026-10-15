@@ -304,7 +304,7 @@ export default function WebhooksPage() {
                                         {log.error && <p className="text-xs text-red-400 mt-0.5">{log.error}</p>}
                                     </div>
                                     <div className="flex items-center gap-2 shrink-0">
-                                        <span className="text-[10px] text-muted-foreground/55">{new Date(log.createdAt).toLocaleTimeString()}</span>
+                                        <span className="text-[10px] text-muted-foreground/55">{new Date(log.createdAt).toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true })} IST</span>
                                         {!log.success && (
                                             <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-foreground"
                                                 onClick={() => handleRetry(log.id)} disabled={retrying === log.id} id={`retry-${log.id}`}>

@@ -251,7 +251,7 @@ export default function DashboardPage() {
                                                         </Badge>
                                                     </TableCell>
                                                     <TableCell className="text-muted-foreground">{table.description}</TableCell>
-                                                    <TableCell>{new Date(table.created_at).toLocaleDateString()}</TableCell>
+                                                    <TableCell>{new Date(table.created_at).toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata', day: '2-digit', month: 'short', year: 'numeric' })}</TableCell>
                                                     <TableCell>
                                                         <Button asChild variant="outline" size="sm">
                                                             <Link href={`/editor?projectId=${selectedProject.project_id}&tableId=${table.table_id}&tableName=${table.table_name}`}>

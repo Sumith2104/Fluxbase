@@ -70,7 +70,7 @@ async function initDb() {
                 user_id VARCHAR(128) NOT NULL REFERENCES fluxbase_global.users(id) ON DELETE CASCADE,
                 display_name VARCHAR(255) NOT NULL,
                 dialect VARCHAR(50) DEFAULT 'mysql',
-                timezone VARCHAR(100) DEFAULT 'UTC',
+                timezone VARCHAR(100) DEFAULT 'Asia/Kolkata',
                 ai_allow_destructive BOOLEAN DEFAULT false,
                 ai_schema_inference BOOLEAN DEFAULT true,
                 created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP

@@ -42,7 +42,7 @@ export function SparklineCard({
         return {
             ...d,
             val,
-            timeLabel: d?.timeLabel || date.toLocaleTimeString([], { hour: 'numeric', hour12: true })
+            timeLabel: d?.timeLabel || date.toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata', hour: 'numeric', hour12: true })
         };
     });
 

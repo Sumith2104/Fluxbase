@@ -366,7 +366,7 @@ export default function WhatsAppChatInterface() {
 
                     {/* Messages */}
                     {messages.map((msg) => {
-                        const timeStr = new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                        const timeStr = new Date(msg.timestamp).toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit', hour12: true });
                         return (
                             <div
                                 key={msg.id}
@@ -491,7 +491,7 @@ export default function WhatsAppChatInterface() {
                                                 <div className="flex justify-between text-[#8696a0]">
                                                     <span className="text-[#25d366] font-bold">TYPE: {pkt.type.toUpperCase()}</span>
                                                     <span>FROM: {pkt.sender}</span>
-                                                    <span>{new Date(pkt.timestamp).toLocaleTimeString()}</span>
+                                                    <span>{new Date(pkt.timestamp).toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true })} IST</span>
                                                 </div>
                                                 {pkt.ciphertext && (
                                                     <div className="text-amber-300 break-all mt-1">

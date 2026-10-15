@@ -228,7 +228,7 @@ export async function POST(req: Request) {
         }
 
         const projectContext = activeProject
-            ? `\nPROJECT: "${activeProject.display_name || ''}" (ID: ${activeProject.project_id}) | Dialect: ${activeProject.dialect || 'postgresql'} | TZ: ${activeProject.timezone || 'UTC'}\n`
+            ? `\nPROJECT: "${activeProject.display_name || ''}" (ID: ${activeProject.project_id}) | Dialect: ${activeProject.dialect || 'postgresql'} | TZ: ${activeProject.timezone || 'Asia/Kolkata'}\n`
             : '\nNo active project. Ask user to select/create one first for SQL operations.\n';
 
         let screenContextStr = '';

@@ -225,7 +225,7 @@ export async function getRealtimeHistoryAction(projectId: string) {
         for (let i = 0; i < minutesList.length; i++) {
             const time = minutesList[i];
             const date = new Date(time);
-            const timeLabel = date.toLocaleTimeString([], { hour12: false, hour: '2-digit', minute: '2-digit' });
+            const timeLabel = date.toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata', hour12: false, hour: '2-digit', minute: '2-digit' });
 
             let apiVal = parseInt((redisValues[i * 2] as string) || '0', 10);
             let sqlVal = parseInt((redisValues[i * 2 + 1] as string) || '0', 10);
@@ -431,7 +431,7 @@ export async function getProjectHistoryAction(projectId: string) {
             for (let i = 29; i >= 0; i--) {
                 const d = new Date(Date.UTC(nowDate.getUTCFullYear(), nowDate.getUTCMonth(), nowDate.getUTCDate() - i));
                 const key = d.toISOString().slice(0, 10);
-                const label = d.toLocaleDateString('en-US', { timeZone: 'UTC', month: 'short', day: 'numeric' });
+                const label = d.toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata', month: 'short', day: 'numeric' });
                 totalHistoryArr.push({
                     val: dayMap.get(key) || 0,
                     timeLabel: label

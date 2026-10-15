@@ -23,7 +23,7 @@ export function TimezoneSelector() {
             return Intl.supportedValuesOf('timeZone');
         } catch {
             // Fallback list if Intl.supportedValuesOf is not supported
-            return ['UTC', 'America/New_York', 'Europe/London', 'Asia/Kolkata', 'Asia/Tokyo', 'Australia/Sydney'];
+            return ['Asia/Kolkata', 'UTC', 'America/New_York', 'Europe/London', 'Asia/Tokyo', 'Australia/Sydney'];
         }
     }, []);
 
@@ -54,7 +54,7 @@ export function TimezoneSelector() {
 
     return (
         <div className="hidden sm:flex items-center shrink-0">
-            <Select value={project.timezone || ''} onValueChange={handleTimezoneChange}>
+            <Select value={project.timezone || 'Asia/Kolkata'} onValueChange={handleTimezoneChange}>
                 <SelectTrigger className="h-6 gap-1 px-2 py-0 text-xs border bg-secondary/30 hover:bg-secondary/50 w-auto font-normal opacity-80 focus:ring-0 rounded-full !outline-none shrink-0 whitespace-nowrap">
                     <Globe className="h-3 w-3 shrink-0" />
                     <SelectValue placeholder="Select timezone" />

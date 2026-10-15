@@ -237,7 +237,7 @@ export default function ApiKeysPage() {
                                             </div>
                                             <div className="flex flex-wrap items-center gap-4 text-[10px] text-muted-foreground">
                                                 <code className="text-muted-foreground/55 bg-secondary/70 px-1.5 py-0.5 rounded font-mono border border-border/60">{key.preview}</code>
-                                                <span className="flex items-center gap-1"><Calendar className="h-3 w-3" />{new Date(key.createdAt).toLocaleDateString()}</span>
+                                                <span className="flex items-center gap-1"><Calendar className="h-3 w-3" />{new Date(key.createdAt).toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata', day: '2-digit', month: 'short', year: 'numeric' })}</span>
                                                 {key.lastUsedAt ? (
                                                     <span className="flex items-center gap-1 text-emerald-500/80"><Clock className="h-3 w-3" />Active {formatDistanceToNow(new Date(key.lastUsedAt), { addSuffix: true })}</span>
                                                 ) : (

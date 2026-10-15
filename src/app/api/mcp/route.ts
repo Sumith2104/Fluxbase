@@ -211,7 +211,7 @@ export async function POST(req: NextRequest) {
           projectName,
           description,
           dialect,
-          'UTC',
+          'Asia/Kolkata',
           'internal',
           {},
           userRole,

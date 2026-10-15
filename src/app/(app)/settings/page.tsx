@@ -49,8 +49,8 @@ import { ThemeToggleCard } from '@/components/settings/theme-toggle-card';
 import { cn } from "@/lib/utils";
 
 const COMMON_TIMEZONES = [
+    { value: 'Asia/Kolkata', label: 'Asia/Kolkata (IST, Indian Standard Time +05:30)' },
     { value: 'UTC', label: 'UTC (Coordinated Universal Time)' },
-    { value: 'Asia/Kolkata', label: 'Asia/Kolkata (IST, +05:30)' },
     { value: 'America/New_York', label: 'America/New_York (EST/EDT, -05:00/-04:00)' },
     { value: 'America/Chicago', label: 'America/Chicago (CST/CDT, -06:00/-05:00)' },
     { value: 'America/Denver', label: 'America/Denver (MST/MDT, -07:00/-06:00)' },
@@ -98,7 +98,7 @@ export default function GeneralSettingsPage() {
     const [deleteAckChecked, setDeleteAckChecked] = useState(false);
     const [isDeletingProject, setIsDeletingProject] = useState(false);
 
-    const [timezone, setTimezone] = useState(selectedProject?.timezone || 'UTC');
+    const [timezone, setTimezone] = useState(selectedProject?.timezone || 'Asia/Kolkata');
     const [savingTimezone, setSavingTimezone] = useState(false);
 
     const queryClient = useQueryClient();
@@ -174,7 +174,7 @@ export default function GeneralSettingsPage() {
 
     useEffect(() => {
         if (selectedProject) {
-            setTimezone(selectedProject.timezone || 'UTC');
+            setTimezone(selectedProject.timezone || 'Asia/Kolkata');
         }
     }, [selectedProject]);
 

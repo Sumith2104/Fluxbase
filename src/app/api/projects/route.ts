@@ -39,7 +39,7 @@ export async function POST(req: Request) {
         const body = await req.json().catch(() => ({}));
         const projectName = body.projectName || body.name || body.display_name;
         const dialect = (body.dialect === 'mysql' ? 'mysql' : 'postgresql');
-        const timezone = body.timezone || 'UTC';
+        const timezone = body.timezone || 'Asia/Kolkata';
         const description = body.description || 'Created via Fluxbase API / MCP';
         const connectionType = body.connectionType || 'internal';
         const connectionConfig = body.connectionConfig || {};

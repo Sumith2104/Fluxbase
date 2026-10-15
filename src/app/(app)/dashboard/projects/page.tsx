@@ -24,7 +24,7 @@ import { createProjectAction, checkGitHubConnectionAction, disconnectGitHubActio
 import { createApiKeyAction } from '@/app/(app)/settings/api-key-actions';
 import { getUserPlanAction } from '@/app/(app)/settings/billing-actions';
 
-const timezones = Intl.supportedValuesOf ? Intl.supportedValuesOf('timeZone') : ['UTC', 'America/New_York', 'Europe/London', 'Asia/Kolkata', 'Asia/Tokyo'];
+const timezones = Intl.supportedValuesOf ? Intl.supportedValuesOf('timeZone') : ['Asia/Kolkata', 'UTC', 'America/New_York', 'Europe/London', 'Asia/Tokyo'];
 
 type UserRoleOption = 'student' | 'employee' | 'org_owner';
 type BillingOption = 'monthly' | 'pay_as_you_go' | 'hybrid';
@@ -85,7 +85,7 @@ export default function SelectProjectPage() {
 
   // Project Creation Form State
   const [projectName, setProjectName] = useState('');
-  const [selectedTimezone, setSelectedTimezone] = useState(Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC');
+  const [selectedTimezone, setSelectedTimezone] = useState('Asia/Kolkata');
   const [selectedRole, setSelectedRole] = useState<UserRoleOption | null>(null);
   const [billingPreference, setBillingPreference] = useState<BillingOption>('monthly');
   const [companyName, setCompanyName] = useState('');
@@ -122,7 +122,7 @@ export default function SelectProjectPage() {
   // Import configuration states
   const [importProjectName, setImportProjectName] = useState('');
   const [importDialect, setImportDialect] = useState<'postgresql' | 'mysql'>('postgresql');
-  const [importTimezone, setImportTimezone] = useState(Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC');
+  const [importTimezone, setImportTimezone] = useState('Asia/Kolkata');
   const [importRole, setImportRole] = useState<UserRoleOption | null>(resolveRoleFromPlan(currentPlan));
   const [studentPlan, setStudentPlan] = useState<'free' | 'pro' | 'max'>(resolveStudentPlanFromPlan(currentPlan));
   const [importBillingPreference, setImportBillingPreference] = useState<BillingOption>('monthly');
@@ -423,7 +423,7 @@ export default function SelectProjectPage() {
             const formData = new FormData();
             formData.append('projectName', projData.projectName);
             formData.append('dialect', projData.dialect);
-            formData.append('timezone', projData.timezone || 'UTC');
+            formData.append('timezone', projData.timezone || 'Asia/Kolkata');
             formData.append('userRole', projData.userRole || planData.role || 'employee');
             formData.append('billingPreference', projData.billingPreference || 'monthly');
             formData.append('companyName', projData.companyName || '');
@@ -717,7 +717,8 @@ export default function SelectProjectPage() {
               </div>
 
               <div className="flex items-center gap-1.5 shrink-0 text-[11px] font-mono text-muted-foreground/60">
-                <span>{new Date(project.created_at).toLocaleDateString(undefined, {
+                <span>{new Date(project.created_at).toLocaleDateString('en-IN', {
+                  timeZone: 'Asia/Kolkata',
                   month: 'short',
                   day: 'numeric',
                   year: 'numeric'

@@ -143,7 +143,7 @@ export async function POST(req: Request) {
             await client.query('BEGIN');
 
             const now = rawTimestamp ? new Date(rawTimestamp) : new Date();
-            const dayName = now.toLocaleDateString('en-US', { weekday: 'long' });
+            const dayName = now.toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata', weekday: 'long' });
             const paymentDate = now.toISOString().split('T')[0];
             const paymentTime = now.toTimeString().split(' ')[0];
 
@@ -348,7 +348,7 @@ export async function POST(req: Request) {
                             projName,
                             pData.workDescription || 'Provisioned upon payment confirmation',
                             pData.dialect || 'postgresql',
-                            pData.timezone || 'UTC',
+                            pData.timezone || 'Asia/Kolkata',
                             'internal',
                             {},
                             pData.userRole || matchedPlanType,

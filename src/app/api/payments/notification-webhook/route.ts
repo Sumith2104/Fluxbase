@@ -113,7 +113,7 @@ export async function POST(req: NextRequest) {
             try {
                 await client.query('BEGIN');
                 const now = new Date();
-                const dayName = now.toLocaleDateString('en-US', { weekday: 'long' });
+                const dayName = now.toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata', weekday: 'long' });
                 const paymentDate = now.toISOString().split('T')[0];
                 const paymentTime = now.toTimeString().split(' ')[0];
                 const sourceChannel = app.toLowerCase().includes('sms') ? 'sms' : 'mobile_notification';
@@ -312,7 +312,7 @@ export async function POST(req: NextRequest) {
                             projName,
                             pData.workDescription || 'Provisioned upon payment confirmation',
                             pData.dialect || 'postgresql',
-                            pData.timezone || 'UTC',
+                            pData.timezone || 'Asia/Kolkata',
                             'internal',
                             {},
                             pData.userRole || planType,

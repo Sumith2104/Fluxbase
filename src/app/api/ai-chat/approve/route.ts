@@ -74,7 +74,7 @@ export async function POST(req: Request) {
                 projectName,
                 'Created via Flux AI agent',
                 dialect,
-                'UTC',
+                'Asia/Kolkata',
                 'internal',
                 {},
                 'employee',

@@ -850,7 +850,8 @@ export default function StoragePage() {
                                                                 {formatBytes(file.size)}
                                                             </td>
                                                             <td className="px-3 py-2.5 text-muted-foreground font-mono text-[11px]">
-                                                                {new Date(file.created_at).toLocaleDateString(undefined, {
+                                                                {new Date(file.created_at).toLocaleDateString('en-IN', {
+                                                                    timeZone: 'Asia/Kolkata',
                                                                     day: 'numeric',
                                                                     month: 'short',
                                                                     year: 'numeric'

@@ -2042,7 +2042,7 @@ export default function HostingPage() {
                                         )}
                                     </div>
                                     <span className="text-xs text-muted-foreground">
-                                        {site.prod_deployed_at ? new Date(site.prod_deployed_at).toLocaleString() : 'No deployment yet'}
+                                        {site.prod_deployed_at ? new Date(site.prod_deployed_at).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', dateStyle: 'medium', timeStyle: 'short' }) + ' IST' : 'No deployment yet'}
                                     </span>
                                 </div>
                                 <CardTitle className="text-base font-semibold mt-2 flex items-center justify-between">
@@ -2436,7 +2436,7 @@ export default function HostingPage() {
                                                             <div className="flex items-center gap-2 text-[11px] text-muted-foreground mt-1">
                                                                 <span>Branch: <span className="font-mono text-foreground">{repo.default_branch || 'main'}</span></span>
                                                                 <span>•</span>
-                                                                <span>Updated {new Date(repo.updated_at).toLocaleDateString()}</span>
+                                                                <span>Updated {new Date(repo.updated_at).toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata', month: 'short', day: 'numeric', year: 'numeric' })}</span>
                                                             </div>
                                                         </div>
 

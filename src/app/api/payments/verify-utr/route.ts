@@ -151,7 +151,7 @@ export async function POST(req: Request) {
                             pData.projectName || 'My Project',
                             pData.workDescription || 'Provisioned upon payment confirmation',
                             pData.dialect || 'postgresql',
-                            pData.timezone || 'UTC',
+                            pData.timezone || 'Asia/Kolkata',
                             'internal',
                             {},
                             pData.userRole || targetPlan,

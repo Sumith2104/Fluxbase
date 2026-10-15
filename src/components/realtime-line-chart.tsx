@@ -59,7 +59,7 @@ export function RealtimeLineChart({ projectId, stats: propStats }: RealtimeLineC
             const date = new Date(time);
             initialData.push({
                 timestamp: time,
-                timeLabel: date.toLocaleTimeString([], { hour12: false, hour: '2-digit', minute: '2-digit' }),
+                timeLabel: date.toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata', hour12: false, hour: '2-digit', minute: '2-digit' }),
                 requests: 0,
                 api: 0,
                 sql: 0,
@@ -126,7 +126,7 @@ export function RealtimeLineChart({ projectId, stats: propStats }: RealtimeLineC
                 newData.shift();
                 newData.push({
                     timestamp: now,
-                    timeLabel: date.toLocaleTimeString([], { hour12: false, minute: '2-digit', second: '2-digit' }),
+                    timeLabel: date.toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata', hour12: false, minute: '2-digit', second: '2-digit' }),
                     requests: deltaReq,
                     api: deltaA,
                     sql: deltaS,

@@ -107,7 +107,7 @@ export async function POST(req: NextRequest) {
               pData.projectName.trim(),
               pData.workDescription || 'Provisioned upon payment confirmation',
               pData.dialect || 'postgresql',
-              pData.timezone || 'UTC',
+              pData.timezone || 'Asia/Kolkata',
               'internal',
               {},
               pData.userRole || userPlan,

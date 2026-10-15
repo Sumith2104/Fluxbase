@@ -126,7 +126,7 @@ export async function getBillingDetailsAction(showTestPayments: boolean = false)
                     amount: amt,
                     plan: label,
                     status: r.status || 'paid',
-                    date: new Date(r.createdAt).toLocaleDateString(),
+                    date: new Date(r.createdAt).toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata', day: '2-digit', month: 'short', year: 'numeric' }),
                     transactionId: r.paymentId || `TXN_${r.id}`
                 };
             });

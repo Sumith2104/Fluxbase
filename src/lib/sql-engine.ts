@@ -394,7 +394,7 @@ export class SqlEngine {
                     const sessionParams = [
                         `"${schemaName}", public`, 
                         this.userId || '', 
-                        this.projectTimezone || 'UTC', 
+                        this.projectTimezone || 'Asia/Kolkata', 
                         claimsJson
                     ];
                     

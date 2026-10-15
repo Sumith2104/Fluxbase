@@ -37,7 +37,7 @@ export async function POST(request: NextRequest) {
             modulePath = 'fluxbase',
             projectName,
             dialect = 'postgresql',
-            timezone = 'UTC',
+            timezone = 'Asia/Kolkata',
             userRole,
             billingPreference = 'monthly'
         } = body;

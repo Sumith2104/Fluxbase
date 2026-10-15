@@ -76,7 +76,7 @@ export function McpApprovalModal() {
                     </div>
                     <div className="flex justify-between">
                         <span className="text-muted-foreground font-medium">Requested At:</span>
-                        <span className="text-muted-foreground">{new Date(currentReq.requestedAt).toLocaleTimeString()}</span>
+                        <span className="text-muted-foreground">{new Date(currentReq.requestedAt).toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true })} IST</span>
                     </div>
                 </div>
 
