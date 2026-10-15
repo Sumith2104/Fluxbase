@@ -125,6 +125,29 @@ export default function RootLayout({
         <script
           dangerouslySetInnerHTML={{
             __html: `
+              (function() {
+                function genUUID() {
+                  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+                    var r = Math.random() * 16 | 0, v = c === 'x' ? r : (r & 0x3 | 0x8);
+                    return v.toString(16);
+                  });
+                }
+                try {
+                  if (typeof window !== 'undefined') {
+                    if (!window.crypto) window.crypto = {};
+                    if (typeof window.crypto.randomUUID !== 'function') {
+                      window.crypto.randomUUID = genUUID;
+                    }
+                    if (typeof Crypto !== 'undefined' && Crypto.prototype && typeof Crypto.prototype.randomUUID !== 'function') {
+                      Object.defineProperty(Crypto.prototype, 'randomUUID', {
+                        value: genUUID,
+                        writable: true,
+                        configurable: true
+                      });
+                    }
+                  }
+                } catch(e) {}
+              })();
               if (typeof navigator !== 'undefined' && navigator.userAgent.includes('FluxbaseDesktop')) {
                 const style = document.createElement('style');
                 style.innerHTML = \`

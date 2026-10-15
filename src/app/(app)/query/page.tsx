@@ -204,8 +204,11 @@ export default function QueryPage() {
 
   const addToHistory = useCallback((queryStr: string, success: boolean) => {
     if (!project?.project_id) return;
+    const uuid = typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+      ? crypto.randomUUID()
+      : 'hist_' + Math.random().toString(36).substring(2) + Date.now().toString(36);
     const newItem: HistoryItem = {
-      id: crypto.randomUUID(),
+      id: uuid,
       query: queryStr,
       timestamp: Date.now(),
       success

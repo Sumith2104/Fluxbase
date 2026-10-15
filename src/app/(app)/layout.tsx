@@ -280,7 +280,7 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
         // [STABILITY FIX]: Removed client-side redirect to root.
         // Middleware handles this before page load. Removing this prevents the infinite "ping-pong" redirect loop
         // that occurs when the client state is briefly null during hydration.
-        if (!userLoading && !userId && !isOffline && !pathname.startsWith('/ai-models') && !pathname.startsWith('/models')) {
+        if (!userLoading && !userId && !isOffline) {
             router.push('/');
             return;
         }
@@ -431,7 +431,7 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
         );
     }
 
-    if (!isLoading && !userId && !pathname.startsWith('/login') && !pathname.startsWith('/signup') && !pathname.startsWith('/ai-models') && !pathname.startsWith('/models')) {
+    if (!isLoading && !userId && !pathname.startsWith('/login') && !pathname.startsWith('/signup')) {
         return <div className="flex items-center justify-center h-screen">Redirecting to login...</div>;
     }
 
