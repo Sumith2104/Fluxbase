@@ -112,9 +112,9 @@ export async function POST(req: Request) {
         const {
             content,
             badge_text = 'Maintenance',
-            bg_color = '#FFFFFF',
-            text_color = '#000000',
-            badge_color = '#696969',
+            bg_color = '#dc2626',
+            text_color = '#ffffff',
+            badge_color = '#991b1b',
             start_time = null,
             end_time = null,
             is_active = true,

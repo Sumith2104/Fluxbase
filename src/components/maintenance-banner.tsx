@@ -145,7 +145,7 @@ export function MaintenanceBanner() {
 
   const bgColor = banner.bg_color || '#dc2626';
   const textColor = banner.text_color || '#ffffff';
-  const badgeColor = banner.badge_color || 'rgba(0, 0, 0, 0.25)';
+  const badgeColor = banner.badge_color || '#991b1b';
   const badgeText = banner.badge_text || 'Maintenance';
 
   return (
