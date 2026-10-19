@@ -192,8 +192,8 @@ export async function sendPasswordlessOtpAction(formData: FormData) {
     const headersList = await headers();
     const host = headersList.get('x-forwarded-host') || headersList.get('host') || 'localhost:3000';
     const proto = headersList.get('x-forwarded-proto') || (host.includes('localhost') ? 'http' : 'https');
-    const detectedOrigin = `${proto}://${host}`;
-    const baseUrl = detectedOrigin || process.env.NEXT_PUBLIC_APP_URL || 'https://www.fluxbasedb.me';
+    const isLocal = host.includes('localhost') || host.includes('127.0.0.1');
+    const baseUrl = isLocal ? `${proto}://${host}` : (process.env.NEXT_PUBLIC_APP_URL || 'https://fluxbasedb.me');
     const magicLink = `${baseUrl}/api/auth/magic-login?token=${token}&email=${encodeURIComponent(email)}`;
 
     // 5. Send Branded Email

@@ -297,8 +297,10 @@ export async function sendMagicLoginEmail(to: string, name: string, otp: string,
                 <p style="color: #e4e4e7; font-size: 15px; margin: 0 0 16px 0; font-weight: 500;">Or sign in with 1-click:</p>
                 <a href="${magicLink}" class="btn">Sign In Instantly</a>
             </div>
-            <p style="color: #a1a1aa; font-size: 13px; margin: 0 0 8px 0;">If the button above doesn't work, copy and paste this secure link:</p>
-            <p style="color: #ff8224; font-size: 12px; word-break: break-all; margin: 0;"><a href="${magicLink}" style="color: #ff8224; text-decoration: underline;">${magicLink}</a></p>
+            <p style="color: #a1a1aa; font-size: 13px; margin: 0 0 8px 0;">If the button above doesn't open, copy and paste this secure link directly into your browser:</p>
+            <div style="background: rgba(255, 130, 36, 0.08); border: 1px dashed rgba(255, 130, 36, 0.3); border-radius: 8px; padding: 12px 14px; margin: 0; text-align: left; word-break: break-all;">
+                <span style="color: #ff8224; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 12px; line-height: 1.5; user-select: all;">${magicLink}</span>
+            </div>
         `
     });
 
